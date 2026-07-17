@@ -1,0 +1,8 @@
+.env
+py-env/
+conda-env/
+tmp/
+session.db
+data/*.db
+poetry.lock
+__pycache__

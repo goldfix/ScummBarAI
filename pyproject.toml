@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "ScummBarAI"
+version = "0.1.0"
+description = "Multi-bot chat powered by Google ADK and Gemini"
+authors = [
+    "goldfix@users.noreply.github.com",
+]
+maintainers = [
+    "goldfix@users.noreply.github.com",
+]
+readme = "README.md"
+homepage = "https://github.com/goldfix/ScummBarAI"
+repository = "https://github.com/goldfix/ScummBarAI"
+documentation = "https://github.com/goldfix/ScummBarAI"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+python-dotenv = "^1.2.2"
+google-adk = {version = "^2.4.0", extras = ["db"]}
+greenlet = "*"
+litellm = "*"
+orjson = "*"
+aiohttp = "^3.11.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
