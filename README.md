@@ -41,6 +41,10 @@ Google ADK 2.x.0  ·  Python 3.12  ·  Gemini / DeepSeek  ·  SQLite  ·  Telegr
 
 ⚠️ **Work in progress** — il progetto è in attivo sviluppo. Le cose cambiano, si rompono e si aggiustano.
 
+### Una nota
+
+L'intero progetto — codice, architettura, documentazione — è stato realizzato con il supporto attivo della **Generative AI** (Claude di Anthropic), usata come assistente di sviluppo lungo tutto il percorso. Anche questo è parte dello studio.
+
 ---
 
 ## 🇬🇧 English
@@ -79,6 +83,10 @@ Google ADK 2.x.0  ·  Python 3.12  ·  Gemini / DeepSeek  ·  SQLite  ·  Telegr
 ### Status
 
 ⚠️ **Work in progress** — the project is in active development. Things change, break, and get fixed.
+
+### A note
+
+The entire project — code, architecture, documentation — was built with the active support of **Generative AI** (Claude by Anthropic), used as a development assistant throughout the process. That too is part of the study.
 
 ---
 
