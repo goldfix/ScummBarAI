@@ -11,8 +11,8 @@ if [[ "$1" == "init_py" ]] ; then
     deactivate || true
     ${PY} -m venv --clear ${SCRIPT_DIR}/py-env
     source ${SCRIPT_DIR}/py-env/bin/activate
-    ${PY} -m pip install --no-cache-dir --upgrade pip
-    ${PY} -m pip install --no-cache-dir -r ${SCRIPT_DIR}/requirements.txt
+    ${PY} -m pip install --upgrade pip
+    ${PY} -m pip install -r ${SCRIPT_DIR}/requirements.txt
     DEV=""
 fi
 
@@ -25,7 +25,7 @@ fi
 
 
 if [[ "$1" == "init_conda" || "$1" == "init_py" ]] ; then
-    poetry install --no-cache --directory=${SCRIPT_DIR} ${DEV}
+    poetry install --directory=${SCRIPT_DIR} ${DEV}
     poetry env info -C ${SCRIPT_DIR}
 
     if [ -f "${SCRIPT_DIR}/py_var.sh" ]; then

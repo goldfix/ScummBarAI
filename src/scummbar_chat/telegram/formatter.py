@@ -13,7 +13,7 @@ import re
 # Inline markdown tokens: captures either *text* or _text_ blocks
 _INLINE_MD = re.compile(r'(\*[^*\n]+\*|_[^_\n]+_)')
 
-# Full line check for environment atmosphere: matches if a line is solely wrapped in underscores
+# Improved full-line check for environment atmosphere: matches if a line is solely wrapped in underscores
 _FULL_LINE_MD = re.compile(r'^\s*_\s*(.+?)\s*_\s*$', re.DOTALL)
 
 def format_response(text: str) -> str:

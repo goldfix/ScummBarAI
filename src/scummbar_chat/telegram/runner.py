@@ -14,16 +14,24 @@ from datetime import datetime, timedelta
 
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
+from google.adk.apps.app import App, EventsCompactionConfig
+from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
+from google.adk.models import Gemini
 from google.genai import types
 
 from ..agent import root_agent
-from ..utils import SESSION_DB_URI
+# Import the new configuration parameters from utilities
+from ..utils import (
+    SESSION_DB_URI,
+    COMPACTION_MODEL,
+    COMPACTION_INTERVAL,
+    COMPACTION_OVERLAP
+)
 
 log = logging.getLogger(__name__)
 
 APP_NAME = "scummbar_chat"
 
-# Singleton structures: shared globally across the module execution lifespan
 _session_service: DatabaseSessionService | None = None
 _runner: Runner | None = None
 
@@ -66,12 +74,36 @@ def _get_runner() -> Runner:
     global _session_service, _runner
     if _runner is None:
         _session_service = DatabaseSessionService(db_url=SESSION_DB_URI)
+
+        # 1. Inizializziamo esplicitamente il modello LLM
+        compaction_summarizer = LlmEventSummarizer(
+            llm=Gemini(model=COMPACTION_MODEL)
+        )
+
+        # 2. Creiamo la configurazione di compattazione
+        compaction_config = EventsCompactionConfig(
+            compaction_interval=COMPACTION_INTERVAL,
+            overlap_size=COMPACTION_OVERLAP,
+            summarizer=compaction_summarizer
+        )
+
+        # 3. Creiamo esplicitamente l'oggetto App (che ospita il root_agent e la configurazione!)
+        scummbar_app = App(
+            name=APP_NAME,
+            root_agent=root_agent,
+            events_compaction_config=compaction_config
+        )
+
+        # 4. Passiamo l'App al Runner al posto dei parametri separati
         _runner = Runner(
-            agent=root_agent,
-            app_name=APP_NAME,
+            app=scummbar_app,
             session_service=_session_service,
         )
-        log.info("ADK Runner initialized (DatabaseSessionService)")
+
+        log.info(
+            "ADK Runner initialized (Model: %s, Interval: %d, Overlap: %d)",
+            COMPACTION_MODEL, COMPACTION_INTERVAL, COMPACTION_OVERLAP
+        )
     return _runner
 
 async def _ensure_session(user_id: str, session_id: str) -> None:

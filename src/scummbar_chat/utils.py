@@ -50,6 +50,15 @@ BOTS_DIR = CHAT_DIR / "bots"
 _DB_PATH = CHAT_DIR.parent.parent / "data" / "sessions.db"
 SESSION_DB_URI: str = f"sqlite+aiosqlite:///{_DB_PATH}"
 
+# --- Context Compaction configuration ---
+# The model dedicated to running background summarization tasks
+COMPACTION_MODEL: str = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")
+
+# Number of completed events required to trigger the compaction process
+COMPACTION_INTERVAL: int = int(os.getenv("COMPACTION_INTERVAL", "30"))
+
+# Number of trailing events retained as an active narrative overlap layer
+COMPACTION_OVERLAP: int = int(os.getenv("COMPACTION_OVERLAP", "2"))
 
 def load_md(path: pathlib.Path) -> str:
     """Load a markdown file and return the cleaned text."""
