@@ -91,7 +91,7 @@ async def _send_message(
                 return False
             return True
     except Exception as e:
-        log.error("Errore sendMessage: %s", e)
+        log.error("Error in sendMessage: %s", e)
         return False
 
 def _detect_bot(text: str) -> str | None:
