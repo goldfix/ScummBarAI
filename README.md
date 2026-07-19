@@ -59,12 +59,12 @@ bash py_env.sh active
 Configure `src/scummbar_chat/.env`:
 
 ```env
-# Google Cloud (for Gemini on Vertex AI)
+# Google Cloud (for Gemini on Vertex AI + context compaction)
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=global
 GOOGLE_GENAI_USE_VERTEXAI=True
 
-# Model selection
+# Model selection — change this one line to switch providers
 # Gemini:   LLM_MODEL=gemini-3.5-flash
 # DeepSeek: LLM_MODEL=deepseek/deepseek-v4-flash
 LLM_MODEL=gemini-3.5-flash
@@ -73,6 +73,11 @@ LLM_THINKING_LEVEL=medium
 # DeepSeek (optional — only if using DeepSeek models)
 DEEPSEEK_API_KEY=your-api-key-here
 DEEPSEEK_REASONING_EFFORT=high
+
+# Context compaction — default Gemini (requires ADC); can use DeepSeek with DEEPSEEK_API_KEY
+COMPACTION_MODEL=gemini-3.5-flash   # model used for session summarization
+COMPACTION_INTERVAL=30              # events before triggering compaction
+COMPACTION_OVERLAP=2                # events retained after compaction
 
 # Telegram (optional — only for Telegram integration)
 TELEGRAM_BOT_TOKEN=your-bot-token
@@ -144,12 +149,12 @@ Then make the bot a **group admin** (for Barnacle's ephemeral messages).
 ```
 src/scummbar_chat/
 ├── agent.py                 # Root agent (coordinator)
-├── utils.py                 # Shared config, model init, file loading
+├── utils.py                 # Model factory, shared config, file loading
 ├── time_context.py          # Real-time → bar atmosphere mapping
 ├── tools.py                 # Placeholder shared tools
 ├── .env                     # Environment configuration
 ├── world/
-│   └── scummbar.md          # World context + narration rules
+│   └── scummbar.md          # World context + narrator rules
 ├── bots/
 │   ├── barnaby/
 │   │   ├── agent.py         # Barnaby agent + SkillToolset
@@ -161,9 +166,9 @@ src/scummbar_chat/
 │   ├── grog/SKILL.md        # Dynamic grog generation
 │   └── menu/SKILL.md        # Menu: quick serve + recipes
 └── telegram/                # Telegram adapter
-    ├── adapter.py           # Long polling, @mention routing, locks
+    ├── adapter.py           # Long polling, @mention routing, locks, narrator
     ├── formatter.py         # ADK output → HTML for Telegram
-    └── runner.py            # ADK Runner + DatabaseSessionService
+    └── runner.py            # ADK Runner + compaction + session pruning
 
 telegram_bot.py              # Telegram entry point
 start.sh                     # ADK web + SQLite launcher
@@ -226,19 +231,22 @@ src/scummbar_chat/telegram/
 User: @barnaby serve me a grog
         │
         ▼ (detect @mention → bot_name = "barnaby")
-    lock[barnaby].acquire()
+    asyncio.wait_for(lock.acquire(), timeout=15s)
         │
-        ▼ (if locked → "Barnaby is busy...")
-    prepend: "[Risponde BARNABY] @barnaby serve me a grog"
+        ▼ (timeout → "Barnaby is busy...")
+    message_counter[session] += 1
+        │
+        ▼ (every 3rd message → inject Narrator prompt)
+    prepend routing hint: "[Risponde BARNABY] ..."
         │
         ▼
     ADK Runner → root_agent → barnaby_agent → response
         │
         ▼ (format response)
-    Barnaby → sendMessage(chat_id, formatted)         # public
-    Barnacle → sendMessage(chat_id, formatted,         # ephemeral
-                          receiver_user_id=user_id)
-              fallback: public with 🐱 whisper note
+    Barnaby  → sendMessage(chat_id, formatted)          # public
+    Barnacle → sendMessage(chat_id, formatted,          # ephemeral
+                           receiver_user_id=user_id)
+               fallback: public with 🐱 whisper note
 ```
 
 **Text formatting (3 levels):**
@@ -251,6 +259,9 @@ User: @barnaby serve me a grog
 
 ### Model Support
 
+Switching models = **one line** in `.env`. A factory function in `utils.py` builds the correct
+`BaseLlm` instance automatically based on the model name prefix.
+
 | `LLM_MODEL` | Provider | Notes |
 |-------------|----------|-------|
 | `gemini-3.5-flash` | Vertex AI (Gemini) | Requires ADC + enabled Vertex AI API |
@@ -258,7 +269,9 @@ User: @barnaby serve me a grog
 | `deepseek/deepseek-v4-flash` | DeepSeek via LiteLlm | Requires `DEEPSEEK_API_KEY` |
 | `deepseek/deepseek-v4-pro` | DeepSeek via LiteLlm | More powerful, slower |
 
-Switching models = changing one line in `.env`.
+> **Note:** regardless of `LLM_MODEL`, context compaction uses a dedicated model
+> (`COMPACTION_MODEL`, default `gemini-3.5-flash`). If using the default, Google ADC
+> must be configured. It can also be set to a DeepSeek model via `.env`.
 
 ### Session Persistence
 
@@ -269,6 +282,41 @@ Conversations persist across restarts via **SQLite** and `DatabaseSessionService
 ```
 
 Session mapping for Telegram: `session_id = chat_id`, `user_id = from.id`.
+
+A background task runs hourly to prune events older than 24 hours, keeping the database lean.
+
+---
+
+### Context Compaction
+
+Long conversations would eventually exceed the model's context window. To prevent this,
+the runner uses ADK's **`App` + `EventsCompactionConfig` + `LlmEventSummarizer`** to
+automatically summarize old dialogue in the background.
+
+```
+Conversation history
+  event 1  ┌───────────────┐
+  event 2  │ summarized  │─► compact summary (stored back in session)
+  ...      │ by Gemini   │
+  event 28 └───────────────┘
+  event 29 ─► kept as active overlap
+  event 30 ─► kept as active overlap  (COMPACTION_OVERLAP=2)
+```
+
+After every `COMPACTION_INTERVAL` events (default: 30), the older portion is replaced by
+a concise summary. Only the last `COMPACTION_OVERLAP` events are preserved verbatim as
+an active narrative bridge.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `COMPACTION_MODEL` | `gemini-3.5-flash` | Model for summarization (Gemini or DeepSeek) |
+| `COMPACTION_INTERVAL` | `30` | Events before triggering compaction |
+| `COMPACTION_OVERLAP` | `2` | Events kept verbatim after compaction |
+
+> `COMPACTION_MODEL` defaults to Gemini (requires Google ADC). Set it to `deepseek/...`
+> to use DeepSeek for compaction instead (requires `DEEPSEEK_API_KEY`).
+>
+> This feature uses ADK's `EventsCompactionConfig`, currently marked **experimental**.
 
 ---
 

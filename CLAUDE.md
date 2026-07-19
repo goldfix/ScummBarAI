@@ -2,12 +2,12 @@
 
 ---
 
-## 🍺 STATO DEL PROGETTO (aggiornato: 2026-07-15)
+## 🍺 STATO DEL PROGETTO (aggiornato: 2026-07-19)
 
 ### Cos'è Scummbar
 Chat interattiva multi-bot ambientata in una taverna piratesca caraibica.
 I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto).
-Sviluppato con **Google ADK 2.4.0** + **Gemini 3.5 Flash** su Vertex AI.
+Sviluppato con **Google ADK 2.4.0** + **Gemini / DeepSeek** via Vertex AI / LiteLlm.
 Integrazione Telegram: **completata** ✅.
 
 ---
@@ -24,12 +24,12 @@ scummbar/
 │   └── scummbar_chat/                 # ← progetto attivo
 │       ├── __init__.py
 │       ├── agent.py                   # root agent + InstructionProvider temporale
-│       ├── utils.py                   # config condivisa, load_md(), load_all_skills(), build_instruction()
+│       ├── utils.py                   # config condivisa, model factory (_build_model_instance), load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
 │       ├── tools.py                   # tools condivisi (placeholder)
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/
-│       │   └── scummbar.md            # world context + regole narrazione ambientale
+│       │   └── scummbar.md            # world context + regole narrazione + logica Narratore
 │       ├── bots/
 │       │   ├── __init__.py            # esporta barnaby_agent, barnacle_agent
 │       │   ├── barnaby/
@@ -45,13 +45,15 @@ scummbar/
 │       │       └── SKILL.md           # skill menu: livello 1 rapido + livello 2 ricetta
 │       └── telegram/                  # Adapter Telegram
 │           ├── __init__.py
-│           ├── adapter.py             # long polling, routing @mention, lock per bot
+│           ├── adapter.py             # long polling, routing @mention, lock+timeout, Narratore
 │           ├── formatter.py           # ADK output → HTML Telegram (3 livelli)
-│           └── runner.py              # ADK Runner + DatabaseSessionService
+│           └── runner.py              # ADK Runner + DatabaseSessionService + session pruning
 ├── data/
 │   └── sessions.db                    # SQLite persistence (creato automaticamente)
 ├── start.sh                           # avvio ADK web con persistenza SQLite
+├── py_env.sh                          # setup ambiente Python (venv + poetry)
 ├── telegram_bot.py                    # avvio bot Telegram
+├── requirements.txt                   # bootstrap: poetry + uv
 ├── pyproject.toml                     # dipendenze progetto
 ├── CLAUDE.md                          # questo file
 └── ruff.toml
@@ -63,7 +65,7 @@ scummbar/
 
 **File `.env`** (`src/scummbar_chat/.env`):
 ```env
-# Google Cloud (per Gemini)
+# Google Cloud (per Gemini + compaction)
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=global
 GOOGLE_GENAI_USE_VERTEXAI=True
@@ -77,6 +79,16 @@ LLM_THINKING_LEVEL=medium
 # DeepSeek
 DEEPSEEK_API_KEY=...                    # da platform.deepseek.com/api_keys
 DEEPSEEK_REASONING_EFFORT=high          # high | max
+
+# Context Compaction (default Gemini, requires ADC; oppure deepseek/... con DEEPSEEK_API_KEY)
+COMPACTION_MODEL=gemini-3.5-flash       # modello usato per i riassunti
+COMPACTION_INTERVAL=30                  # eventi prima di triggerare la compaction
+COMPACTION_OVERLAP=2                    # eventi di overlap mantenuti dopo la compaction
+
+# Telegram
+TELEGRAM_BOT_TOKEN=...                  # da BotFather
+TELEGRAM_BOT_USERNAME=scummbar_bot      # senza @
+TELEGRAM_GROUP_LINK=https://t.me/...   # mostrato nel redirect dai DM
 ```
 
 **Auth Google**: `gcloud auth application-default login`
@@ -93,8 +105,13 @@ greenlet                orjson       python-dotenv
 
 **Avvio**:
 ```bash
-cd /path/to/scummbar
-source py-env/bin/activate
+# Setup iniziale (prima volta)
+bash py_env.sh init_py
+
+# Attiva ambiente (ogni nuova sessione)
+bash py_env.sh active
+
+# Avvio
 ./start.sh                              # avvio con SQLite persistence
 adk web src/                            # avvio senza persistence (InMemory)
 adk web src/ --log_level DEBUG          # debug verboso
@@ -114,10 +131,57 @@ root_agent  (scummbar_chat)
     └── barnacle  → instruction = persona.md
 ```
 
-**Perché `global_instruction` è una funzione (InstructionProvider):**
-- Viene chiamata ad ogni model call → il momento del giorno è sempre aggiornato
-- La parte statica (WORLD_CONTEXT) rimane uguale tra i bot → Gemini la può cachare
-- Solo la persona cambia quando il controllo passa tra barnaby e barnacle → meno cache miss
+### 🧑‍🏫 Sistema Narratore (`scummbar.md` + `adapter.py`)
+
+Ogni **3 messaggi** nel gruppo, l'adapter inietta automaticamente una nota di sistema al bot attivo,
+chiedendogli di aggiungere una descrizione d'ambiente in corsivo alla fine della risposta.
+
+**Logica in `adapter.py`:**
+```python
+_message_counters[session_id] += 1
+if _message_counters[session_id] % 3 == 0:
+    augmented += "\n\n[NOTA DI SISTEMA: È il momento del Narratore...]"
+```
+
+**Regole del Narratore (in `scummbar.md`):**
+- Frequenza: ~ogni 3 messaggi nel canale
+- Formattazione: sempre in corsivo (`_testo_`) per distinguersi dai dialoghi
+- Stile: evocativo, sensoriale (suoni, odori, luci, azioni fisiche dei personaggi)
+- Tipologie: dettagli ambiente, azioni di Barnaby, stranezze di Barnacle
+
+---
+
+### 🔒 Lock con Timeout (`adapter.py`)
+
+Invece di attendere indefinitamente il lock, ora viene usato `asyncio.wait_for` con timeout di 15 secondi.
+Se il lock non si libera entro 15s, l'utente riceve il messaggio "è occupato".
+
+```python
+try:
+    await asyncio.wait_for(lock.acquire(), timeout=15.0)
+except asyncio.TimeoutError:
+    await _send_message(http, chat_id, _BOT_BUSY[bot_name])
+    return
+```
+
+---
+
+### 🧹 Session Pruning (`runner.py` + `adapter.py`)
+
+`runner.py` espone `purge_old_sessions(hours=24)` che rimuove eventi SQLite più vecchi di X ore.
+`adapter.py` avvia un background cron (`_session_cleaner_cron`) ogni ora al lancio del bot.
+
+```python
+# runner.py — DELETE diretta sulla tabella 'events' di ADK
+cursor.execute("DELETE FROM events WHERE timestamp < ?", (cutoff_str,))
+
+# adapter.py — cron ogni 3600s
+asyncio.create_task(_session_cleaner_cron())
+```
+
+⚠️ **Nota tecnica**: la DELETE usa lo schema interno di ADK (`events` table). Se ADK cambia
+lo schema in future versioni, la query può fallire con `sqlite3.OperationalError` — già gestita
+con try/except e log.
 
 ---
 
@@ -186,9 +250,15 @@ Cambiare modello = **una riga nel `.env`**:
 | `deepseek/deepseek-v4-flash` | DeepSeek via LiteLlm | Richiede `DEEPSEEK_API_KEY` |
 | `deepseek/deepseek-v4-pro` | DeepSeek via LiteLlm | Più potente |
 
-`utils.py` gestisce automaticamente la configurazione thinking:
-- Gemini → `GenerateContentConfig(ThinkingConfig(thinking_level=...))`
-- DeepSeek → `LiteLlm(thinking={"type":"enabled"}, reasoning_effort=...)`
+`utils.py` espone un **factory `_build_model_instance(model_name, is_main_model)`** che restituisce
+il corretto `BaseLlm` in base al prefisso del modello:
+- `deepseek/...` → `LiteLlm(thinking=enabled, reasoning_effort=high)` (solo per main model)
+- qualsiasi altro → `Gemini(model=...)`
+
+Variabili esportate:
+- `MODEL` — istanza per gli agenti (Barnaby, Barnacle, root)
+- `COMPACTION_LLM` — istanza dedicata al riassunto sessioni (default Gemini, configurabile)
+- `THINKING_CONFIG` — `GenerateContentConfig` per Gemini, `None` per DeepSeek
 
 ---
 
@@ -203,17 +273,50 @@ adk web src/ --session_service_uri "sqlite+aiosqlite:///$(pwd)/data/sessions.db"
 
 ---
 
+### 🧹 Context Compaction (`runner.py`)
+
+Per evitare che le sessioni lunghe facciano crescere il context window all'infinito,
+`runner.py` usa `App` + `EventsCompactionConfig` + `LlmEventSummarizer` di ADK.
+
+Dopo ogni `COMPACTION_INTERVAL` eventi, ADK riassume automaticamente la conversazione
+passata con un modello Gemini dedicato, mantenendo solo gli ultimi `COMPACTION_OVERLAP`
+eventi come contesto attivo.
+
+```python
+# runner.py — schema semplificato
+compaction_summarizer = LlmEventSummarizer(llm=COMPACTION_LLM)
+compaction_config = EventsCompactionConfig(
+    compaction_interval=COMPACTION_INTERVAL,  # default: 30
+    overlap_size=COMPACTION_OVERLAP,          # default: 2
+    summarizer=compaction_summarizer,
+)
+scummbar_app = App(
+    name=APP_NAME,
+    root_agent=root_agent,
+    events_compaction_config=compaction_config,
+)
+_runner = Runner(app=scummbar_app, session_service=_session_service)
+```
+
+⚠️ **Note importanti:**
+- `EventsCompactionConfig` è marcata **[EXPERIMENTAL]** da ADK — può cambiare senza preavviso
+- `COMPACTION_LLM` usa di default `gemini-3.5-flash` — richiede **Google ADC**
+- Può essere configurata su DeepSeek (`COMPACTION_MODEL=deepseek/...`) — richiede `DEEPSEEK_API_KEY`
+- I valori di default (interval=30, overlap=2) sono configurabili nel `.env`
+
+---
+
 ### 📝 File Markdown da gestire (contenuti)
 
 | File | Chi lo gestisce | Stato |
 |------|----------------|-------|
-| `world/scummbar.md` | Utente | ✅ completo |
+| `world/scummbar.md` | Utente | ✅ completo — include regole Narratore |
 | `bots/barnaby/persona.md` | Utente | ✅ completo |
 | `bots/barnacle/persona.md` | Utente | ✅ completo |
 | `skills/grog/SKILL.md` | Utente | ✅ completo |
 | `skills/menu/SKILL.md` | Utente | ✅ completo |
 
-**⚠️ Regola**: nessun riferimento a "Slack" o "Telegram" nei file markdown — i prompt sono canale-agnostici.
+**⚠️ Regola**: i prompt sono canale-agnostici (nessun riferimento a Telegram).
 
 ---
 
@@ -234,9 +337,14 @@ adk web src/ --session_service_uri "sqlite+aiosqlite:///$(pwd)/data/sessions.db"
 | Switch modello via .env | ✅ | Gemini e DeepSeek supportati |
 | DeepSeek thinking | ✅ | `LiteLlm(reasoning_effort=high)` |
 | Primo test `adk web` | ✅ | Funzionante |
-| Integrazione Telegram | ✅ | Adapter aiohttp: polling, routing @mention, lock per bot, ephemeral Barnacle |
+| Integrazione Telegram | ✅ | Adapter aiohttp: polling, routing @mention, lock+timeout, ephemeral |
+| Sistema Narratore | ✅ | Ogni 3 messaggi, iniezione prompt descrizione ambientale |
+| Session pruning (24h) | ✅ | `purge_old_sessions()` + cron orario |
+| Lock con timeout (15s) | ✅ | `asyncio.wait_for` invece di wait indefinito |
+| Context Compaction (LLM-based) | ✅ | `App` + `EventsCompactionConfig` + `LlmEventSummarizer` |
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
-| Integrazione Slack | 🔲 | Future — dopo Telegram |
+| Integrazione Slack | 🔲 | Future |
+| Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
 
 ---
 
@@ -247,15 +355,22 @@ adk web src/ --session_service_uri "sqlite+aiosqlite:///$(pwd)/data/sessions.db"
 - **Ogni bot ha solo la sua `persona.md`** — world context arriva via global_instruction
 - **Skills auto-discovery** — aggiungere skill = creare cartella, zero codice
 - **Skill = self-contained** — no references directory, tutto nel SKILL.md
-- **Nessun riferimento a Slack/Telegram nei prompt** — canale-agnostico
+- **Prompt canale-agnostici** — nessun riferimento a Telegram nei file markdown
 - **`LLM_MODEL` generico** (non `GEMINI_MODEL`) — supporta sia Gemini che DeepSeek
+- **`_build_model_instance()` factory** in `utils.py` — restituisce `BaseLlm` corretto dal prefisso del modello
+- **`MODEL` vs `COMPACTION_LLM`** — istanze separate: conversazione vs riassunto sessioni
+- **`COMPACTION_LLM`** — segue `COMPACTION_MODEL` nel `.env`; default `gemini-3.5-flash` (richiede ADC); supporta anche DeepSeek
 - **`thinking_level=medium`** / **`reasoning_effort=high`** per Gemini/DeepSeek
-- **`include_thoughts=False`** — il reasoning rimane interno
+- **`include_thoughts=False`** / filtro `part.thought=True` — reasoning rimane interno
 - **`location=global`** per `gemini-3.5-flash` su Vertex AI
+- **Context Compaction** — `App` + `EventsCompactionConfig` [EXPERIMENTAL] + `LlmEventSummarizer`; usa `COMPACTION_LLM` (default Gemini, configurabile)
 - **Telegram adapter**: solo `aiohttp` (già installato), nessuna libreria aggiuntiva
-- **Telegram futuro**: session_id = chat_id, user_id = from.id, `DatabaseSessionService` già pronto
+- **Session mapping**: `session_id = chat_id` (storia condivisa del gruppo), `user_id = from.id`
 - **Barnacle ephemeral**: richiede bot admin nel gruppo; fallback pubblico con nota `🐱` se non admin
-- **DeepSeek thinking visibile**: filtro `part.thought=True` in `runner.py` + `drop_params=True` in `LiteLlm`
+- **Narratore via injection**: ogni 3 messaggi, `adapter.py` aggiunge prompt di sistema al testo
+- **Lock timeout 15s**: `asyncio.wait_for(lock.acquire(), timeout=15)` invece di wait indefinito
+- **Session pruning 24h**: `purge_old_sessions()` + cron orario — mantiene il DB pulito
+- **`drop_params=True`** in `LiteLlm` — ignora parametri non supportati da DeepSeek
 
 ---
 
@@ -444,18 +559,24 @@ chat.type == "private"? → redirect in-character al gruppo
     ▼
 bot_name = _detect_bot(text)   # barnacle ha priorità
     │
-lock[bot_name].locked()? → risposta "è occupato..."
+asyncio.wait_for(lock.acquire(), timeout=15s)
+    errore timeout → "è occupato..."
     │
-async with lock:
-    sendChatAction(typing)
-    augmented = "[Risponde BARNABY/BARNACLE] {text}"
-    response = run_agent(user_id, session_id=chat_id, augmented)
-    formatted = format_response(response)
+sendChatAction(typing)
     │
-    barnaby  → sendMessage(chat_id, formatted)           # pubblico
-    barnacle → sendMessage(chat_id, formatted,           # ephemeral
-                           receiver_user_id=user_id)     # solo per te
-              fallback pubblico se bot non è admin
+_message_counters[session_id] += 1
+    se counter % 3 == 0 → aggiunge nota Narratore al testo
+    │
+augmented = "[Risponde BARNABY/BARNACLE] {text}"
+response = run_agent(user_id, session_id=chat_id, augmented)
+formatted = format_response(response)
+    │
+barnaby  → sendMessage(chat_id, formatted)           # pubblico
+barnacle → sendMessage(chat_id, formatted,           # ephemeral
+                       receiver_user_id=user_id)     # solo per te
+          fallback pubblico se bot non è admin
+    │
+finally: lock.release()  # sempre, anche in caso di errore
 ```
 
 **Formattazione HTML (3 livelli):**
@@ -727,11 +848,19 @@ response.usage.prompt_cache_miss_tokens   # token calcolati ex novo
 
 ### Avvio
 ```bash
-cd /path/to/scummbar
-source py-env/bin/activate
+# Setup iniziale (prima volta)
+bash py_env.sh init_py
+
+# Attiva ambiente (ogni nuova sessione)
+bash py_env.sh active
+
+# ADK web
 ./start.sh                          # con SQLite persistence
 adk web src/                        # senza persistence (InMemory)
 adk web src/ --log_level DEBUG      # debug verboso
+
+# Telegram
+python telegram_bot.py
 ```
 
 ### Switch modello (solo `.env`)
@@ -786,3 +915,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 | Telegram bot non risponde nel gruppo | Privacy Mode ON → disabilitare via BotFather (`/setprivacy`) |
 | Telegram MarkdownV2 error | Usa `parse_mode="HTML"` — molto più semplice |
 | Barnacle non risponde / ephemeral fallisce | Rendere il bot admin del gruppo |
+| Session DB cresce troppo | `purge_old_sessions()` già attivo (cron orario, 24h retention) |
+| `purge_old_sessions` lancia OperationalError | Schema ADK cambiato — verificare nome tabella `events` nel DB |
+| EventsCompactionConfig breaking change | Feature [EXPERIMENTAL] — verificare ADK changelog ad ogni upgrade |
+| Compaction fallisce con 403/ADC error | `COMPACTION_MODEL` usa Gemini per default — eseguire `gcloud auth application-default login` |

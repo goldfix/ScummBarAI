@@ -6,3 +6,4 @@ session.db
 data/*.db
 poetry.lock
 __pycache__
+.DS_Store
