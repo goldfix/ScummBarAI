@@ -16,12 +16,14 @@ from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
 from google.adk.apps.app import App, EventsCompactionConfig
 from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
-from google.adk.models import Gemini
 from google.genai import types
 
 from ..agent import root_agent
+
+# 1. Update utilities imports to get the pre-built COMPACTION_LLM
 from ..utils import (
     SESSION_DB_URI,
+    COMPACTION_LLM,
     COMPACTION_MODEL,
     COMPACTION_INTERVAL,
     COMPACTION_OVERLAP
@@ -40,7 +42,6 @@ async def purge_old_sessions(hours: int = 24) -> int:
     cutoff_time = datetime.utcnow() - timedelta(hours=hours)
     cutoff_str = cutoff_time.strftime("%Y-%m-%d %H:%M:%S")
 
-    # Clean the connection uri to extract the true absolute or relative file path
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     loop = asyncio.get_running_loop()
 
@@ -48,8 +49,7 @@ async def purge_old_sessions(hours: int = 24) -> int:
         try:
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
-                # Prune old entries from the 'events' table to contain token window inflation.
-                # We target 'events' as defined by the ADK DDL schema, leaving the 'sessions' keys intact.
+                # Targets the standard ADK 'events' table to clear bulky raw dialogue rows
                 cursor.execute(
                     "DELETE FROM events WHERE timestamp < ?",
                     (cutoff_str,)
@@ -60,7 +60,6 @@ async def purge_old_sessions(hours: int = 24) -> int:
             log.error("Database error during session purging: %s", e)
             return 0
 
-    # Execute synchronous I/O on a separate thread pool to keep the event loop non-blocking
     deleted_rows = await loop.run_in_executor(None, _execute_purge)
     if deleted_rows > 0:
         log.info("🧹 Galley cleanup: removed %d old events from the database.", deleted_rows)
@@ -73,28 +72,24 @@ def _get_runner() -> Runner:
     if _runner is None:
         _session_service = DatabaseSessionService(db_url=SESSION_DB_URI)
 
-        # Inizialize the LLM model specifically dedicated to running compaction summaries.
-        # NOTE: compaction always uses Gemini regardless of LLM_MODEL — requires Google ADC.
+        # 2. Inject the dynamic LLM instance (Gemini or LiteLlm) into the Summarizer
         compaction_summarizer = LlmEventSummarizer(
-            llm=Gemini(model=COMPACTION_MODEL)
+            llm=COMPACTION_LLM
         )
 
-        # Configure the Compactor parameters.
-        # NOTE: EventsCompactionConfig is marked [EXPERIMENTAL] by ADK — may change without notice.
         compaction_config = EventsCompactionConfig(
             compaction_interval=COMPACTION_INTERVAL,
             overlap_size=COMPACTION_OVERLAP,
             summarizer=compaction_summarizer
         )
 
-        # Instantiate the App object which holds the root agent and the compaction layout
         scummbar_app = App(
             name=APP_NAME,
             root_agent=root_agent,
             events_compaction_config=compaction_config
         )
 
-        # Bind the configured App instance to the final Runner architecture
+        # 4. Attach the fully operational App instance to the top-level Runner
         _runner = Runner(
             app=scummbar_app,
             session_service=_session_service,
@@ -135,7 +130,7 @@ async def run_agent(
     )
 
     response_parts: list[str] = []
-    # Fixed: Async stream processing loop changed from 'async if' to 'async for'
+    # Async stream loop consuming real-time tokens
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session_id,
@@ -143,7 +138,7 @@ async def run_agent(
     ):
         if event.is_final_response() and event.content and event.content.parts:
             for part in event.content.parts:
-                # Omit thought processing tokens to keep the public output clean
+                # Discard internal thoughts to preserve standard dialogue formatting
                 if part.text and not getattr(part, 'thought', False):
                     response_parts.append(part.text)
 

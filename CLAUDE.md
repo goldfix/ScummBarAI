@@ -24,7 +24,7 @@ scummbar/
 │   └── scummbar_chat/                 # ← progetto attivo
 │       ├── __init__.py
 │       ├── agent.py                   # root agent + InstructionProvider temporale
-│       ├── utils.py                   # config condivisa, load_md(), load_all_skills(), build_instruction()
+│       ├── utils.py                   # config condivisa, model factory (_build_model_instance), load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
 │       ├── tools.py                   # tools condivisi (placeholder)
 │       ├── .env                       # config ambiente (NON committare)
@@ -65,7 +65,7 @@ scummbar/
 
 **File `.env`** (`src/scummbar_chat/.env`):
 ```env
-# Google Cloud (per Gemini)
+# Google Cloud (per Gemini + compaction)
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=global
 GOOGLE_GENAI_USE_VERTEXAI=True
@@ -79,6 +79,16 @@ LLM_THINKING_LEVEL=medium
 # DeepSeek
 DEEPSEEK_API_KEY=...                    # da platform.deepseek.com/api_keys
 DEEPSEEK_REASONING_EFFORT=high          # high | max
+
+# Context Compaction (default Gemini, requires ADC; oppure deepseek/... con DEEPSEEK_API_KEY)
+COMPACTION_MODEL=gemini-3.5-flash       # modello usato per i riassunti
+COMPACTION_INTERVAL=30                  # eventi prima di triggerare la compaction
+COMPACTION_OVERLAP=2                    # eventi di overlap mantenuti dopo la compaction
+
+# Telegram
+TELEGRAM_BOT_TOKEN=...                  # da BotFather
+TELEGRAM_BOT_USERNAME=scummbar_bot      # senza @
+TELEGRAM_GROUP_LINK=https://t.me/...   # mostrato nel redirect dai DM
 ```
 
 **Auth Google**: `gcloud auth application-default login`
@@ -240,9 +250,15 @@ Cambiare modello = **una riga nel `.env`**:
 | `deepseek/deepseek-v4-flash` | DeepSeek via LiteLlm | Richiede `DEEPSEEK_API_KEY` |
 | `deepseek/deepseek-v4-pro` | DeepSeek via LiteLlm | Più potente |
 
-`utils.py` gestisce automaticamente la configurazione thinking:
-- Gemini → `GenerateContentConfig(ThinkingConfig(thinking_level=...))`
-- DeepSeek → `LiteLlm(thinking={"type":"enabled"}, reasoning_effort=...)`
+`utils.py` espone un **factory `_build_model_instance(model_name, is_main_model)`** che restituisce
+il corretto `BaseLlm` in base al prefisso del modello:
+- `deepseek/...` → `LiteLlm(thinking=enabled, reasoning_effort=high)` (solo per main model)
+- qualsiasi altro → `Gemini(model=...)`
+
+Variabili esportate:
+- `MODEL` — istanza per gli agenti (Barnaby, Barnacle, root)
+- `COMPACTION_LLM` — istanza dedicata al riassunto sessioni (sempre Gemini)
+- `THINKING_CONFIG` — `GenerateContentConfig` per Gemini, `None` per DeepSeek
 
 ---
 
@@ -254,6 +270,39 @@ adk web src/ --session_service_uri "sqlite+aiosqlite:///$(pwd)/data/sessions.db"
 ```
 
 `SESSION_DB_URI` disponibile in `utils.py` per uso programmatico.
+
+---
+
+### 🧹 Context Compaction (`runner.py`)
+
+Per evitare che le sessioni lunghe facciano crescere il context window all'infinito,
+`runner.py` usa `App` + `EventsCompactionConfig` + `LlmEventSummarizer` di ADK.
+
+Dopo ogni `COMPACTION_INTERVAL` eventi, ADK riassume automaticamente la conversazione
+passata con un modello Gemini dedicato, mantenendo solo gli ultimi `COMPACTION_OVERLAP`
+eventi come contesto attivo.
+
+```python
+# runner.py — schema semplificato
+compaction_summarizer = LlmEventSummarizer(llm=COMPACTION_LLM)
+compaction_config = EventsCompactionConfig(
+    compaction_interval=COMPACTION_INTERVAL,  # default: 30
+    overlap_size=COMPACTION_OVERLAP,          # default: 2
+    summarizer=compaction_summarizer,
+)
+scummbar_app = App(
+    name=APP_NAME,
+    root_agent=root_agent,
+    events_compaction_config=compaction_config,
+)
+_runner = Runner(app=scummbar_app, session_service=_session_service)
+```
+
+⚠️ **Note importanti:**
+- `EventsCompactionConfig` è marcata **[EXPERIMENTAL]** da ADK — può cambiare senza preavviso
+- La compaction usa **sempre Gemini** (`COMPACTION_LLM`) anche se `LLM_MODEL=deepseek/...`
+- Richiede quindi **Google ADC attivo** in entrambi i casi
+- I valori di default (interval=30, overlap=2) sono configurabili nel `.env`
 
 ---
 
@@ -292,6 +341,7 @@ adk web src/ --session_service_uri "sqlite+aiosqlite:///$(pwd)/data/sessions.db"
 | Sistema Narratore | ✅ | Ogni 3 messaggi, iniezione prompt descrizione ambientale |
 | Session pruning (24h) | ✅ | `purge_old_sessions()` + cron orario |
 | Lock con timeout (15s) | ✅ | `asyncio.wait_for` invece di wait indefinito |
+| Context Compaction (LLM-based) | ✅ | `App` + `EventsCompactionConfig` + `LlmEventSummarizer` |
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
 | Integrazione Slack | 🔲 | Future |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
@@ -307,9 +357,13 @@ adk web src/ --session_service_uri "sqlite+aiosqlite:///$(pwd)/data/sessions.db"
 - **Skill = self-contained** — no references directory, tutto nel SKILL.md
 - **Prompt canale-agnostici** — nessun riferimento a Telegram nei file markdown
 - **`LLM_MODEL` generico** (non `GEMINI_MODEL`) — supporta sia Gemini che DeepSeek
+- **`_build_model_instance()` factory** in `utils.py` — restituisce `BaseLlm` corretto dal prefisso del modello
+- **`MODEL` vs `COMPACTION_LLM`** — istanze separate: conversazione vs riassunto sessioni
+- **`COMPACTION_LLM`** — segue `COMPACTION_MODEL` nel `.env`; default `gemini-3.5-flash` (richiede ADC); supporta anche DeepSeek
 - **`thinking_level=medium`** / **`reasoning_effort=high`** per Gemini/DeepSeek
 - **`include_thoughts=False`** / filtro `part.thought=True` — reasoning rimane interno
 - **`location=global`** per `gemini-3.5-flash` su Vertex AI
+- **Context Compaction** — `App` + `EventsCompactionConfig` [EXPERIMENTAL] + `LlmEventSummarizer`; usa `COMPACTION_LLM` (default Gemini, configurabile)
 - **Telegram adapter**: solo `aiohttp` (già installato), nessuna libreria aggiuntiva
 - **Session mapping**: `session_id = chat_id` (storia condivisa del gruppo), `user_id = from.id`
 - **Barnacle ephemeral**: richiede bot admin nel gruppo; fallback pubblico con nota `🐱` se non admin
@@ -863,3 +917,5 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 | Barnacle non risponde / ephemeral fallisce | Rendere il bot admin del gruppo |
 | Session DB cresce troppo | `purge_old_sessions()` già attivo (cron orario, 24h retention) |
 | `purge_old_sessions` lancia OperationalError | Schema ADK cambiato — verificare nome tabella `events` nel DB |
+| EventsCompactionConfig breaking change | Feature [EXPERIMENTAL] — verificare ADK changelog ad ogni upgrade |
+| Compaction fallisce con 403/ADC error | `COMPACTION_LLM` usa sempre Gemini — eseguire `gcloud auth application-default login` |
