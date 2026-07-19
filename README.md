@@ -1,90 +1,278 @@
 # 🍺 ScummBar AI
 
-> *"Qui le sciabole riposano, e le storie galleggiano."*
+> *"Here sabers rest, and stories float."*
+
+A multi-bot interactive chat set in a Caribbean pirate tavern, built with **Google Agent Development Kit (ADK)** and integrated with **Telegram**.
+
+This is a **study project** — no commercial purpose, just learning how to build multi-agent systems with AI.
 
 ---
 
-## 🇮🇹 Italiano
+## The Story
 
-### Cos'è questo progetto?
+The **Scummbar** is a Caribbean pirate tavern. A place where tired sailors put down their swords, order a mug of grog, and sit down to listen.
 
-ScummBar AI è un progetto **didattico** nato per esplorare e studiare il funzionamento del **Google Agent Development Kit (ADK)** e la sua integrazione con **Telegram**.
+Two characters run the bar:
 
-Non ha finalità commerciali né di produzione. È un work in progress, aperto a chi vuole capire come costruire sistemi multi-agente con modelli AI.
+| Character | Role | Personality |
+|-----------|------|-------------|
+| 🍺 **Barnaby** | Bartender | Always listening, knows the sea, makes unforgettable grogs |
+| 🐱 **Barnacle** | The bar cat | Mysterious, solitary, speaks rarely — but when he does, it's worth hearing |
 
-### La storia
-
-Lo **Scummbar** è una taverna piratesca caraibica. Un posto dove i marinai stanchi depongono le armi, ordinano un boccale di grog e si siedono ad ascoltare le storie degli altri.
-
-Il bar è gestito da due personaggi:
-- 🍺 **Barnaby** — il barista. Sa ascoltare, conosce il mare e prepara grog memorabili.
-- 🐱 **Barnacle** — il gatto del bar. Misterioso, solitario, poco loquace. Quando decide di parlare, vale la pena ascoltarlo.
-
-Entrambi sono alimentati da AI. Entrambi hanno una storia. Non aspettarti troppo... o forse sì.
-
-### Cosa si studia
-
-- Architettura **multi-agente** con Google ADK
-- Gestione di **sessioni persistenti** (SQLite)
-- **Skills** modulari per estendere le capacità dei bot
-- Contesto temporale dinamico via **InstructionProvider**
-- Integrazione con **Telegram Bot API** (long polling, messaggi effimeri)
-- Confronto tra modelli: **Gemini** (Vertex AI) e **DeepSeek** (via LiteLlm)
-
-### Stack
-
-```
-Google ADK 2.x.0  ·  Python 3.12  ·  Gemini / DeepSeek  ·  SQLite  ·  Telegram Bot API
-```
-
-### Stato
-
-⚠️ **Work in progress** — il progetto è in attivo sviluppo. Le cose cambiano, si rompono e si aggiustano.
-
-### Una nota
-
-L'intero progetto — codice, architettura, documentazione — è stato realizzato con il supporto attivo della **Generative AI** (Claude di Anthropic), usata come assistente di sviluppo lungo tutto il percorso. Anche questo è parte dello studio.
+Both are AI-powered. Both have a story.
 
 ---
 
-## 🇬🇧 English
+## Getting Started
 
-### What is this project?
+### Prerequisites
 
-ScummBar AI is a **study project** created to explore and learn how **Google Agent Development Kit (ADK)** works, and how to integrate it with **Telegram**.
+- Python 3.11+
+- [Google Cloud ADC](https://cloud.google.com/docs/authentication/application-default-credentials) (for Gemini on Vertex AI)
+- A [DeepSeek API key](https://platform.deepseek.com/api_keys) (optional, for DeepSeek models)
 
-It has no commercial or production purpose. It's a work in progress, open to anyone who wants to understand how to build multi-agent systems with AI models.
+### Setup
 
-### The story
+```bash
+# 1. Clone the repository
+git clone https://github.com/goldfix/ScummBarAI.git
+cd ScummBarAI
 
-The **Scummbar** is a Caribbean pirate tavern. A place where tired sailors put down their swords, order a mug of grog, and sit down to listen to other people's stories.
+# 2. Initialize the environment (creates py-env/, installs dependencies)
+bash py_env.sh init_py
 
-The bar is run by two characters:
-- 🍺 **Barnaby** — the bartender. A good listener, knows the sea, and makes unforgettable grogs.
-- 🐱 **Barnacle** — the bar cat. Mysterious, solitary, not much of a talker. When he decides to speak, it's worth listening.
+# 3. Activate it (each new terminal session)
+bash py_env.sh active
 
-Both are AI-powered. Both have a story. Don't expect too much... or maybe do.
-
-### What's being studied
-
-- **Multi-agent** architecture with Google ADK
-- **Persistent session** management (SQLite)
-- Modular **Skills** to extend bot capabilities
-- Dynamic time context via **InstructionProvider**
-- **Telegram Bot API** integration (long polling, ephemeral messages)
-- Model comparison: **Gemini** (Vertex AI) vs **DeepSeek** (via LiteLlm)
-
-### Stack
-
-```
-Google ADK 2.x.0  ·  Python 3.12  ·  Gemini / DeepSeek  ·  SQLite  ·  Telegram Bot API
+# 4. Configure the environment
+# Edit src/scummbar_chat/.env with your API keys and project settings
 ```
 
-### Status
+### Quick activate (existing environment)
 
-⚠️ **Work in progress** — the project is in active development. Things change, break, and get fixed.
+```bash
+bash py_env.sh active
+```
 
-### A note
+### Environment File
+
+Configure `src/scummbar_chat/.env`:
+
+```env
+# Google Cloud (for Gemini on Vertex AI)
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+GOOGLE_CLOUD_LOCATION=global
+GOOGLE_GENAI_USE_VERTEXAI=True
+
+# Model selection
+# Gemini:   LLM_MODEL=gemini-3.5-flash
+# DeepSeek: LLM_MODEL=deepseek/deepseek-v4-flash
+LLM_MODEL=gemini-3.5-flash
+LLM_THINKING_LEVEL=medium
+
+# DeepSeek (optional — only if using DeepSeek models)
+DEEPSEEK_API_KEY=your-api-key-here
+DEEPSEEK_REASONING_EFFORT=high
+
+# Telegram (optional — only for Telegram integration)
+TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_BOT_USERNAME=your_bot_username
+TELEGRAM_GROUP_LINK=https://t.me/your-group
+```
+
+---
+
+## Running
+
+### Web Interface (ADK Web)
+
+```bash
+# With SQLite persistence:
+./start.sh
+
+# Without persistence:
+adk web src/
+
+# Debug mode:
+adk web src/ --log_level DEBUG
+```
+
+Open [http://localhost:8000](http://localhost:8000) to chat with the bots.
+
+### Telegram Bot
+
+Start the Telegram long-polling adapter:
+
+```bash
+python telegram_bot.py
+```
+
+#### BotFather Setup
+
+On Telegram, chat with [@BotFather](https://t.me/botfather):
+
+```
+/newbot      → create your bot → get the token
+/setprivacy  → Disable (so the bot sees all messages)
+/setcommands → register commands:
+
+start - Enter the Scummbar
+grog - Order a special grog
+menu - Check the galley
+barnaby - Talk to the bartender
+barnacle - Bother the cat
+help - Help and available commands
+```
+
+Then make the bot a **group admin** (for Barnacle's ephemeral messages).
+
+#### How it works
+
+- Users in a group mention `@barnaby` or `@barnacle`
+- Only mentioned bots respond
+- Barnaby replies publicly
+- Barnacle replies with ephemeral messages (visible only to the requester)
+- Private messages to the bot get an in-character redirect to the group
+- One user at a time per bot (asyncio locks)
+
+---
+
+## Architecture
+
+### Project Structure
+
+```
+src/scummbar_chat/
+├── agent.py                 # Root agent (coordinator)
+├── utils.py                 # Shared config, model init, file loading
+├── time_context.py          # Real-time → bar atmosphere mapping
+├── tools.py                 # Placeholder shared tools
+├── .env                     # Environment configuration
+├── world/
+│   └── scummbar.md          # World context + narration rules
+├── bots/
+│   ├── barnaby/
+│   │   ├── agent.py         # Barnaby agent + SkillToolset
+│   │   └── persona.md       # Barnaby's personality prompt
+│   └── barnacle/
+│       ├── agent.py         # Barnacle agent
+│       └── persona.md       # Barnacle's personality prompt
+├── skills/                  # Auto-discovered ADK skills
+│   ├── grog/SKILL.md        # Dynamic grog generation
+│   └── menu/SKILL.md        # Menu: quick serve + recipes
+└── telegram/                # Telegram adapter
+    ├── adapter.py           # Long polling, @mention routing, locks
+    ├── formatter.py         # ADK output → HTML for Telegram
+    └── runner.py            # ADK Runner + DatabaseSessionService
+
+telegram_bot.py              # Telegram entry point
+start.sh                     # ADK web + SQLite launcher
+data/sessions.db             # SQLite session persistence (auto-created)
+```
+
+### Agent Hierarchy
+
+```
+root_agent (scummbar_chat)
+├── global_instruction = InstructionProvider
+│   └── WORLD_CONTEXT + get_time_description()
+├── instruction = coordinator prompt
+└── sub_agents:
+    ├── barnaby → persona.md + SkillToolset (skills auto-discovery)
+    └── barnacle → persona.md
+```
+
+The root agent never responds directly — it **delegates** to the appropriate sub-agent
+based on a routing hint prepended to the message (`[Risponde BARNABY]` or `[Risponde BARNACLE]`).
+
+### Time Context
+
+`time_context.py` maps real time to six atmospheric moods in the bar:
+
+| Time | Period | Vibe |
+|------|--------|------|
+| 07–09 | Dawn | Bar opens, quiet, first pink light |
+| 09–12 | Morning | Bar wakes up, first customers |
+| 12–14 | Noon | Peak activity, crowded counter |
+| 14–16 | Afternoon | Post-lunch calm, Barnacle naps |
+| 16–18 | Sunset | Golden light, candles lit |
+| 18+ | Night | Bar never closes, candlelight |
+
+The description is injected into every model call via `InstructionProvider`,
+so the AI always knows the current bar atmosphere.
+
+### Skills (Auto-Discovery)
+
+Skills are modular prompt bundles loaded dynamically from the `skills/` directory.
+**Adding a new skill = creating a new folder with an `SKILL.md` file** — zero code changes.
+
+| Skill | Description |
+|-------|-------------|
+| `grog/` | Generates unique grogs based on user context, mood, and preferences |
+| `menu/` | Level 1: quick dish serve. Level 2: real recipe in pirate jargon |
+
+### Telegram Adapter
+
+```
+src/scummbar_chat/telegram/
+├── adapter.py    # Long polling, @barnaby/@barnacle detection, per-bot locks
+├── formatter.py  # ADK output → HTML (3 formatting levels)
+└── runner.py     # ADK Runner + DatabaseSessionService (SQLite)
+```
+
+**Message flow:**
+
+```
+User: @barnaby serve me a grog
+        │
+        ▼ (detect @mention → bot_name = "barnaby")
+    lock[barnaby].acquire()
+        │
+        ▼ (if locked → "Barnaby is busy...")
+    prepend: "[Risponde BARNABY] @barnaby serve me a grog"
+        │
+        ▼
+    ADK Runner → root_agent → barnaby_agent → response
+        │
+        ▼ (format response)
+    Barnaby → sendMessage(chat_id, formatted)         # public
+    Barnacle → sendMessage(chat_id, formatted,         # ephemeral
+                          receiver_user_id=user_id)
+              fallback: public with 🐱 whisper note
+```
+
+**Text formatting (3 levels):**
+
+| Pattern | Rendered As |
+|---------|-------------|
+| `Plain text` | `Plain text` (dialogue) |
+| `*action*` | `<i>action</i>` (character narration) |
+| `_full line_` | `<blockquote><i>...</i></blockquote>` (atmosphere) |
+
+### Model Support
+
+| `LLM_MODEL` | Provider | Notes |
+|-------------|----------|-------|
+| `gemini-3.5-flash` | Vertex AI (Gemini) | Requires ADC + enabled Vertex AI API |
+| `gemini-3.1-flash-lite` | Vertex AI (Gemini) | Faster, less powerful |
+| `deepseek/deepseek-v4-flash` | DeepSeek via LiteLlm | Requires `DEEPSEEK_API_KEY` |
+| `deepseek/deepseek-v4-pro` | DeepSeek via LiteLlm | More powerful, slower |
+
+Switching models = changing one line in `.env`.
+
+### Session Persistence
+
+Conversations persist across restarts via **SQLite** and `DatabaseSessionService`:
+
+```bash
+./start.sh  # Uses sqlite+aiosqlite:///data/sessions.db
+```
+
+Session mapping for Telegram: `session_id = chat_id`, `user_id = from.id`.
+
+---
+
+## A Note
 
 The entire project — code, architecture, documentation — was built with the active support of **Generative AI** (Claude by Anthropic), used as a development assistant throughout the process. That too is part of the study.
 

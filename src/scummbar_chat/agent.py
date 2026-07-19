@@ -1,4 +1,4 @@
-"""scummbar_chat — Root Agent (coordinatore della chat)."""
+"""scummbar_chat — Root Agent (chat coordinator)."""
 
 from google.adk.agents import Agent
 from google.adk.agents.readonly_context import ReadonlyContext
@@ -22,7 +22,7 @@ Non rispondere mai direttamente: delega sempre a uno dei due bot.
 
 
 def _world_instruction_provider(context: ReadonlyContext) -> str:
-    """Assembla il global_instruction con il world context + il momento del giorno."""
+    """Build the global_instruction with world context + time of day."""
     return f"{WORLD_CONTEXT}\n\n{get_time_description()}"
 
 

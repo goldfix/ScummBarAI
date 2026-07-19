@@ -1,4 +1,4 @@
-"""Barnaby — agente del barista dello Scummbar."""
+"""Barnaby — the Scummbar bartender agent."""
 
 import pathlib
 
@@ -10,8 +10,8 @@ from ...utils import MODEL, THINKING_CONFIG, load_all_skills, load_md
 _PERSONA = load_md(pathlib.Path(__file__).parent / "persona.md")
 
 # --- Skills (auto-discovery) ---
-# Ogni cartella in skills/ con un SKILL.md viene caricata automaticamente.
-# Aggiungere una nuova skill = creare una nuova cartella, zero codice.
+# Every folder in skills/ with an SKILL.md is auto-loaded.
+# Adding a new skill = create a new folder, zero code.
 _SKILLS_DIR = pathlib.Path(__file__).parent.parent.parent / "skills"
 
 _barnaby_toolset = skill_toolset.SkillToolset(
