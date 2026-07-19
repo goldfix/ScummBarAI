@@ -51,7 +51,8 @@ _DB_PATH = CHAT_DIR.parent.parent / "data" / "sessions.db"
 SESSION_DB_URI: str = f"sqlite+aiosqlite:///{_DB_PATH}"
 
 # --- Context Compaction configuration ---
-# The model dedicated to running background summarization tasks
+# Model used for background summarization — always Gemini, requires Google ADC.
+# Active even when LLM_MODEL=deepseek/... (compaction runs independently).
 COMPACTION_MODEL: str = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")
 
 # Number of completed events required to trigger the compaction process

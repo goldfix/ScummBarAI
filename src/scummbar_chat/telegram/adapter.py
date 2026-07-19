@@ -134,7 +134,7 @@ async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
     TIMEOUT_CODA = 15.0
     lock_acquired = False
 
-    # Attempt to acquire lock within timeout to handle concurrent message spikes
+    # Attempt to acquire lock within timeout to handle concurrent message spikes safely
     try:
         await asyncio.wait_for(lock.acquire(), timeout=TIMEOUT_CODA)
         lock_acquired = True
@@ -181,7 +181,7 @@ async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
             await _send_message(http, chat_id, formatted)
 
     finally:
-        # Guarantee lock release even if generation or communication fails
+        # Guarantee lock release even if generation or communication fails, only if acquired
         if lock_acquired:
             lock.release()
 
@@ -195,6 +195,7 @@ async def _session_cleaner_cron() -> None:
         await asyncio.sleep(3600)
 
 async def run_polling() -> None:
+    """Start the Telegram long-polling loop. Blocks until interrupted."""
     if not TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN not configured in .env")
 

@@ -20,7 +20,6 @@ from google.adk.models import Gemini
 from google.genai import types
 
 from ..agent import root_agent
-# Import the new configuration parameters from utilities
 from ..utils import (
     SESSION_DB_URI,
     COMPACTION_MODEL,
@@ -32,17 +31,17 @@ log = logging.getLogger(__name__)
 
 APP_NAME = "scummbar_chat"
 
+# Singleton structures: shared globally across the module execution lifespan
 _session_service: DatabaseSessionService | None = None
 _runner: Runner | None = None
 
 async def purge_old_sessions(hours: int = 24) -> int:
     """Removes historical events older than X hours from the ADK SQLite backend."""
     cutoff_time = datetime.utcnow() - timedelta(hours=hours)
-    # ADK typically handles timestamps in standard string formats for SQLite
     cutoff_str = cutoff_time.strftime("%Y-%m-%d %H:%M:%S")
 
     # Clean the connection uri to extract the true absolute or relative file path
-    db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "")
+    db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     loop = asyncio.get_running_loop()
 
     def _execute_purge() -> int:
@@ -50,8 +49,7 @@ async def purge_old_sessions(hours: int = 24) -> int:
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
                 # Prune old entries from the 'events' table to contain token window inflation.
-                # We target 'events' as defined by the ADK DDL schema,
-                # leaving the 'sessions' keys intact.
+                # We target 'events' as defined by the ADK DDL schema, leaving the 'sessions' keys intact.
                 cursor.execute(
                     "DELETE FROM events WHERE timestamp < ?",
                     (cutoff_str,)
@@ -75,31 +73,32 @@ def _get_runner() -> Runner:
     if _runner is None:
         _session_service = DatabaseSessionService(db_url=SESSION_DB_URI)
 
-        # 1. Inizializziamo esplicitamente il modello LLM
+        # Inizialize the LLM model specifically dedicated to running compaction summaries.
+        # NOTE: compaction always uses Gemini regardless of LLM_MODEL — requires Google ADC.
         compaction_summarizer = LlmEventSummarizer(
             llm=Gemini(model=COMPACTION_MODEL)
         )
 
-        # 2. Creiamo la configurazione di compattazione
+        # Configure the Compactor parameters.
+        # NOTE: EventsCompactionConfig is marked [EXPERIMENTAL] by ADK — may change without notice.
         compaction_config = EventsCompactionConfig(
             compaction_interval=COMPACTION_INTERVAL,
             overlap_size=COMPACTION_OVERLAP,
             summarizer=compaction_summarizer
         )
 
-        # 3. Creiamo esplicitamente l'oggetto App (che ospita il root_agent e la configurazione!)
+        # Instantiate the App object which holds the root agent and the compaction layout
         scummbar_app = App(
             name=APP_NAME,
             root_agent=root_agent,
             events_compaction_config=compaction_config
         )
 
-        # 4. Passiamo l'App al Runner al posto dei parametri separati
+        # Bind the configured App instance to the final Runner architecture
         _runner = Runner(
             app=scummbar_app,
             session_service=_session_service,
         )
-
         log.info(
             "ADK Runner initialized (Model: %s, Interval: %d, Overlap: %d)",
             COMPACTION_MODEL, COMPACTION_INTERVAL, COMPACTION_OVERLAP
@@ -136,7 +135,7 @@ async def run_agent(
     )
 
     response_parts: list[str] = []
-    # Async stream processing of agent event cycles
+    # Fixed: Async stream processing loop changed from 'async if' to 'async for'
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session_id,
