@@ -322,7 +322,7 @@ an active narrative bridge.
 
 ## A Note
 
-The entire project — code, architecture, documentation — was built with the active support of **Generative AI** (Claude by Anthropic), used as a development assistant throughout the process. That too is part of the study.
+The project — code and documentation — was built with the active support of **Generative AI** (Claude by Anthropic), used as a development assistant throughout the process. That too is part of the study.
 
 ---
 
