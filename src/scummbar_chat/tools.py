@@ -8,18 +8,40 @@ Operations:
 
 import sqlite3
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from google.adk.tools import FunctionTool
+from google.adk.tools.tool_context import ToolContext
 from .utils import SESSION_DB_URI
 
 log = logging.getLogger(__name__)
 
-async def recall_patron_memory(user_id: str) -> dict:
+
+def _ensure_patron_memories_table() -> None:
+    """Create the patron_memories table if it does not exist yet."""
+    db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS patron_memories (
+                user_id           TEXT PRIMARY KEY,
+                patron_name       TEXT,
+                core_traits       TEXT,
+                last_chat_summary TEXT,
+                last_interaction  DATETIME
+            )
+        """)
+        conn.commit()
+
+
+async def recall_patron_memory(tool_context: ToolContext) -> dict:
     """
     Recupera la memoria narrativa di uno specifico avventore della taverna Scummbar.
-    Usa questo strumento IMMEDIATAMENTE non appena un cliente ti rivolge la parola o entra in una conversazione, in modo da poterlo salutare adeguatamente.
-    Se il dizionario restituito contiene il campo 'last_chat_summary', sei OBBLIGATO a usarlo per riallacciarti in modo naturale e coerente all'ultima discussione avvenuta.
+    Usa questo strumento IMMEDIATAMENTE non appena un cliente ti rivolge la parola,
+    in modo da poterlo salutare adeguatamente e con cognizione di causa.
+    Se il dizionario restituito contiene il campo 'last_chat_summary', sei OBBLIGATO
+    a usarlo per riallacciarti in modo naturale e coerente all'ultima discussione.
     """
+    user_id = tool_context.user_id
+    _ensure_patron_memories_table()
     # Clean up the DB engine prefix to get a regular sqlite file path
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
 
@@ -42,21 +64,27 @@ async def recall_patron_memory(user_id: str) -> dict:
         return {"status": "error", "message": "I tuoi ricordi sono confusi al momento. Saluta normalmente."}
 
 async def memorize_patron_chat(
-    user_id: str,
+    tool_context: ToolContext,
     patron_name: str,
     new_traits_learned: str,
     chat_summary: str
 ) -> str:
     """
     Aggiorna o crea la memoria a lungo termine di un avventore nel registro dello Scummbar.
-    Esegui questo strumento solo quando una conversazione giunge a una conclusione naturale o se l'avventore rivela dettagli biografici determinanti.
+    Esegui questo strumento solo quando una conversazione giunge a una conclusione naturale
+    o se l'avventore rivela dettagli biografici determinanti.
 
-    REGOLE TASSATIVE DI COMPILAZIONE DEL PROMPT:
-    - new_traits_learned: Inserisci solo caratteristiche permanenti stabili o oggetti di inventario (es. 'Teme i fantasmi', 'Ha una gamba di legno'). Sii schematico (massimo 10 tratti in totale per utente). Se non ci sono novità, lascia questa stringa vuota.
-    - chat_summary: Un riassunto telegrafico dei fatti cruciali emersi nell'incontro attuale. MASSIMO 300 caratteri. Questo testo sovrascriverà interamente il riassunto precedente.
+    REGOLE TASSATIVE:
+    - new_traits_learned: solo caratteristiche permanenti stabili (es. 'Teme i fantasmi',
+      'Ha una gamba di legno'). Massimo 10 tratti totali per utente. Lascia vuoto se non
+      hai appreso nulla di nuovo.
+    - chat_summary: riassunto telegrafico dei fatti cruciali dell'incontro attuale.
+      MASSIMO 300 caratteri. Sovrascrive interamente il riassunto precedente.
     """
+    user_id = tool_context.user_id
+    _ensure_patron_memories_table()
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         with sqlite3.connect(db_path) as conn:

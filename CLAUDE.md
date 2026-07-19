@@ -26,17 +26,17 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory (_build_model_instance), load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # tools condivisi (placeholder)
+│       ├── tools.py                   # FunctionTool: recall_patron_memory, memorize_patron_chat
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/
 │       │   └── scummbar.md            # world context + regole narrazione + logica Narratore
 │       ├── bots/
 │       │   ├── __init__.py            # esporta barnaby_agent, barnacle_agent
 │       │   ├── barnaby/
-│       │   │   ├── agent.py           # LlmAgent Barnaby + SkillToolset (auto-discovery)
+│       │   │   ├── agent.py           # LlmAgent Barnaby + SkillToolset + memory tools
 │       │   │   └── persona.md         # chi è Barnaby, come parla
 │       │   └── barnacle/
-│       │       ├── agent.py           # LlmAgent Barnacle
+│       │       ├── agent.py           # LlmAgent Barnacle + recall_patron_tool
 │       │       └── persona.md         # chi è Barnacle, come si comporta
 │       ├── skills/                    # Skills ADK (auto-discovery)
 │       │   ├── grog/
@@ -45,14 +45,17 @@ scummbar/
 │       │       └── SKILL.md           # skill menu: livello 1 rapido + livello 2 ricetta
 │       └── telegram/                  # Adapter Telegram
 │           ├── __init__.py
-│           ├── adapter.py             # long polling, routing @mention, lock+timeout, Narratore
+│           ├── adapter.py             # long polling, semantic routing, lock+timeout, Narratore
 │           ├── formatter.py           # ADK output → HTML Telegram (3 livelli)
-│           └── runner.py              # ADK Runner + DatabaseSessionService + session pruning
+│           └── runner.py              # ADK Runner + DatabaseSessionService + compaction + session pruning
 ├── data/
-│   └── sessions.db                    # SQLite persistence (creato automaticamente)
+│   ├── sessions.db                    # SQLite persistence (creato automaticamente)
+│   └── logs/                          # Log rotativi (creati automaticamente)
+│       ├── bot.log                    # tutti i livelli — 5 MB × 3 file
+│       └── errors.log                 # WARNING+ — 2 MB × 2 file
 ├── start.sh                           # avvio ADK web con persistenza SQLite
 ├── py_env.sh                          # setup ambiente Python (venv + poetry)
-├── telegram_bot.py                    # avvio bot Telegram
+├── telegram_bot.py                    # avvio bot Telegram (--debug flag, log su file)
 ├── requirements.txt                   # bootstrap: poetry + uv
 ├── pyproject.toml                     # dipendenze progetto
 ├── CLAUDE.md                          # questo file
@@ -115,6 +118,10 @@ bash py_env.sh active
 ./start.sh                              # avvio con SQLite persistence
 adk web src/                            # avvio senza persistence (InMemory)
 adk web src/ --log_level DEBUG          # debug verboso
+
+# Telegram
+python telegram_bot.py                  # avvio normale
+python telegram_bot.py --debug          # log DEBUG su console + file
 ```
 
 ---
@@ -131,7 +138,7 @@ root_agent  (scummbar_chat)
     └── barnacle  → instruction = persona.md
 ```
 
-### 🧑‍🏫 Sistema Narratore (`scummbar.md` + `adapter.py`)
+### Sistema Narratore (`scummbar.md` + `adapter.py`)
 
 Ogni **3 messaggi** nel gruppo, l'adapter inietta automaticamente una nota di sistema al bot attivo,
 chiedendogli di aggiungere una descrizione d'ambiente in corsivo alla fine della risposta.
@@ -151,9 +158,92 @@ if _message_counters[session_id] % 3 == 0:
 
 ---
 
-### 🔒 Lock con Timeout (`adapter.py`)
+### 🧭 Semantic Routing (`adapter.py`)
 
-Invece di attendere indefinitamente il lock, ora viene usato `asyncio.wait_for` con timeout di 15 secondi.
+`_resolve_intent(text)` sostituisce il vecchio `_detect_bot`. Usa due livelli di priorità:
+
+1. **@mention esplicita** — `@barnacle` o `@barnaby` nel testo (sempre prioritaria)
+2. **Keyword matching** — se non c'è @mention, cerca parole chiave in `_INTENT_MAP`
+
+```python
+_INTENT_MAP = {
+    "barnaby": ["barnaby", "barista", "grog", "birra", "bere", "drink", ...],
+    "barnacle": ["barnacle", "micio", "gatto", "felino", "fusa", ...]
+}
+```
+
+Se nessun pattern corrisponde, il messaggio viene ignorato (nessun bot risponde).
+
+**Keyword** — estendibili direttamente in `_INTENT_MAP` senza toccare la logica.
+
+---
+
+### 🧠 Memoria Avventori (`tools.py` + `patron_memories`)
+
+Barnaby e Barnacle ricordano i clienti tra una sessione e l'altra grazie a due
+`FunctionTool` ADK che leggono/scrivono su una tabella SQLite dedicata.
+
+**Schema tabella `patron_memories`:**
+
+```sql
+CREATE TABLE IF NOT EXISTS patron_memories (
+    user_id           TEXT PRIMARY KEY,   -- Telegram user ID (numerico)
+    patron_name       TEXT,               -- nome del pirata
+    core_traits       TEXT,               -- tratti separati da ' | '
+    last_chat_summary TEXT,               -- riassunto ultima chat (max 300 chars)
+    last_interaction  DATETIME            -- timestamp UTC ultimo aggiornamento
+)
+```
+
+**Tool disponibili:**
+
+| Tool | Chi lo usa | Quando |
+|------|-----------|--------|
+| `recall_patron_tool` | Barnaby + Barnacle | All'inizio di ogni interazione |
+| `memorize_patron_tool` | Barnaby | A fine conversazione o su rivelazione biografica |
+
+**`user_id` affidabile via `ToolContext`:**
+
+Il `user_id` Telegram (numerico) non viene mai passato come parametro LLM
+— l'LLM potrebbe inventarlo. ADK lo inietta automaticamente via `ToolContext`:
+
+```python
+async def recall_patron_memory(tool_context: ToolContext) -> dict:
+    user_id = tool_context.user_id   # ← Telegram ID reale, dalla sessione ADK
+    ...
+```
+
+Il messaggio augmentato include anche `[avventore_id: {user_id}]` come
+contesto visivo per il personaggio, ma i tool non lo leggono da lì.
+
+**La tabella viene creata automaticamente** al primo utilizzo di qualsiasi tool
+tramite `_ensure_patron_memories_table()` (`CREATE TABLE IF NOT EXISTS`).
+
+---
+
+### 🟡 Logging e gestione errori (`telegram_bot.py` + `adapter.py`)
+
+**`telegram_bot.py`** è ora un entry point robusto con:
+- `--debug` flag: attiva livello DEBUG su console e file
+- `_check_env()`: pre-flight al boot — verifica token, logga modello e path
+- Log rotativi su `data/logs/bot.log` (5 MB × 3) e `data/logs/errors.log` (2 MB × 2)
+- `_dump_exception()`: scrive traceback completo con timestamp in caso di crash
+- Exit code `1` su errore fatale
+
+**`adapter.py`** ora cattura eccezioni a tutti i livelli:
+- `_handle_update` wrappa `_handle_update_inner` con `try/except + log.exception()`
+- `_on_task_done` callback: logga eccezioni dai task asyncio
+- `gather` finale al shutdown: logga eccezioni residue
+- `_session_cleaner_cron`: usa `log.exception()` invece di `log.error()`
+
+Tutti gli errori a livello WARNING+ finiscono in `data/logs/errors.log`.
+
+```bash
+python telegram_bot.py           # INFO su console, tutto su bot.log
+python telegram_bot.py --debug   # DEBUG su console, tutto su bot.log
+```
+
+Invece di attendere indefinitamente il lock, viene usato `asyncio.wait_for` con timeout di 15 secondi.
 Se il lock non si libera entro 15s, l'utente riceve il messaggio "è occupato".
 
 ```python
@@ -342,6 +432,9 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Session pruning (24h) | ✅ | `purge_old_sessions()` + cron orario |
 | Lock con timeout (15s) | ✅ | `asyncio.wait_for` invece di wait indefinito |
 | Context Compaction (LLM-based) | ✅ | `App` + `EventsCompactionConfig` + `LlmEventSummarizer` |
+| Semantic routing | ✅ | `_resolve_intent()`: @mention + keyword matching via `_INTENT_MAP` |
+| Memoria avventori | ✅ | `patron_memories` SQLite + `recall_patron_tool` + `memorize_patron_tool` |
+| Logging verboso + error export | ✅ | `--debug`, `bot.log`, `errors.log`, `_dump_exception()` |
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
 | Integrazione Slack | 🔲 | Future |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
@@ -371,6 +464,11 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 - **Lock timeout 15s**: `asyncio.wait_for(lock.acquire(), timeout=15)` invece di wait indefinito
 - **Session pruning 24h**: `purge_old_sessions()` + cron orario — mantiene il DB pulito
 - **`drop_params=True`** in `LiteLlm` — ignora parametri non supportati da DeepSeek
+- **Semantic routing**: `_resolve_intent()` — @mention con priorità, poi keyword matching; keywords estendibili in `_INTENT_MAP`
+- **Memoria avventori**: `patron_memories` SQLite; `user_id` da `ToolContext` (mai dall'LLM) — impossibile inventarlo
+- **`_augment_text` con `avventore_id`**: inietta `[avventore_id: {user_id}]` nel testo — contesto visivo per il personaggio
+- **Logging su file**: `data/logs/bot.log` + `data/logs/errors.log` (rotativi); `--debug` flag
+- **Error propagation**: `_handle_update` wrappa con `try/except`, `_on_task_done` callback, `gather` finale logga residui
 
 ---
 
@@ -553,11 +651,12 @@ python telegram_bot.py
 ```
 messaggio gruppo
     │
-    ▼  (solo se contiene @barnaby o @barnacle)
+    ▼
 chat.type == "private"? → redirect in-character al gruppo
     │
     ▼
-bot_name = _detect_bot(text)   # barnacle ha priorità
+bot_name = _resolve_intent(text)   # @mention prima, poi keyword matching
+    se None → ignora (nessun bot coinvolto)
     │
 asyncio.wait_for(lock.acquire(), timeout=15s)
     errore timeout → "è occupato..."
@@ -567,7 +666,7 @@ sendChatAction(typing)
 _message_counters[session_id] += 1
     se counter % 3 == 0 → aggiunge nota Narratore al testo
     │
-augmented = "[Risponde BARNABY/BARNACLE] {text}"
+augmented = "[Risponde BARNABY/BARNACLE] [avventore_id: {user_id}] {text}"
 response = run_agent(user_id, session_id=chat_id, augmented)
 formatted = format_response(response)
     │
@@ -919,3 +1018,5 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 | `purge_old_sessions` lancia OperationalError | Schema ADK cambiato — verificare nome tabella `events` nel DB |
 | EventsCompactionConfig breaking change | Feature [EXPERIMENTAL] — verificare ADK changelog ad ogni upgrade |
 | Compaction fallisce con 403/ADC error | `COMPACTION_MODEL` usa Gemini per default — eseguire `gcloud auth application-default login` |
+| `patron_memories` non trovata | Prima chiamata ai tool la crea automaticamente — verificare che il DB esista (`./start.sh` almeno una volta) |
+| `patron_memories` righe duplicate con user_id inventati | `user_id` viene da `ToolContext`, non dall'LLM — se succede, `DELETE FROM patron_memories WHERE user_id NOT GLOB '[0-9]*'` |
