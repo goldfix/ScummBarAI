@@ -257,7 +257,7 @@ il corretto `BaseLlm` in base al prefisso del modello:
 
 Variabili esportate:
 - `MODEL` — istanza per gli agenti (Barnaby, Barnacle, root)
-- `COMPACTION_LLM` — istanza dedicata al riassunto sessioni (sempre Gemini)
+- `COMPACTION_LLM` — istanza dedicata al riassunto sessioni (default Gemini, configurabile)
 - `THINKING_CONFIG` — `GenerateContentConfig` per Gemini, `None` per DeepSeek
 
 ---
@@ -300,8 +300,8 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 
 ⚠️ **Note importanti:**
 - `EventsCompactionConfig` è marcata **[EXPERIMENTAL]** da ADK — può cambiare senza preavviso
-- La compaction usa **sempre Gemini** (`COMPACTION_LLM`) anche se `LLM_MODEL=deepseek/...`
-- Richiede quindi **Google ADC attivo** in entrambi i casi
+- `COMPACTION_LLM` usa di default `gemini-3.5-flash` — richiede **Google ADC**
+- Può essere configurata su DeepSeek (`COMPACTION_MODEL=deepseek/...`) — richiede `DEEPSEEK_API_KEY`
 - I valori di default (interval=30, overlap=2) sono configurabili nel `.env`
 
 ---
@@ -918,4 +918,4 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 | Session DB cresce troppo | `purge_old_sessions()` già attivo (cron orario, 24h retention) |
 | `purge_old_sessions` lancia OperationalError | Schema ADK cambiato — verificare nome tabella `events` nel DB |
 | EventsCompactionConfig breaking change | Feature [EXPERIMENTAL] — verificare ADK changelog ad ogni upgrade |
-| Compaction fallisce con 403/ADC error | `COMPACTION_LLM` usa sempre Gemini — eseguire `gcloud auth application-default login` |
+| Compaction fallisce con 403/ADC error | `COMPACTION_MODEL` usa Gemini per default — eseguire `gcloud auth application-default login` |

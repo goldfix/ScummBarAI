@@ -74,7 +74,7 @@ LLM_THINKING_LEVEL=medium
 DEEPSEEK_API_KEY=your-api-key-here
 DEEPSEEK_REASONING_EFFORT=high
 
-# Context compaction — always uses Gemini, requires Google ADC
+# Context compaction — default Gemini (requires ADC); can use DeepSeek with DEEPSEEK_API_KEY
 COMPACTION_MODEL=gemini-3.5-flash   # model used for session summarization
 COMPACTION_INTERVAL=30              # events before triggering compaction
 COMPACTION_OVERLAP=2                # events retained after compaction
@@ -269,8 +269,9 @@ Switching models = **one line** in `.env`. A factory function in `utils.py` buil
 | `deepseek/deepseek-v4-flash` | DeepSeek via LiteLlm | Requires `DEEPSEEK_API_KEY` |
 | `deepseek/deepseek-v4-pro` | DeepSeek via LiteLlm | More powerful, slower |
 
-> **Note:** regardless of `LLM_MODEL`, context compaction always uses a dedicated Gemini model
-> (`COMPACTION_MODEL`). Google ADC must be configured even when running DeepSeek.
+> **Note:** regardless of `LLM_MODEL`, context compaction uses a dedicated model
+> (`COMPACTION_MODEL`, default `gemini-3.5-flash`). If using the default, Google ADC
+> must be configured. It can also be set to a DeepSeek model via `.env`.
 
 ### Session Persistence
 
@@ -308,10 +309,13 @@ an active narrative bridge.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `COMPACTION_MODEL` | `gemini-3.5-flash` | Gemini model used for summarization |
+| `COMPACTION_MODEL` | `gemini-3.5-flash` | Model for summarization (Gemini or DeepSeek) |
 | `COMPACTION_INTERVAL` | `30` | Events before triggering compaction |
 | `COMPACTION_OVERLAP` | `2` | Events kept verbatim after compaction |
 
+> `COMPACTION_MODEL` defaults to Gemini (requires Google ADC). Set it to `deepseek/...`
+> to use DeepSeek for compaction instead (requires `DEEPSEEK_API_KEY`).
+>
 > This feature uses ADK's `EventsCompactionConfig`, currently marked **experimental**.
 
 ---
