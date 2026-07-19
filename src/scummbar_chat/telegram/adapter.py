@@ -58,6 +58,36 @@ _BOT_BUSY = {
     ),
 }
 
+# --- Semantic router: defines which bot should respond ---
+_INTENT_MAP = {
+    "barnaby": [
+        "barnaby", "barista", "grog", "birra", "bere", "drink",
+        "ordinare", "conto", "pulire", "servire"
+    ],
+    "barnacle": [
+        "barnacle", "micio", "gatto", "felino", "bestia",
+        "peloso", "dormire", "fusa", "soffia"
+    ]
+}
+
+def _resolve_intent(text: str) -> str | None:
+    """
+    Detect which bot should respond, using @ tags or keyword matching.
+    Tags have priority, followed by semantic keyword matching.
+    """
+    tl = text.lower()
+
+    # 1. Priorità ai Tag (Metodo esplicito @)
+    if "@barnacle" in tl: return "barnacle"
+    if "@barnaby" in tl: return "barnaby"
+
+    # 2. Semantic routing (keyword matching)
+    for bot, keywords in _INTENT_MAP.items():
+        if any(keyword in tl for keyword in keywords):
+            return bot
+
+    return None
+
 async def _send_typing(http: aiohttp.ClientSession, chat_id: int) -> None:
     """Sends the standard Telegram 'typing...' chat action."""
     try:
@@ -94,15 +124,6 @@ async def _send_message(
         log.error("Error in sendMessage: %s", e)
         return False
 
-def _detect_bot(text: str) -> str | None:
-    """Determines which character is being addressed, giving Barnacle priority."""
-    tl = text.lower()
-    if "@barnacle" in tl:
-        return "barnacle"
-    if "@barnaby" in tl:
-        return "barnaby"
-    return None
-
 def _augment_text(text: str, bot_name: str) -> str:
     """Appends routing metadata so the core coordinator knows who is responding."""
     label = bot_name.upper()
@@ -126,7 +147,8 @@ async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
         await _send_message(http, chat_id, _PRIVATE_REDIRECT)
         return
 
-    bot_name = _detect_bot(text)
+    # Use semantic router instead of simple @mention detection
+    bot_name = _resolve_intent(text)
     if not bot_name:
         return
 
