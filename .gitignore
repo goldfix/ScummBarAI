@@ -4,6 +4,7 @@ conda-env/
 tmp/
 session.db
 data/*.db
+data/logs/
 poetry.lock
 __pycache__
 .DS_Store

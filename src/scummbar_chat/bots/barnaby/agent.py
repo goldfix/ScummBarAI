@@ -6,6 +6,8 @@ from google.adk.agents import Agent
 from google.adk.tools import skill_toolset
 
 from ...utils import MODEL, THINKING_CONFIG, load_all_skills, load_md
+# Import the memory tools we created earlier
+from ...tools import recall_patron_tool, memorize_patron_tool
 
 _PERSONA = load_md(pathlib.Path(__file__).parent / "persona.md")
 
@@ -25,5 +27,6 @@ barnaby_agent = Agent(
     description="Barnaby, il barista dello Scummbar. Gestisce il bancone e interagisce con i clienti.",
     instruction=_PERSONA,
     generate_content_config=THINKING_CONFIG,
-    tools=[_barnaby_toolset],
+    # Inject both the dynamic skills and the database memory tools
+    tools=[_barnaby_toolset, recall_patron_tool, memorize_patron_tool],
 )

@@ -4,7 +4,7 @@ Operations:
 - Orchestrates the Telegram Bot runtime via long polling (`getUpdates`).
 - Implements concurrent request serialization using per-bot asynchronous locks.
 - Manages request queueing timeouts (15 seconds) to prevent starvation.
-- Handles multi-bot character routing based on mentions (@barnaby vs @barnacle).
+- Routes messages via semantic intent resolution: @ tags first, then keyword matching.
 - Implements a group-shared message counter to dynamically inject Narrator prompts.
 - Runs a background cron task that triggers hourly database pruning for 24-hour retention.
 """
@@ -58,6 +58,36 @@ _BOT_BUSY = {
     ),
 }
 
+# --- Semantic router: defines which bot should respond ---
+_INTENT_MAP = {
+    "barnaby": [
+        "barnaby", "barista", "grog", "birra", "bere", "drink",
+        "ordinare", "conto", "pulire", "servire"
+    ],
+    "barnacle": [
+        "barnacle", "micio", "gatto", "felino", "bestia",
+        "peloso", "dormire", "fusa", "soffia"
+    ]
+}
+
+def _resolve_intent(text: str) -> str | None:
+    """
+    Detect which bot should respond, using @ tags or keyword matching.
+    Tags have priority, followed by semantic keyword matching.
+    """
+    tl = text.lower()
+
+    # 1. Explicit @ tags take priority
+    if "@barnacle" in tl: return "barnacle"
+    if "@barnaby" in tl: return "barnaby"
+
+    # 2. Semantic routing (keyword matching)
+    for bot, keywords in _INTENT_MAP.items():
+        if any(keyword in tl for keyword in keywords):
+            return bot
+
+    return None
+
 async def _send_typing(http: aiohttp.ClientSession, chat_id: int) -> None:
     """Sends the standard Telegram 'typing...' chat action."""
     try:
@@ -94,22 +124,35 @@ async def _send_message(
         log.error("Error in sendMessage: %s", e)
         return False
 
-def _detect_bot(text: str) -> str | None:
-    """Determines which character is being addressed, giving Barnacle priority."""
-    tl = text.lower()
-    if "@barnacle" in tl:
-        return "barnacle"
-    if "@barnaby" in tl:
-        return "barnaby"
-    return None
-
-def _augment_text(text: str, bot_name: str) -> str:
-    """Appends routing metadata so the core coordinator knows who is responding."""
+def _augment_text(text: str, bot_name: str, user_id: str) -> str:
+    """Prepends routing hint and patron ID for context. user_id is used by tools via ToolContext."""
     label = bot_name.upper()
-    return f"[Risponde {label}] {text}"
+    return f"[Risponde {label}] [avventore_id: {user_id}] {text}"
+
+def _on_task_done(task: asyncio.Task) -> None:
+    """Callback attached to every update task — logs unhandled exceptions."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc:
+        log.exception(
+            "Unhandled exception in update task [%s]: %s",
+            task.get_name(), exc,
+            exc_info=exc,
+        )
 
 async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
     """Processes a single incoming Telegram update under a concurrency lock."""
+    try:
+        await _handle_update_inner(http, update)
+    except Exception as exc:
+        log.exception(
+            "Unhandled exception in _handle_update (update_id=%s): %s",
+            update.get("update_id"), exc,
+        )
+
+async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> None:
+    """Core update processing logic — called by _handle_update."""
     message = update.get("message")
     if not message or not message.get("text"):
         return
@@ -126,7 +169,8 @@ async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
         await _send_message(http, chat_id, _PRIVATE_REDIRECT)
         return
 
-    bot_name = _detect_bot(text)
+    # Use semantic router instead of simple @mention detection
+    bot_name = _resolve_intent(text)
     if not bot_name:
         return
 
@@ -148,7 +192,7 @@ async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
 
         # Track message cadence per session to trigger the Narrator every 3rd message
         _message_counters[session_id] = _message_counters.get(session_id, 0) + 1
-        augmented = _augment_text(text, bot_name)
+        augmented = _augment_text(text, bot_name, user_id)
 
         if _message_counters[session_id] % 3 == 0:
             _message_counters[session_id] = 0
@@ -190,8 +234,8 @@ async def _session_cleaner_cron() -> None:
     while True:
         try:
             await purge_old_sessions(hours=24)
-        except Exception as e:
-            log.error("Error in session cleaner background task: %s", e)
+        except Exception as exc:
+            log.exception("Error in session cleaner background task: %s", exc)
         await asyncio.sleep(3600)
 
 async def run_polling() -> None:
@@ -222,8 +266,8 @@ async def run_polling() -> None:
                     offset = upd["update_id"] + 1
                     task = asyncio.create_task(_handle_update(http, upd))
                     pending.add(task)
-                    # Clean up completed tasks from the tracking set
                     task.add_done_callback(pending.discard)
+                    task.add_done_callback(_on_task_done)
 
             except asyncio.CancelledError:
                 log.info("Polling stopped.")
@@ -232,5 +276,9 @@ async def run_polling() -> None:
                 log.error("Polling error: %s", e)
                 await asyncio.sleep(5)
 
+        # Drain pending tasks; log any exceptions that surface
         if pending:
-            await asyncio.gather(*pending, return_exceptions=True)
+            results = await asyncio.gather(*pending, return_exceptions=True)
+            for r in results:
+                if isinstance(r, Exception):
+                    log.exception("Exception in pending task at shutdown: %s", r, exc_info=r)

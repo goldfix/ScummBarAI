@@ -10,7 +10,7 @@ Operations:
 import asyncio
 import logging
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
@@ -20,7 +20,7 @@ from google.genai import types
 
 from ..agent import root_agent
 
-# 1. Update utilities imports to get the pre-built COMPACTION_LLM
+# Utilities imports: pre-built model instances for agents and compaction
 from ..utils import (
     SESSION_DB_URI,
     COMPACTION_LLM,
@@ -39,7 +39,7 @@ _runner: Runner | None = None
 
 async def purge_old_sessions(hours: int = 24) -> int:
     """Removes historical events older than X hours from the ADK SQLite backend."""
-    cutoff_time = datetime.utcnow() - timedelta(hours=hours)
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
     cutoff_str = cutoff_time.strftime("%Y-%m-%d %H:%M:%S")
 
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
@@ -72,7 +72,7 @@ def _get_runner() -> Runner:
     if _runner is None:
         _session_service = DatabaseSessionService(db_url=SESSION_DB_URI)
 
-        # 2. Inject the dynamic LLM instance (Gemini or LiteLlm) into the Summarizer
+        # Inject the compaction model into the LLM-based summarizer
         compaction_summarizer = LlmEventSummarizer(
             llm=COMPACTION_LLM
         )
@@ -89,7 +89,7 @@ def _get_runner() -> Runner:
             events_compaction_config=compaction_config
         )
 
-        # 4. Attach the fully operational App instance to the top-level Runner
+        # Attach the App instance (with compaction config) to the Runner
         _runner = Runner(
             app=scummbar_app,
             session_service=_session_service,
