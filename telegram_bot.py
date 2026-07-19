@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Avvia il bot Telegram dello Scummbar.
+"""Start the Scummbar Telegram bot.
 
-Uso:
+Usage:
     source py-env/bin/activate
     python telegram_bot.py
 """
@@ -11,7 +11,7 @@ import logging
 import sys
 from pathlib import Path
 
-# Aggiunge src/ al path
+# Add src/ to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 logging.basicConfig(
@@ -26,4 +26,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(run_polling())
     except KeyboardInterrupt:
-        print("\n👋 Scummbar chiuso. Alla prossima!")
+        print("\n👋 Scummbar closed. See you next time!")

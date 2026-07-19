@@ -1,14 +1,14 @@
-"""scummbar_chat — Contesto temporale del bar.
+"""scummbar_chat — Bar time context.
 
-Mappa l'orario reale ai momenti della giornata nello Scummbar.
-Viene usato dall'InstructionProvider del global_instruction.
+Maps real time to moments of the day in the Scummbar.
+Used by the InstructionProvider in global_instruction.
 """
 
 import datetime
 
 
 # ---------------------------------------------------------------------------
-# Mappatura oraria → momento della giornata
+# Hour → time period mapping
 # ---------------------------------------------------------------------------
 
 _TIME_PERIODS = [
@@ -92,17 +92,17 @@ debolmente alla luce del fuoco.
 
 
 # ---------------------------------------------------------------------------
-# Funzione pubblica
+# Public functions
 # ---------------------------------------------------------------------------
 
 def get_time_description(now: datetime.datetime | None = None) -> str:
-    """Restituisce la descrizione del momento della giornata nello Scummbar.
+    """Return the current time of day description for the Scummbar.
 
     Args:
-        now: orario da usare (default: orario corrente del sistema).
+        now: datetime to use (default: current system time).
 
     Returns:
-        Stringa con la descrizione atmosferica del momento.
+        String with the atmospheric description of the moment.
     """
     if now is None:
         now = datetime.datetime.now()
@@ -117,7 +117,7 @@ def get_time_description(now: datetime.datetime | None = None) -> str:
 
 
 def get_current_period(now: datetime.datetime | None = None) -> str:
-    """Restituisce il nome del periodo corrente (alba, mattino, ecc.)."""
+    """Return the current period name (alba, mattino, etc.)."""
     if now is None:
         now = datetime.datetime.now()
 

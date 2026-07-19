@@ -1,6 +1,6 @@
-"""ADK Runner per il Telegram adapter.
+"""ADK Runner for the Telegram adapter.
 
-Gestisce sessioni persistenti (SQLite) e invoca gli agenti.
+Manages persistent sessions (SQLite) and invokes agents.
 """
 
 import logging
@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 
 APP_NAME = "scummbar_chat"
 
-# Singleton: Runner + SessionService condivisi
+# Singleton: shared Runner + SessionService
 _session_service: DatabaseSessionService | None = None
 _runner: Runner | None = None
 
@@ -29,12 +29,12 @@ def _get_runner() -> Runner:
             app_name=APP_NAME,
             session_service=_session_service,
         )
-        log.info("ADK Runner inizializzato (DatabaseSessionService)")
+        log.info("ADK Runner initialized (DatabaseSessionService)")
     return _runner
 
 
 async def _ensure_session(user_id: str, session_id: str) -> None:
-    """Crea la sessione se non esiste."""
+    """Create the session if it doesn't exist."""
     svc = _get_runner().session_service
     session = await svc.get_session(
         app_name=APP_NAME,
@@ -54,15 +54,15 @@ async def run_agent(
     session_id: str,
     text: str,
 ) -> str:
-    """Invoca il root_agent e restituisce il testo della risposta finale.
+    """Invoke the root_agent and return the final response text.
 
     Args:
-        user_id:    ID Telegram dell'utente (str).
-        session_id: ID sessione ADK (= chat_id del gruppo).
-        text:       Testo del messaggio già arricchito con routing hint.
+        user_id:    Telegram user ID (str).
+        session_id: ADK session ID (= group chat_id).
+        text:       Message text already augmented with routing hint.
 
     Returns:
-        Testo della risposta finale dell'agente, o stringa vuota.
+        Final response text from the agent, or empty string.
     """
     runner = _get_runner()
     await _ensure_session(user_id, session_id)
@@ -80,7 +80,7 @@ async def run_agent(
     ):
         if event.is_final_response() and event.content and event.content.parts:
             for part in event.content.parts:
-                # Salta i thought (reasoning interno di DeepSeek/Gemini)
+                # Skip thought parts (DeepSeek/Gemini internal reasoning)
                 if part.text and not getattr(part, 'thought', False):
                     response_parts.append(part.text)
 

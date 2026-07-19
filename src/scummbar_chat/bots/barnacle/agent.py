@@ -1,4 +1,4 @@
-"""Barnacle — agente del gatto dello Scummbar."""
+"""Barnacle — Scummbar cat agent."""
 
 import pathlib
 
