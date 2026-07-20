@@ -23,6 +23,7 @@ aiosqlite = "^0.21.0"
 litellm = "^1.52.0"
 greenlet = "^3.1.0"
 orjson = "^3.10.0"
+ruff = "^0.15.22"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

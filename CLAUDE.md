@@ -36,7 +36,7 @@ scummbar/
 │       │   │   ├── agent.py           # LlmAgent Barnaby + SkillToolset + memory tools
 │       │   │   └── persona.md         # chi è Barnaby, come parla
 │       │   └── barnacle/
-│       │       ├── agent.py           # LlmAgent Barnacle + recall_patron_tool
+│       │       ├── agent.py           # LlmAgent Barnacle + recall_patron_memory tool
 │       │       └── persona.md         # chi è Barnacle, come si comporta
 │       ├── skills/                    # Skills ADK (auto-discovery)
 │       │   ├── grog/
@@ -199,8 +199,8 @@ CREATE TABLE IF NOT EXISTS patron_memories (
 
 | Tool | Chi lo usa | Quando |
 |------|-----------|--------|
-| `recall_patron_tool` | Barnaby + Barnacle | All'inizio di ogni interazione |
-| `memorize_patron_tool` | Barnaby | A fine conversazione o su rivelazione biografica |
+| `recall_patron_memory` | Barnaby + Barnacle | All'inizio di ogni interazione |
+| `memorize_patron_chat` | Barnaby | A fine conversazione o su rivelazione biografica |
 
 **`user_id` affidabile via `ToolContext`:**
 
@@ -433,7 +433,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Lock con timeout (15s) | ✅ | `asyncio.wait_for` invece di wait indefinito |
 | Context Compaction (LLM-based) | ✅ | `App` + `EventsCompactionConfig` + `LlmEventSummarizer` |
 | Semantic routing | ✅ | `_resolve_intent()`: @mention + keyword matching via `_INTENT_MAP` |
-| Memoria avventori | ✅ | `patron_memories` SQLite + `recall_patron_tool` + `memorize_patron_tool` |
+| Memoria avventori | ✅ | `patron_memories` SQLite + `recall_patron_memory` + `memorize_patron_chat` |
 | Logging verboso + error export | ✅ | `--debug`, `bot.log`, `errors.log`, `_dump_exception()` |
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
 | Integrazione Slack | 🔲 | Future |
@@ -443,6 +443,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 
 ### 💡 Decisioni architetturali
 
+- **Lingua Mista (Code vs Prompts)**: Tutti i commenti tecnici in Python e la documentazione del codice (`#` o `"""`) sono in **Inglese** (per mantenere lo standard di sviluppo). I messaggi di ritorno dei tools per l'LLM e i file Markdown dei prompt sono in **Italiano** (perché fanno parte dell'input/output del modello).
 - **Prompt in Markdown** — editabili senza toccare codice
 - **`global_instruction` = InstructionProvider** — world context + orario aggiornato ad ogni turno, cachabile da Gemini
 - **Ogni bot ha solo la sua `persona.md`** — world context arriva via global_instruction
