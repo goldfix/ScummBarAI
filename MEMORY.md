@@ -10,7 +10,7 @@
 
 ### Cos'è Scummbar
 Chat interattiva multi-bot ambientata in una taverna piratesca caraibica.
-I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto).
+I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto, Isolde la veggente).
 Sviluppato con **Google ADK 2.4.0** + **Gemini / DeepSeek** via Vertex AI / LiteLlm.
 Integrazione Telegram: **completata** ✅.
 
@@ -30,18 +30,21 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory (_build_model_instance), load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll
+│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, cast_vision
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/
 │       │   └── scummbar.md            # world context + regole narrazione + logica Narratore
 │       ├── bots/
-│       │   ├── __init__.py            # esporta barnaby_agent, barnacle_agent
+│       │   ├── __init__.py            # esporta barnaby_agent, barnacle_agent, isolde_agent
 │       │   ├── barnaby/
 │       │   │   ├── agent.py           # LlmAgent Barnaby + SkillToolset + memory tools
 │       │   │   └── persona.md         # chi è Barnaby, come parla
-│       │   └── barnacle/
-│       │       ├── agent.py           # LlmAgent Barnacle + recall_patron_memory tool
-│       │       └── persona.md         # chi è Barnacle, come si comporta
+│       │   ├── barnacle/
+│       │   │   ├── agent.py           # LlmAgent Barnacle + recall_patron_memory tool
+│       │   │   └── persona.md         # chi è Barnacle, come si comporta
+│       │   └── isolde/
+│       │       ├── agent.py           # LlmAgent Isolde + recall_patron_memory + cast_vision_tool
+│       │       └── persona.md         # chi è Isolde, veggente dell'Angolo Oscuro
 │       ├── skills/                    # Skills ADK (auto-discovery)
 │       │   ├── grog/
 │       │   │   └── SKILL.md           # skill dinamica: genera grog unici per contesto
@@ -191,7 +194,7 @@ Se nessun pattern corrisponde, il messaggio viene ignorato (nessun bot risponde)
 
 ### 🧠 Memoria Avventori (`tools.py` + `patron_memories`)
 
-Barnaby e Barnacle ricordano i clienti tra una sessione e l'altra grazie a due
+Barnaby, Barnacle e Isolde ricordano i clienti tra una sessione e l'altra grazie a due
 `FunctionTool` ADK che leggono/scrivono su una tabella SQLite dedicata.
 
 **Schema tabella `patron_memories`:**
@@ -210,8 +213,9 @@ CREATE TABLE IF NOT EXISTS patron_memories (
 
 | Tool | Chi lo usa | Quando |
 |------|-----------|--------|
-| `recall_patron_memory` | Barnaby + Barnacle | All'inizio di ogni interazione |
+| `recall_patron_memory` | Barnaby + Barnacle + Isolde | All'inizio di ogni interazione |
 | `memorize_patron_chat` | Barnaby | A fine conversazione o su rivelazione biografica |
+| `cast_vision` | Isolde | Per proiettare visioni / tarocchi (genera immagini con fallback PIL) |
 
 **`user_id` affidabile via `ToolContext`:**
 

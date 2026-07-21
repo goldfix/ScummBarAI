@@ -126,6 +126,7 @@ grog - Order a special grog
 menu - Check the galley
 barnaby - Talk to the bartender
 barnacle - Bother the cat
+isolde - Seek a tarot vision from the shadow corner
 help - Help and available commands
 ```
 
@@ -133,9 +134,9 @@ Then make the bot a **group admin** (for Barnacle's ephemeral messages).
 
 #### How it works
 
-- Users can engage bots via **@mention** (`@barnaby`, `@barnacle`) or **keywords** (e.g. `grog`, `gatto`)
+- Users can engage bots via **@mention** (`@barnaby`, `@barnacle`, `@isolde`) or **keywords** (e.g. `grog`, `gatto`, `carte`)
 - @mention always takes priority over keyword matching
-- Barnaby replies publicly in the group
+- Barnaby and Isolde reply publicly in the group
 - Barnacle replies with ephemeral messages (visible only to the requester)
 - Private messages to the bot get an in-character redirect to the group
 - One user at a time per bot (asyncio locks with 15s timeout)
@@ -159,9 +160,12 @@ src/scummbar_chat/
 │   ├── barnaby/
 │   │   ├── agent.py         # Barnaby agent + SkillToolset + memory/artifact tools
 │   │   └── persona.md       # Barnaby's personality prompt
-│   └── barnacle/
-│       ├── agent.py         # Barnacle agent + recall_patron_tool
-│       └── persona.md       # Barnacle's personality prompt
+│   ├── barnacle/
+│   │   ├── agent.py         # Barnacle agent + recall_patron_tool
+│   │   └── persona.md       # Barnacle's personality prompt
+│   └── isolde/
+│       ├── agent.py         # Isolde agent + recall_patron_tool + cast_vision_tool
+│       └── persona.md       # Isolde's personality prompt (mysterious tarot reader)
 ├── skills/                  # Auto-discovered ADK skills
 │   ├── grog/SKILL.md        # Dynamic grog generation
 │   └── menu/SKILL.md        # Menu: quick serve + recipes
@@ -186,11 +190,12 @@ root_agent (scummbar_chat)
 ├── instruction = coordinator prompt
 └── sub_agents:
     ├── barnaby → persona.md + SkillToolset (skills auto-discovery)
-    └── barnacle → persona.md
+    ├── barnacle → persona.md
+    └── isolde → persona.md
 ```
 
 The root agent never responds directly — it **delegates** to the appropriate sub-agent
-based on a routing hint prepended to the message (`[Risponde BARNABY]` or `[Risponde BARNACLE]`).
+based on a routing hint prepended to the message (`[Risponde BARNABY]`, `[Risponde BARNACLE]`, or `[Risponde ISOLDE]`).
 
 ### Time Context
 
@@ -223,13 +228,14 @@ Skills are modular prompt bundles loaded dynamically from the `skills/` director
 Messages are routed to the right bot through `_resolve_intent()`, which applies two
 priority levels in order:
 
-1. **Explicit @ tag** — `@barnaby` or `@barnacle` in the message text (always wins)
+1. **Explicit @ tag** — `@barnaby`, `@barnacle`, or `@isolde` in the message text (always wins)
 2. **Keyword matching** — if no tag is found, the message is scanned against `_INTENT_MAP`
 
 ```python
 _INTENT_MAP = {
     "barnaby":  ["barnaby", "barista", "grog", "birra", "bere", "drink", ...],
-    "barnacle": ["barnacle", "micio", "gatto", "felino", "fusa", ...]
+    "barnacle": ["barnacle", "micio", "gatto", "felino", "fusa", ...],
+    "isolde":   ["isolde", "carte", "giocare", "gioco", "dadi", "tarocchi", "segreto", ...]
 }
 ```
 
@@ -413,23 +419,34 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
 
 The table is created automatically on first use (`CREATE TABLE IF NOT EXISTS`).
 
-#### 5. Artifact Delivery (`InMemoryArtifactService` + `write_secret_scroll`)
+#### 5. Artifact & Media Delivery (`InMemoryArtifactService`, `write_secret_scroll`, `cast_vision`)
 
-To support tangible digital handovers (like "Secret Recipes" or "Treasure Maps"), we configured ADK's `InMemoryArtifactService` on the Runner. 
+To support tangible digital handovers (like "Secret Recipes", "Treasure Maps", or "Tarot Card Visions"), we configured ADK's `InMemoryArtifactService` on the Runner.
 
-When Barnaby uses the `write_secret_scroll` tool, ADK writes a text file to RAM:
-1. Barnaby calls the tool supplying `title` and `content`.
+Depending on the mime type/extension, artifacts are delivered dynamically to Telegram:
+
+##### A. Text-Based Scrolls (Barnaby's Bartending Recipes / Maps)
+1. Barnaby calls the `write_secret_scroll` tool supplying `title` and `content`.
 2. The file is saved as an ADK Artifact (`types.Part.from_bytes` under `text/plain`).
 3. `runner.py` intercepts `event.actions.artifact_delta` during execution and extracts the raw bytes.
-4. `adapter.py` streams the file to Telegram using the native `sendDocument` API wrapped as a `multipart/form-data` request:
+4. `adapter.py` streams the file to Telegram as a downloadable attachment using the native `sendDocument` API:
+   ```python
+   # Streams from RAM as multipart/form-data
+   await _send_document(http, chat_id, filename, file_bytes)
+   ```
 
-```python
-# InMemory lookup & network pipeline:
-part = await _artifact_service.load_artifact(filename=f, version=v, ...)
-await _send_document(http, chat_id, filename, part.inline_data.data)
-```
+##### B. Visual Images (Isolde's Mystic Tarot Card Visions)
+1. Isolde calls the `cast_vision` tool supplying a `title` and a visual `description`.
+2. The tool attempts to generate an AI image via Imagen 3 (`imagen-3.0-generate-002`) on Vertex AI or Google AI Studio. 
+3. **Robust Fallback**: If the AI model fails or is blocked by corporate security (e.g. Google Cloud VPC Service Controls), the tool gracefully falls back to generating a beautiful, custom-drawn in-character tarot card `.png` in-memory using **Pillow**.
+4. The file is saved as a `.png` artifact and intercepted.
+5. `adapter.py` detects the `.png` extension and uploads it as an inline, beautifully rendered chat photo using the Telegram `sendPhoto` API:
+   ```python
+   # Renders inline in the chat
+   await _send_photo(http, chat_id, filename, file_bytes)
+   ```
 
-No cloud storage or Google GCS buckets are used, making the artifact generation fast, secure, and entirely locally-contained.
+Both models are fully parameterized. All settings (e.g. `IMAGE_MODEL` and `IMAGE_LOCATION` region override) are configured centrally in `.env`. No cloud storage or Google GCS buckets are used, making the artifact generation fast, secure, and entirely locally-contained.
 
 ---
 
