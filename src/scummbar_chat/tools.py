@@ -8,6 +8,7 @@ Operations:
 
 import sqlite3
 import logging
+import google.genai.types as types
 from datetime import datetime, timezone
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
@@ -121,6 +122,40 @@ async def memorize_patron_chat(
         log.error("Database error in memorize_patron_chat: %s", e)
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
 
+async def write_secret_scroll(
+    tool_context: ToolContext,
+    title: str,
+    content: str
+) -> str:
+    """
+    Usa questo strumento per scrivere fisicamente una pergamena, una ricetta segreta o una
+    mappa del tesoro da consegnare a mano al pirata. Genererà un file reale scaricabile in chat.
+    - title: Il titolo del documento (es. 'Ricetta Grog Ombra').
+    - content: Il testo completo che vuoi scrivere sulla pergamena. Sii creativo e descrittivo.
+    """
+    file_bytes = content.encode("utf-8")
+    
+    artifact_part = types.Part.from_bytes(
+        data=file_bytes,
+        mime_type="text/plain"
+    )
+    
+    # Sanitize the title to make it a valid filename
+    safe_title = "".join(c if c.isalnum() else "_" for c in title.strip().lower())
+    filename = f"{safe_title}.txt"
+    
+    try:
+        # InMemoryArtifactService handles storage under the session/user namespace
+        version = await tool_context.save_artifact(
+            filename=filename,
+            artifact=artifact_part
+        )
+        return f"Pergamena {filename} (versione {version}) scritta e arrotolata con successo! Il cliente la riceverà a breve."
+    except Exception as e:
+        log.error("Errore salvataggio artifact in write_secret_scroll: %s", e)
+        return "La penna si è rotta e l'inchiostro si è sparso! Non sono riuscito a scrivere la pergamena."
+
 # Wrapped ADK primitives exported for agent binding
 recall_patron_tool = FunctionTool(recall_patron_memory)
 memorize_patron_tool = FunctionTool(memorize_patron_chat)
+write_secret_scroll_tool = FunctionTool(write_secret_scroll)

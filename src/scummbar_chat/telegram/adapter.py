@@ -30,13 +30,13 @@ BOT_USER  = os.getenv("TELEGRAM_BOT_USERNAME", "").lower()
 GROUP_URL = os.getenv("TELEGRAM_GROUP_LINK", "")
 BASE      = f"https://api.telegram.org/bot{TOKEN}"
 
-# --- Per-bot lock: prevents race conditions when updating the same session history ---
+# --- Per-bot lock: serializes updates to prevent race conditions in LLM session history ---
 _locks: dict[str, asyncio.Lock] = {
     "barnaby":  asyncio.Lock(),
     "barnacle": asyncio.Lock(),
 }
 
-# --- Shared group message counters for Narrator logic ---
+# --- Tracks user message counts per chat room to trigger Narrator events ---
 _message_counters: dict[str, int] = {}
 
 # --- In-character messages ---
@@ -97,6 +97,39 @@ async def _send_typing(http: aiohttp.ClientSession, chat_id: int) -> None:
         )
     except Exception:
         pass
+
+async def _send_document(
+    http: aiohttp.ClientSession,
+    chat_id: int,
+    filename: str,
+    file_bytes: bytes,
+    receiver_user_id: int | None = None,
+) -> bool:
+    """
+    Upload raw byte artifacts as files directly to Telegram using multipart/form-data.
+    Bypasses local disk storage, streaming directly from RAM.
+    """
+    data = aiohttp.FormData()
+    data.add_field("chat_id", str(chat_id))
+    data.add_field(
+        "document",
+        file_bytes,
+        filename=filename,
+        content_type="text/plain"
+    )
+    if receiver_user_id:
+        data.add_field("receiver_user_id", str(receiver_user_id))
+
+    try:
+        async with http.post(f"{BASE}/sendDocument", data=data) as resp:
+            resp_data = await resp.json()
+            if not resp_data.get("ok"):
+                log.warning("sendDocument failed: %s", resp_data.get("description", resp_data))
+                return False
+            return True
+    except Exception as e:
+        log.error("Error in sendDocument: %s", e)
+        return False
 
 async def _send_message(
     http: aiohttp.ClientSession,
@@ -169,7 +202,7 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
         await _send_message(http, chat_id, _PRIVATE_REDIRECT)
         return
 
-    # Use semantic router instead of simple @mention detection
+    # Use semantic router to match message to a specific bot persona
     bot_name = _resolve_intent(text)
     if not bot_name:
         return
@@ -178,11 +211,12 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
     TIMEOUT_CODA = 15.0
     lock_acquired = False
 
-    # Attempt to acquire lock within timeout to handle concurrent message spikes safely
+    # Attempt to acquire lock within a 15-second window to prevent Telegram request piling/starvation
     try:
         await asyncio.wait_for(lock.acquire(), timeout=TIMEOUT_CODA)
         lock_acquired = True
     except asyncio.TimeoutError:
+        # Notify user that the character is currently busy (lock timeout)
         await _send_message(http, chat_id, _BOT_BUSY[bot_name])
         return
 
@@ -190,7 +224,7 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
         await _send_typing(http, chat_id)
         session_id = str(chat_id)
 
-        # Track message cadence per session to trigger the Narrator every 3rd message
+        # Increment message count. On every 3rd message, inject the Narrator prompt.
         _message_counters[session_id] = _message_counters.get(session_id, 0) + 1
         augmented = _augment_text(text, bot_name, user_id)
 
@@ -202,7 +236,7 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
                 "racchiusa ESATTAMENTE tra due trattini bassi, seguendo le regole del file scummbar.md.]"
             )
 
-        response = await run_agent(
+        response, files = await run_agent(
             user_id=user_id,
             session_id=session_id,
             text=augmented,
@@ -221,8 +255,12 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
             if not sent:
                 fallback = formatted + "\n\n<i>🐱 (whisper — just for you)</i>"
                 await _send_message(http, chat_id, fallback)
+            for f in files:
+                await _send_document(http, chat_id, f["filename"], f["bytes"], receiver_user_id=int(user_id))
         else:
             await _send_message(http, chat_id, formatted)
+            for f in files:
+                await _send_document(http, chat_id, f["filename"], f["bytes"])
 
     finally:
         # Guarantee lock release even if generation or communication fails, only if acquired

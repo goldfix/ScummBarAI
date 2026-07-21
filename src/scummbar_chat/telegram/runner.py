@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 from google.adk.runners import Runner
 from google.adk.sessions import DatabaseSessionService
+from google.adk.artifacts import InMemoryArtifactService
 from google.adk.apps.app import App, EventsCompactionConfig
 from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
 from google.genai import types
@@ -35,6 +36,7 @@ APP_NAME = "scummbar_chat"
 
 # Singleton structures: shared globally across the module execution lifespan
 _session_service: DatabaseSessionService | None = None
+_artifact_service: InMemoryArtifactService | None = None
 _runner: Runner | None = None
 
 async def purge_old_sessions(hours: int = 24) -> int:
@@ -68,9 +70,10 @@ async def purge_old_sessions(hours: int = 24) -> int:
 
 def _get_runner() -> Runner:
     """Lazy initializer ensuring the ADK runner and DB session layer exist as a singleton."""
-    global _session_service, _runner
+    global _session_service, _artifact_service, _runner
     if _runner is None:
         _session_service = DatabaseSessionService(db_url=SESSION_DB_URI)
+        _artifact_service = InMemoryArtifactService()
 
         # Inject the compaction model into the LLM-based summarizer
         compaction_summarizer = LlmEventSummarizer(
@@ -89,10 +92,11 @@ def _get_runner() -> Runner:
             events_compaction_config=compaction_config
         )
 
-        # Attach the App instance (with compaction config) to the Runner
+        # Attach the App instance (with compaction config) and Artifacts to the Runner
         _runner = Runner(
             app=scummbar_app,
             session_service=_session_service,
+            artifact_service=_artifact_service,
         )
         log.info(
             "ADK Runner initialized (Model: %s, Interval: %d, Overlap: %d)",
@@ -119,8 +123,11 @@ async def run_agent(
     user_id: str,
     session_id: str,
     text: str,
-) -> str:
-    """Dispatches augmented textual updates through the ADK coordinator and extracts generation content."""
+) -> tuple[str, list[dict]]:
+    """
+    Dispatches augmented textual updates through the ADK coordinator.
+    Returns a tuple: (text_response, list_of_artifacts)
+    """
     runner = _get_runner()
     await _ensure_session(user_id, session_id)
 
@@ -130,16 +137,36 @@ async def run_agent(
     )
 
     response_parts: list[str] = []
-    # Async stream loop consuming real-time tokens
+    generated_files: list[dict] = []
+    
+    # Async stream loop consuming real-time tokens and events
     async for event in runner.run_async(
         user_id=user_id,
         session_id=session_id,
         new_message=user_message,
     ):
+        # 1. Extract Artifacts if Barnaby generated any
+        if event.actions and event.actions.artifact_delta:
+            for filename, version in event.actions.artifact_delta.items():
+                # Load the bytes from the in-memory service
+                part = await _artifact_service.load_artifact(
+                    app_name=APP_NAME,
+                    user_id=user_id,
+                    session_id=session_id,
+                    filename=filename,
+                    version=version
+                )
+                if part and part.inline_data:
+                    generated_files.append({
+                        "filename": filename,
+                        "bytes": part.inline_data.data
+                    })
+                    
+        # 2. Extract final textual dialogue
         if event.is_final_response() and event.content and event.content.parts:
             for part in event.content.parts:
                 # Discard internal thoughts to preserve standard dialogue formatting
                 if part.text and not getattr(part, 'thought', False):
                     response_parts.append(part.text)
 
-    return "".join(response_parts).strip()
+    return "".join(response_parts).strip(), generated_files

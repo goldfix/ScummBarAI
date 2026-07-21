@@ -6,7 +6,7 @@ from google.adk.agents import Agent
 from google.adk.tools import skill_toolset
 
 from ...utils import MODEL, THINKING_CONFIG, load_all_skills, load_md
-# Il gatto ha bisogno SOLO dello strumento di lettura (olfatto)
+# The cat only needs the read-only recall tool (sense of smell)
 from ...tools import recall_patron_tool
 
 _PERSONA = load_md(pathlib.Path(__file__).parent / "persona.md")
@@ -26,6 +26,6 @@ barnacle_agent = Agent(
     description="Barnacle, il gatto dello Scummbar. Vive nel bar, osserva tutto e ricorda gli odori dei clienti.",
     instruction=_PERSONA,
     generate_content_config=THINKING_CONFIG,
-    # Barnacle è "read-only": usa il recall tool ma non può memorizzare/scrivere
+    # Barnacle is "read-only": uses the recall tool but cannot memorize/write
     tools=[_barnacle_toolset, recall_patron_tool],
 )

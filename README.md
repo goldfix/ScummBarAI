@@ -151,13 +151,13 @@ src/scummbar_chat/
 ├── agent.py                 # Root agent (coordinator)
 ├── utils.py                 # Model factory, shared config, file loading
 ├── time_context.py          # Real-time → bar atmosphere mapping
-├── tools.py                 # FunctionTools: recall_patron_memory, memorize_patron_chat
+├── tools.py                 # FunctionTools: recall_patron_memory, memorize_patron_chat, write_secret_scroll_tool
 ├── .env                     # Environment configuration
 ├── world/
 │   └── scummbar.md          # World context + narrator rules
 ├── bots/
 │   ├── barnaby/
-│   │   ├── agent.py         # Barnaby agent + SkillToolset + memory tools
+│   │   ├── agent.py         # Barnaby agent + SkillToolset + memory/artifact tools
 │   │   └── persona.md       # Barnaby's personality prompt
 │   └── barnacle/
 │       ├── agent.py         # Barnacle agent + recall_patron_tool
@@ -412,6 +412,24 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
 ```
 
 The table is created automatically on first use (`CREATE TABLE IF NOT EXISTS`).
+
+#### 5. Artifact Delivery (`InMemoryArtifactService` + `write_secret_scroll`)
+
+To support tangible digital handovers (like "Secret Recipes" or "Treasure Maps"), we configured ADK's `InMemoryArtifactService` on the Runner. 
+
+When Barnaby uses the `write_secret_scroll` tool, ADK writes a text file to RAM:
+1. Barnaby calls the tool supplying `title` and `content`.
+2. The file is saved as an ADK Artifact (`types.Part.from_bytes` under `text/plain`).
+3. `runner.py` intercepts `event.actions.artifact_delta` during execution and extracts the raw bytes.
+4. `adapter.py` streams the file to Telegram using the native `sendDocument` API wrapped as a `multipart/form-data` request:
+
+```python
+# InMemory lookup & network pipeline:
+part = await _artifact_service.load_artifact(filename=f, version=v, ...)
+await _send_document(http, chat_id, filename, part.inline_data.data)
+```
+
+No cloud storage or Google GCS buckets are used, making the artifact generation fast, secure, and entirely locally-contained.
 
 ---
 
