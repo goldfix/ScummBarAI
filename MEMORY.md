@@ -455,6 +455,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
 | Integrazione Slack | 🔲 | Future |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
+| Supporto duale autenticazione (Service Account ↔ API Key) | 🔲 | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |
 | Autenticazione Gemini via Service Account | ✅ | `.env` + `GOOGLE_APPLICATION_CREDENTIALS`; pre-flight check in `telegram_bot.py` |
 | Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
 

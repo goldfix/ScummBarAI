@@ -83,6 +83,11 @@ COMPACTION_OVERLAP=2                # events retained after compaction
 TELEGRAM_BOT_TOKEN=your-bot-token
 TELEGRAM_BOT_USERNAME=your_bot_username
 TELEGRAM_GROUP_LINK=https://t.me/your-group
+
+# Image Generation (Isolde)
+IMAGE_MODEL=gemini-3.1-flash-lite-image
+# Optional: Google AI Studio API key to bypass Vertex AI for image generation
+# GEMINI_API_KEY=your-api-key-here
 ```
 
 ---
