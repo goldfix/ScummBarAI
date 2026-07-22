@@ -164,7 +164,7 @@ src/scummbar_chat/
 │   │   ├── agent.py         # Barnacle agent + recall_patron_tool
 │   │   └── persona.md       # Barnacle's personality prompt
 │   └── isolde/
-│       ├── agent.py         # Isolde agent + recall_patron_tool + cast_vision_tool
+│       ├── agent.py         # Isolde agent + recall_patron_tool + draw_tarot_card_tool
 │       └── persona.md       # Isolde's personality prompt (mysterious tarot reader)
 ├── skills/                  # Auto-discovered ADK skills
 │   ├── grog/SKILL.md        # Dynamic grog generation
@@ -419,7 +419,7 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
 
 The table is created automatically on first use (`CREATE TABLE IF NOT EXISTS`).
 
-#### 5. Artifact & Media Delivery (`InMemoryArtifactService`, `write_secret_scroll`, `cast_vision`)
+#### 5. Artifact & Media Delivery (`InMemoryArtifactService`, `write_secret_scroll`, `draw_tarot_card`)
 
 To support tangible digital handovers (like "Secret Recipes", "Treasure Maps", or "Tarot Card Visions"), we configured ADK's `InMemoryArtifactService` on the Runner.
 
@@ -436,17 +436,17 @@ Depending on the mime type/extension, artifacts are delivered dynamically to Tel
    ```
 
 ##### B. Visual Images (Isolde's Mystic Tarot Card Visions)
-1. Isolde calls the `cast_vision` tool supplying a `title` and a visual `description`.
-2. The tool attempts to generate an AI image via Imagen 3 (`imagen-3.0-generate-002`) on Vertex AI or Google AI Studio. 
-3. **Robust Fallback**: If the AI model fails or is blocked by corporate security (e.g. Google Cloud VPC Service Controls), the tool gracefully falls back to generating a beautiful, custom-drawn in-character tarot card `.png` in-memory using **Pillow**.
-4. The file is saved as a `.png` artifact and intercepted.
-5. `adapter.py` detects the `.png` extension and uploads it as an inline, beautifully rendered chat photo using the Telegram `sendPhoto` API:
+1. Isolde calls the `draw_tarot_card` tool supplying a `card_name` and a visual `scene_description`.
+2. The tool attempts to generate an AI image using the Google GenAI SDK. If `GEMINI_API_KEY` is provided in `.env`, the client will automatically authenticate and generate high-quality AI images.
+3. **Robust Fallback**: If the AI model fails or is blocked by network/security issues, the tool gracefully falls back to generating a beautiful, custom-drawn in-character tarot card `.png` in-memory using **Pillow**.
+4. The file is saved as a `.png` or `.jpg` artifact (automatically detected from the bytes) and intercepted.
+5. `adapter.py` detects the extension and uploads it as an inline, beautifully rendered chat photo using the Telegram `sendPhoto` API:
    ```python
    # Renders inline in the chat
    await _send_photo(http, chat_id, filename, file_bytes)
    ```
 
-Both models are fully parameterized. All settings (e.g. `IMAGE_MODEL` and `IMAGE_LOCATION` region override) are configured centrally in `.env`. No cloud storage or Google GCS buckets are used, making the artifact generation fast, secure, and entirely locally-contained.
+All models are fully parameterized. All settings (e.g. `IMAGE_MODEL` and the API key) are configured centrally in `.env`. No cloud storage or Google GCS buckets are used, making the artifact generation fast, secure, and entirely locally-contained.
 
 ---
 

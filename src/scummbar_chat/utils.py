@@ -11,9 +11,9 @@ from dotenv import load_dotenv
 from google.genai import types
 from google.adk.models import BaseLlm
 
-# --- Load .env ---
+# --- Load .env (override=True so .env values take precedence over shell env vars) ---
 _ENV_PATH = pathlib.Path(__file__).parent / ".env"
-load_dotenv(_ENV_PATH)
+load_dotenv(_ENV_PATH, override=True)
 
 # --- Environment Variables ---
 LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-3.5-flash")
@@ -24,8 +24,7 @@ COMPACTION_MODEL: str = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")
 COMPACTION_INTERVAL: int = int(os.getenv("COMPACTION_INTERVAL", "30"))
 COMPACTION_OVERLAP: int = int(os.getenv("COMPACTION_OVERLAP", "2"))
 
-IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "imagen-3.0-generate-002")
-IMAGE_LOCATION: str = os.getenv("IMAGE_LOCATION", "us-central1")
+IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
 
 def _build_model_instance(model_name: str, is_main_model: bool = False) -> BaseLlm:
     """Factory to build the appropriate ADK BaseLlm instance based on the provider prefix."""

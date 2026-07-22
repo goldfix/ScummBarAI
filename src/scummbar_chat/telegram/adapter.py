@@ -75,7 +75,8 @@ _INTENT_MAP = {
     ],
     "isolde": [
         "isolde", "carte", "giocare", "gioco", "dadi", "tarocchi",
-        "barare", "trucco", "scommessa", "predizione", "segreto", "pettegolezzo"
+        "barare", "trucco", "scommessa", "predizione", "segreto", "pettegolezzo",
+        "maga"
     ]
 }
 

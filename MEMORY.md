@@ -23,6 +23,7 @@ scummbar/
 ├── docs/                              # Documentazione (ADK, DeepSeek, Telegram)
 │   ├── *.md                           # Documentazione ADK (53 file)
 │   ├── deepseek/                      # Documentazione DeepSeek API (5 file)
+│   ├── gemini-nano-img/               # Documentazione Nano Banana / image generation (3 file)
 │   └── telegram/                      # Documentazione Telegram Bot API (4 file)
 ├── src/
 │   └── scummbar_chat/                 # ← progetto attivo
@@ -30,7 +31,7 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory (_build_model_instance), load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, cast_vision
+│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/
 │       │   └── scummbar.md            # world context + regole narrazione + logica Narratore
@@ -43,7 +44,7 @@ scummbar/
 │       │   │   ├── agent.py           # LlmAgent Barnacle + recall_patron_memory tool
 │       │   │   └── persona.md         # chi è Barnacle, come si comporta
 │       │   └── isolde/
-│       │       ├── agent.py           # LlmAgent Isolde + recall_patron_memory + cast_vision_tool
+│       │       ├── agent.py           # LlmAgent Isolde + recall_patron_memory + draw_tarot_card_tool
 │       │       └── persona.md         # chi è Isolde, veggente dell'Angolo Oscuro
 │       ├── skills/                    # Skills ADK (auto-discovery)
 │       │   ├── grog/
@@ -215,7 +216,7 @@ CREATE TABLE IF NOT EXISTS patron_memories (
 |------|-----------|--------|
 | `recall_patron_memory` | Barnaby + Barnacle + Isolde | All'inizio di ogni interazione |
 | `memorize_patron_chat` | Barnaby | A fine conversazione o su rivelazione biografica |
-| `cast_vision` | Isolde | Per proiettare visioni / tarocchi (genera immagini con fallback PIL) |
+| `draw_tarot_card` | Isolde | Per proiettare visioni / tarocchi (genera immagini con fallback PIL) |
 
 **`user_id` affidabile via `ToolContext`:**
 
@@ -946,6 +947,20 @@ response.usage.prompt_cache_miss_tokens   # token calcolati ex novo
 |------|-----------|
 | `Google Gemini models for ADK agents.md` | Modelli, auth, Live API, retry 429 |
 | `ai-google-dev-gemini-api-docs-whats-new-gemini-3-5.md` | **Gemini 3.5**: `thinking_level` (non `thinking_budget`), no temperature, 1M context |
+
+#### 🖼️ Nano Banana / Image Generation (`docs/gemini-nano-img/`)
+
+| File | Contenuto |
+|------|-----------|
+| `ai-google-dev-gemini-api-docs-image-generation.md` | Guida completa: text-to-image, image editing, multi-turn, video-to-image, aspect ratio, modelli disponibili |
+| `ai-google-dev-gemini-api-docs-models-gemini-3-1-flash-image.md` | **Nano Banana 2** (`gemini-3.1-flash-image`): 1K-4K, Search Grounding, no Function calling, no Caching |
+| `ai-google-dev-gemini-api-docs-models-gemini-3-1-flash-lite-i.md` | **Nano Banana 2 Lite** (`gemini-3.1-flash-lite-image`): sub-2s latency, Function calling ✅, Thinking ✅, 1K only |
+
+**📌 Note sulla generazione di immagini (Google GenAI):**
+- **Generazione Nativa Gemini**: Il tool utilizza direttamente l'API standard `client.models.generate_content` impostando `response_modalities=["IMAGE"]`, per generare immagini tramite i modelli della famiglia Gemini 3.1 Flash Image (es. `gemini-3.1-flash-lite-image`).
+- **Rilevamento Formato Dinamico**: Il tool analizza l'intestazione dei byte generati (PNG o JPEG) per applicare l'estensione di file corretta (`.png` o `.jpg`) e il rispettivo MIME-type.
+- **Integrazione API Key**: Il client viene inizializzato usando la configurazione standard di `google-genai`. Se nel `.env` è presente `GEMINI_API_KEY` (Google AI Studio), il tool si connette direttamente ad AI Studio.
+- **Fallback PIL Robusto**: Se la generazione AI fallisce, interviene immediatamente il fallback PIL (`_draw_tarot_card_fallback`) che genera splendide carte dei tarocchi in-character in RAM (con dettagli di onde, stelle e lune), funzionante al 100% offline.
 
 ---
 
