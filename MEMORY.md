@@ -1,12 +1,16 @@
-# CLAUDE.md — Guida al Progetto Scummbar
+# MEMORY.md — Memoria del Progetto Scummbar
+
+> Questo file è la **memoria viva** del progetto: storia, decisioni, stato corrente, roadmap e attività aperte.
+> Viene aggiornato ad ogni sessione di lavoro significativa.
+> Gli agenti AI devono leggerlo prima di qualsiasi attività (vedi `AGENTS.md`).
 
 ---
 
-## 🍺 STATO DEL PROGETTO (aggiornato: 2026-07-19)
+## 🍺 STATO DEL PROGETTO (aggiornato: 2026-07-21)
 
 ### Cos'è Scummbar
 Chat interattiva multi-bot ambientata in una taverna piratesca caraibica.
-I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto).
+I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto, Isolde la veggente).
 Sviluppato con **Google ADK 2.4.0** + **Gemini / DeepSeek** via Vertex AI / LiteLlm.
 Integrazione Telegram: **completata** ✅.
 
@@ -26,18 +30,21 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory (_build_model_instance), load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # FunctionTool: recall_patron_memory, memorize_patron_chat
+│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, cast_vision
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/
 │       │   └── scummbar.md            # world context + regole narrazione + logica Narratore
 │       ├── bots/
-│       │   ├── __init__.py            # esporta barnaby_agent, barnacle_agent
+│       │   ├── __init__.py            # esporta barnaby_agent, barnacle_agent, isolde_agent
 │       │   ├── barnaby/
 │       │   │   ├── agent.py           # LlmAgent Barnaby + SkillToolset + memory tools
 │       │   │   └── persona.md         # chi è Barnaby, come parla
-│       │   └── barnacle/
-│       │       ├── agent.py           # LlmAgent Barnacle + recall_patron_tool
-│       │       └── persona.md         # chi è Barnacle, come si comporta
+│       │   ├── barnacle/
+│       │   │   ├── agent.py           # LlmAgent Barnacle + recall_patron_memory tool
+│       │   │   └── persona.md         # chi è Barnacle, come si comporta
+│       │   └── isolde/
+│       │       ├── agent.py           # LlmAgent Isolde + recall_patron_memory + cast_vision_tool
+│       │       └── persona.md         # chi è Isolde, veggente dell'Angolo Oscuro
 │       ├── skills/                    # Skills ADK (auto-discovery)
 │       │   ├── grog/
 │       │   │   └── SKILL.md           # skill dinamica: genera grog unici per contesto
@@ -58,7 +65,8 @@ scummbar/
 ├── telegram_bot.py                    # avvio bot Telegram (--debug flag, log su file)
 ├── requirements.txt                   # bootstrap: poetry + uv
 ├── pyproject.toml                     # dipendenze progetto
-├── CLAUDE.md                          # questo file
+├── AGENTS.md                          # istruzioni per agenti AI
+├── MEMORY.md                          # questo file — memoria del progetto
 └── ruff.toml
 ```
 
@@ -72,6 +80,7 @@ scummbar/
 GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 GOOGLE_CLOUD_LOCATION=global
 GOOGLE_GENAI_USE_VERTEXAI=True
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json # Decommenta per Service Account in prod
 
 # Modello attivo (cambia solo questa riga per switchare)
 # Gemini:   LLM_MODEL=gemini-3.5-flash
@@ -94,8 +103,13 @@ TELEGRAM_BOT_USERNAME=scummbar_bot      # senza @
 TELEGRAM_GROUP_LINK=https://t.me/...   # mostrato nel redirect dai DM
 ```
 
-**Auth Google**: `gcloud auth application-default login`
-- Account: `your-account@example.com`
+**Auth Google**: Due opzioni disponibili:
+1. **Sviluppo (ADC)**: eseguire `gcloud auth application-default login`
+   - Account: `your-account@example.com`
+2. **Produzione (Service Account)**: impostare `GOOGLE_APPLICATION_CREDENTIALS` nel file `.env`
+   - Es. `GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json`
+
+**Requisiti GCP**:
 - Progetto: `your-gcp-project-id` (Vertex AI + Gemini 3.5 abilitati)
 - Location: `global` (necessaria per `gemini-3.5-flash`)
 - ⚠️ Verificare che Vertex AI API sia abilitata sul progetto GCP
@@ -180,7 +194,7 @@ Se nessun pattern corrisponde, il messaggio viene ignorato (nessun bot risponde)
 
 ### 🧠 Memoria Avventori (`tools.py` + `patron_memories`)
 
-Barnaby e Barnacle ricordano i clienti tra una sessione e l'altra grazie a due
+Barnaby, Barnacle e Isolde ricordano i clienti tra una sessione e l'altra grazie a due
 `FunctionTool` ADK che leggono/scrivono su una tabella SQLite dedicata.
 
 **Schema tabella `patron_memories`:**
@@ -199,8 +213,9 @@ CREATE TABLE IF NOT EXISTS patron_memories (
 
 | Tool | Chi lo usa | Quando |
 |------|-----------|--------|
-| `recall_patron_tool` | Barnaby + Barnacle | All'inizio di ogni interazione |
-| `memorize_patron_tool` | Barnaby | A fine conversazione o su rivelazione biografica |
+| `recall_patron_memory` | Barnaby + Barnacle + Isolde | All'inizio di ogni interazione |
+| `memorize_patron_chat` | Barnaby | A fine conversazione o su rivelazione biografica |
+| `cast_vision` | Isolde | Per proiettare visioni / tarocchi (genera immagini con fallback PIL) |
 
 **`user_id` affidabile via `ToolContext`:**
 
@@ -433,16 +448,20 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Lock con timeout (15s) | ✅ | `asyncio.wait_for` invece di wait indefinito |
 | Context Compaction (LLM-based) | ✅ | `App` + `EventsCompactionConfig` + `LlmEventSummarizer` |
 | Semantic routing | ✅ | `_resolve_intent()`: @mention + keyword matching via `_INTENT_MAP` |
-| Memoria avventori | ✅ | `patron_memories` SQLite + `recall_patron_tool` + `memorize_patron_tool` |
+| Memoria avventori | ✅ | `patron_memories` SQLite + `recall_patron_memory` + `memorize_patron_chat` |
+| Artefatti e Pergamene | ✅ | `InMemoryArtifactService` + `write_secret_scroll` + `sendDocument` |
 | Logging verboso + error export | ✅ | `--debug`, `bot.log`, `errors.log`, `_dump_exception()` |
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
 | Integrazione Slack | 🔲 | Future |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
+| Autenticazione Gemini via Service Account | ✅ | `.env` + `GOOGLE_APPLICATION_CREDENTIALS`; pre-flight check in `telegram_bot.py` |
+| Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
 
 ---
 
 ### 💡 Decisioni architetturali
 
+- **Lingua Mista (Code vs Prompts)**: Tutti i commenti tecnici in Python e la documentazione del codice (`#` o `"""`) sono in **Inglese** (per mantenere lo standard di sviluppo). I messaggi di ritorno dei tools per l'LLM e i file Markdown dei prompt sono in **Italiano** (perché fanno parte dell'input/output del modello).
 - **Prompt in Markdown** — editabili senza toccare codice
 - **`global_instruction` = InstructionProvider** — world context + orario aggiornato ad ogni turno, cachabile da Gemini
 - **Ogni bot ha solo la sua `persona.md`** — world context arriva via global_instruction
@@ -466,9 +485,13 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 - **`drop_params=True`** in `LiteLlm` — ignora parametri non supportati da DeepSeek
 - **Semantic routing**: `_resolve_intent()` — @mention con priorità, poi keyword matching; keywords estendibili in `_INTENT_MAP`
 - **Memoria avventori**: `patron_memories` SQLite; `user_id` da `ToolContext` (mai dall'LLM) — impossibile inventarlo
+- **Gestione Artefatti (Pergamene)**: `InMemoryArtifactService` abilitato nel Runner; `write_secret_scroll` genera file di testo in memoria; l'adapter intercetta `artifact_delta` ed esegue l'upload diretto su Telegram via `sendDocument` usando `aiohttp.FormData` multipart.
 - **`_augment_text` con `avventore_id`**: inietta `[avventore_id: {user_id}]` nel testo — contesto visivo per il personaggio
 - **Logging su file**: `data/logs/bot.log` + `data/logs/errors.log` (rotativi); `--debug` flag
 - **Error propagation**: `_handle_update` wrappa con `try/except`, `_on_task_done` callback, `gather` finale logga residui
+- **Autenticazione Gemini**: supporta sia ADC (`gcloud auth application-default login`) sia Service Account (`GOOGLE_APPLICATION_CREDENTIALS` nel `.env`); l'SDK `google-auth` li risolve automaticamente all'avvio
+- **Pre-flight check Service Account**: `telegram_bot.py` verifica l'esistenza del file JSON al boot e si arresta con errore esplicito se mancante
+- **`AGENTS.md` + `MEMORY.md`**: sostituiscono `CLAUDE.md`; `AGENTS.md` = istruzioni operative per agenti AI; `MEMORY.md` = memoria e storia del progetto
 
 ---
 
@@ -667,10 +690,11 @@ _message_counters[session_id] += 1
     se counter % 3 == 0 → aggiunge nota Narratore al testo
     │
 augmented = "[Risponde BARNABY/BARNACLE] [avventore_id: {user_id}] {text}"
-response = run_agent(user_id, session_id=chat_id, augmented)
+response, files = run_agent(user_id, session_id=chat_id, augmented)
 formatted = format_response(response)
     │
 barnaby  → sendMessage(chat_id, formatted)           # pubblico
+         → sendDocument(chat_id, file.bytes)         # per ogni file generato
 barnacle → sendMessage(chat_id, formatted,           # ephemeral
                        receiver_user_id=user_id)     # solo per te
           fallback pubblico se bot non è admin
@@ -1020,3 +1044,36 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 | Compaction fallisce con 403/ADC error | `COMPACTION_MODEL` usa Gemini per default — eseguire `gcloud auth application-default login` |
 | `patron_memories` non trovata | Prima chiamata ai tool la crea automaticamente — verificare che il DB esista (`./start.sh` almeno una volta) |
 | `patron_memories` righe duplicate con user_id inventati | `user_id` viene da `ToolContext`, non dall'LLM — se succede, `DELETE FROM patron_memories WHERE user_id NOT GLOB '[0-9]*'` |
+| Gemini: auth fallisce in produzione senza ADC | Usare `GOOGLE_APPLICATION_CREDENTIALS=/path/assoluto/key.json` nel `.env`; il bot verifica il file al boot |
+| Service Account: file JSON non trovato al boot | `telegram_bot.py` stampa errore esplicito e si arresta — verificare il path in `.env` |
+
+---
+
+## 📋 Log delle Sessioni di Lavoro
+
+### 2026-07-21 — Service Account + Riorganizzazione Documentazione
+
+**Obiettivo**: supportare autenticazione Gemini tramite Service Account (oltre ad ADC) e riorganizzare la documentazione del progetto.
+
+**Attività svolte**:
+1. **Autenticazione Gemini via Service Account**
+   - Analisi del flusso di autenticazione: `utils.py` chiama `load_dotenv()` prima di istanziare `Gemini`, quindi `GOOGLE_APPLICATION_CREDENTIALS` è disponibile nell'ambiente prima che `google-auth` venga interpellato
+   - Aggiunto commento/variabile `GOOGLE_APPLICATION_CREDENTIALS` (commentata) in `src/scummbar_chat/.env`
+   - Aggiornato `telegram_bot.py` → `_check_env()`: se il modello attivo è Gemini, verifica la presenza e validità del file JSON del Service Account al boot, con messaggio di errore esplicito e halt se il file non esiste
+   - Nessuna modifica necessaria a `utils.py` o al costruttore `Gemini` — il meccanismo standard `google-auth` gestisce tutto automaticamente
+
+2. **Riorganizzazione documentazione AI**
+   - `CLAUDE.md` → sostituito da due file separati con ruoli distinti
+   - `AGENTS.md`: istruzioni operative per agenti AI (regole codice, pattern, checklist, quick reference)
+   - `MEMORY.md`: memoria del progetto (storia, decisioni, roadmap, problemi noti, log sessioni)
+   - Aggiornato albero file in `MEMORY.md`
+   - Aggiunti nuovi voci in Roadmap, Decisioni architetturali e Problemi Comuni
+
+**File modificati**: `src/scummbar_chat/.env`, `telegram_bot.py`, `AGENTS.md` (riscritto), `MEMORY.md` (aggiornato da CLAUDE.md)
+
+---
+
+### 2026-07-19 — Sessioni precedenti (riepilogo)
+
+Tutte le feature completate fino a questa data sono documentate nella sezione **Roadmap** con stato ✅.
+Le decisioni architetturali prese sono registrate nella sezione **Decisioni architetturali**.

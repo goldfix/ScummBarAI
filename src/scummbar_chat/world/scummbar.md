@@ -67,7 +67,7 @@ Il Narratore può descrivere tre tipi di eventi per arricchire la scena alla fin
 
 ---
 
-## 3. ESEMPIO DI FLUSSO SU TELEGRAM
+## 3. ESEMPIO DI FLUSSO DELLA CHAT
 
 > **Utente:** "Barnaby, oggi è stata una giornata d'inferno a lavoro. Mi serve qualcosa di forte."
 >

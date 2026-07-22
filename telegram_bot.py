@@ -99,8 +99,28 @@ def _check_env() -> bool:
         log.warning("⚠️   TELEGRAM_BOT_USERNAME not set — some features may misbehave")
 
     model = os.getenv("LLM_MODEL", "gemini-3.5-flash")
+    compaction_model = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")
+
+    # Verifica Service Account / ADC se si usano modelli Gemini
+    uses_gemini = (not model.startswith("deepseek/")) or (not compaction_model.startswith("deepseek/"))
+    if uses_gemini:
+        sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+        if sa_path:
+            sa_file = Path(sa_path)
+            if not sa_file.is_absolute():
+                # Se relativo, risolviamo rispetto alla root del progetto
+                sa_file = (ROOT_DIR / sa_path).resolve()
+            
+            if not sa_file.exists():
+                log.error("❌  GOOGLE_APPLICATION_CREDENTIALS è impostato ma il file JSON non esiste: %s", sa_path)
+                ok = False
+            else:
+                log.info("🔑  Google Service Account rilevato e valido: %s", sa_file)
+        else:
+            log.info("ℹ️   GOOGLE_APPLICATION_CREDENTIALS non impostato. Gemini utilizzerà le Application Default Credentials (ADC) o IAM di istanza.")
+
     log.info("🤖  LLM_MODEL        = %s", model)
-    log.info("🧠  COMPACTION_MODEL = %s", os.getenv("COMPACTION_MODEL", "gemini-3.5-flash"))
+    log.info("🧠  COMPACTION_MODEL = %s", compaction_model)
     log.info("📦  SESSION_DB       = data/sessions.db")
     log.info("📋  LOG_FILE         = %s", LOG_FILE)
     log.info("🚨  ERROR_FILE       = %s", ERR_FILE)

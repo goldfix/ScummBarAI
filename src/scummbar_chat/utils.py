@@ -24,6 +24,9 @@ COMPACTION_MODEL: str = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")
 COMPACTION_INTERVAL: int = int(os.getenv("COMPACTION_INTERVAL", "30"))
 COMPACTION_OVERLAP: int = int(os.getenv("COMPACTION_OVERLAP", "2"))
 
+IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "imagen-3.0-generate-002")
+IMAGE_LOCATION: str = os.getenv("IMAGE_LOCATION", "us-central1")
+
 def _build_model_instance(model_name: str, is_main_model: bool = False) -> BaseLlm:
     """Factory to build the appropriate ADK BaseLlm instance based on the provider prefix."""
     if model_name.startswith("deepseek/"):
