@@ -12,7 +12,7 @@ import google.genai.types as types
 from datetime import datetime, timezone
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
-from .utils import SESSION_DB_URI, IMAGE_MODEL, IMAGE_LOCATION
+from .utils import SESSION_DB_URI, IMAGE_MODEL
 
 log = logging.getLogger(__name__)
 
@@ -165,12 +165,16 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     img = Image.new("RGB", (width, height), color="#161412")
     draw = ImageDraw.Draw(img)
     
-    # Outer Border: golden line
+    # Bordo esterno dorato a doppia linea
     draw.rectangle([(10, 10), (width - 10, height - 10)], outline="#c5a059", width=2)
-    # Inner Border: thin gold line
     draw.rectangle([(18, 18), (width - 18, height - 18)], outline="#c5a059", width=1)
     
-    # Draw a mystical glyph/star in the center
+    # Decorazioni agli angoli: piccole stelle dorate (*)
+    font = ImageFont.load_default()
+    for sx, sy in [(25, 25), (width - 35, 25), (25, height - 35), (width - 35, height - 35)]:
+        draw.text((sx, sy), "*", fill="#c5a059", font=font)
+    
+    # Glifo mistico al centro
     cx, cy = width // 2, height // 2 - 20
     r = 80
     for i in range(8):
@@ -182,15 +186,22 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
         draw.line([(x1, y1), (x2, y2)], fill="#c5a059", width=1)
     
     draw.ellipse([(cx - r // 2, cy - r // 2), (cx + r // 2, cy + r // 2)], outline="#c5a059", width=2)
+    
+    # Onde marittime stilizzate all'interno del glifo centrale
+    draw.arc([(cx - r // 3, cy + r // 8), (cx, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
+    draw.arc([(cx, cy + r // 8), (cx + r // 3, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
+    
+    # Luna crescente stilizzata in alto a sinistra del glifo
+    draw.arc([(cx - r // 2, cy - r // 2), (cx - r // 4, cy - r // 4)], start=90, end=270, fill="#c5a059", width=1)
+    
     draw.ellipse([(cx - 10, cy - 10), (cx + 10, cy + 10)], fill="#c5a059")
     
-    font = ImageFont.load_default()
     title_text = card_name.strip().upper()
     
-    # Gold banner rectangle at the bottom
+    # Title banner rectangle at the bottom
     draw.rectangle([(30, height - 100), (width - 30, height - 40)], outline="#c5a059", width=2, fill="#1e1b18")
     
-    # Centered text using default font
+    # Testo centrato
     tx = width // 2
     ty = height - 75
     draw.text((tx - len(title_text)*3, ty), title_text, fill="#c5a059", font=font)
@@ -202,77 +213,89 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     img.save(out, format="PNG")
     return out.getvalue()
 
-async def cast_vision(
+async def draw_tarot_card(
     tool_context: ToolContext,
-    title: str,
-    description: str,
+    card_name: str,
+    scene_description: str,
 ) -> str:
     """
-    Usa questo strumento per proiettare una visione mistica ed evocarne l'immagine per l'avventore.
-    - title: Il titolo o nome della visione (es. 'La Torre', 'Il Naufragio').
-    - description: Dettagliata descrizione visiva di ciò che appare nella visione (es. 'un pirata sotto la pioggia che guarda una mappa').
+    Usa questo strumento ESCLUSIVAMENTE per estrarre una carta dei Tarocchi dal tuo mazzo e svelarne l'immagine all'avventore.
+    - card_name: Il titolo o nome dell'arcano (es. 'Il Leviatano', 'La Taverna', 'Il Naufragio').
+    - scene_description: Dettagliata descrizione visiva e marinaresca di ciò che appare nell'illustrazione della carta.
     """
     from google import genai
     import os
     
-    log.info("Isolde casts vision: %s (%s)", title, description)
+    # Retrieve the configured image model
+    image_model = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
+    
+    log.info("Isolde draws tarot card: %s (%s)", card_name, scene_description)
     
     img_bytes = None
     
     try:
-        use_vertex = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "False") == "True"
-        project = os.getenv("GOOGLE_CLOUD_PROJECT")
+        # Initialize the standard Google GenAI Client
+        client = genai.Client()
         
-        if use_vertex:
-            client = genai.Client(
-                vertexai=True,
-                project=project,
-                location=IMAGE_LOCATION
-            )
-        else:
-            client = genai.Client()
-            
-        result = client.models.generate_images(
-            model=IMAGE_MODEL,
-            prompt=f"A vintage mystical tarot card showing {description}, hand-drawn 2d pirate cartoon style, gold borders, dark paper texture",
-            config=dict(
-                number_of_images=1,
-                output_mime_type="image/png",
-                aspect_ratio="1:1"
-            )
+        tarot_prompt = (
+            f"A vintage mystical tarot card showing {scene_description}. "
+            f"Card title at the bottom: {card_name}. "
+            "Hand-drawn 2d pirate cartoon style, esoteric gold borders, dark parchment paper texture."
         )
-        if result and result.generated_images:
-            img_bytes = result.generated_images[0].image.image_bytes
-            log.info("Tarot card image generated successfully via AI model.")
-    except Exception as e:
-        log.warning("AI Image generation failed (falling back to PIL drawing): %s", e)
         
-    if not img_bytes:
-        img_bytes = _draw_tarot_card_fallback(title, description)
+        # Use the modern Gemini 3.1 Flash Image API to generate native images
+        response = client.models.generate_content(
+            model=image_model,
+            contents=tarot_prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(
+                    aspect_ratio="1:1",
+                    image_size="1K",
+                ),
+            ),
+        )
+        # Extract raw image bytes from the response parts
+        for part in response.candidates[0].content.parts:
+            if part.inline_data and part.inline_data.data:
+                img_bytes = part.inline_data.data
+                log.info("Tarot card generated successfully via Gemini multimodal generate_content.")
+                break
+            
+    except Exception as e:
+        log.warning("Errore generazione immagine AI: %s. Attivazione fallback PIL.", e)
+        img_bytes = _draw_tarot_card_fallback(card_name, scene_description)
+        
+    # 2. Register the image as an Artifact in ADK
+    # Dynamically detect if the bytes represent PNG or JPEG to apply the correct extension and mime type
+    if img_bytes.startswith(b"\x89PNG"):
+        file_ext = "png"
+        mime_type = "image/png"
+    elif img_bytes.startswith(b"\xff\xd8"):
+        file_ext = "jpg"
+        mime_type = "image/jpeg"
+    else:
+        file_ext = "png"
+        mime_type = "image/png"
         
     artifact_part = types.Part.from_bytes(
         data=img_bytes,
-        mime_type="image/png"
+        mime_type=mime_type
     )
     
-    safe_title = "".join(c if c.isalnum() else "_" for c in title.strip().lower())
-    filename = f"vision_{safe_title}.png"
+    safe_title = "".join(c if c.isalnum() else "_" for c in card_name.strip().lower())
+    filename = f"tarocco_{safe_title}.{file_ext}"
     
-    try:
-        version = await tool_context.save_artifact(
-            filename=filename,
-            artifact=artifact_part
-        )
-        return (
-            f"La visione '{title}' è stata proiettata con successo! "
-            f"L'immagine è stata disegnata nelle nebbie e consegnata (Salvata come {filename}, v{version})."
-        )
-    except Exception as e:
-        log.error("Errore salvataggio artifact in cast_vision: %s", e)
-        return f"Ho visto la visione '{title}', ma le candele si sono spente e non sono riuscita a mostrarti la figura!"
+    # Save the artifact to the current ADK session
+    version = await tool_context.save_artifact(
+        filename=filename,
+        artifact=artifact_part
+    )
+    
+    return f"La carta '{card_name}' è stata svelata sul tavolo! L'immagine è ora visibile all'avventore (Salvata come {filename}, v{version})."
 
-# Wrapped ADK primitives exported for agent binding
+# Esportazione degli strumenti ADK
 recall_patron_tool = FunctionTool(recall_patron_memory)
 memorize_patron_tool = FunctionTool(memorize_patron_chat)
 write_secret_scroll_tool = FunctionTool(write_secret_scroll)
-cast_vision_tool = FunctionTool(cast_vision)
+draw_tarot_card_tool = FunctionTool(draw_tarot_card)
