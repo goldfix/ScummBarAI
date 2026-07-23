@@ -12,7 +12,7 @@ import google.genai.types as types
 from datetime import datetime, timezone
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
-from .utils import SESSION_DB_URI, IMAGE_MODEL
+from .utils import SESSION_DB_URI, IMAGE_MODEL, get_gemini_client_kwargs
 
 log = logging.getLogger(__name__)
 
@@ -234,8 +234,8 @@ async def draw_tarot_card(
     img_bytes = None
     
     try:
-        # Initialize the standard Google GenAI Client
-        client = genai.Client()
+        # Initialize the standard Google GenAI Client with independent image credentials
+        client = genai.Client(**get_gemini_client_kwargs(prefix="IMAGE_"))
         
         tarot_prompt = (
             f"A vintage mystical tarot card showing {scene_description}. "

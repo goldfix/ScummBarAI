@@ -60,35 +60,75 @@ bash py_env.sh active
 Configure `src/scummbar_chat/.env`:
 
 ```env
-# Google Cloud (for Gemini on Vertex AI + context compaction)
-GOOGLE_CLOUD_PROJECT=your-gcp-project-id
-GOOGLE_CLOUD_LOCATION=global
-GOOGLE_GENAI_USE_VERTEXAI=True
+# ===========================================================================
+# 🔐 SECTION 1: CORE GEMINI AUTHENTICATION (Chat & Compaction Auth)
+# ===========================================================================
+# Configura le credenziali di connessione per la Chat e la Compattazione (Sez. 2 e Sez. 3).
+# Scegli UNA sola delle due opzioni (A o B) e commenta l'altra.
 
-# Model selection — change this one line to switch providers
-# Gemini:   LLM_MODEL=gemini-3.5-flash
-# DeepSeek: LLM_MODEL=deepseek/deepseek-v4-flash
-LLM_MODEL=gemini-3.5-flash
+# --- OPZIONE A: Google AI Studio (API Key) — simplest, no GCP project needed ---
+GEMINI_API_KEY=your-api-key-here
+
+# --- OPZIONE B: Vertex AI / Google Cloud (Service Account) — for GCP users ---
+# GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+# GOOGLE_CLOUD_LOCATION=global
+# GOOGLE_GENAI_USE_VERTEXAI=True
+# GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/key.json
+
+
+# ===========================================================================
+# 💬 SECTION 2: CHAT CONVERSATION (Core LLM Settings)
+# ===========================================================================
+# Il modello principale usato dai bot per chattare con gli avventori.
+# Supporta: modelli Gemini (usa Auth Sez. 1) o DeepSeek (richiega Sez. 5).
+LLM_MODEL=gemini-3.1-flash-lite
 LLM_THINKING_LEVEL=medium
 
-# DeepSeek (optional — only if using DeepSeek models)
-DEEPSEEK_API_KEY=your-api-key-here
+
+# ===========================================================================
+# 🗜️ SECTION 3: CONTEXT COMPACTION (Compression Settings)
+# ===========================================================================
+# Configurazione del sistema di riassunto automatico per risparmiare memoria.
+# NOTA: Se si usa un modello Gemini, eredita automaticamente le credenziali della Sez. 1.
+COMPACTION_MODEL=gemini-3.5-flash
+COMPACTION_INTERVAL=30
+COMPACTION_OVERLAP=2
+
+
+# ===========================================================================
+# 🔮 SECTION 4: IMAGE GENERATION (Isolde Settings & INDEPENDENT AUTH)
+# ===========================================================================
+# Modello usato da Isolde per generare le immagini dei Tarocchi.
+IMAGE_MODEL=gemini-3.1-flash-lite-image
+
+# Configura le credenziali di connessione INDIPENDENTI per la generazione immagini.
+# Scegli UNA sola delle due opzioni (A o B) e commenta l'altra.
+
+# --- OPZIONE A: Google AI Studio (API Key Dedicata per Immagini) ---
+IMAGE_GEMINI_API_KEY=your-image-api-key-here
+
+# --- OPZIONE B: Vertex AI / Google Cloud (Service Account Dedicato per Immagini) ---
+# IMAGE_GOOGLE_CLOUD_PROJECT=another-gcp-project-id
+# IMAGE_GOOGLE_CLOUD_LOCATION=europe-west1
+# IMAGE_GOOGLE_GENAI_USE_VERTEXAI=True
+# IMAGE_GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/another-key.json
+
+
+# ===========================================================================
+# 🧠 SECTION 5: DEEPSEEK PROVIDER OVERRIDES (Optional)
+# ===========================================================================
+# Da compilare SOLO se imposti modelli che iniziano con "deepseek/" in Sez. 2 o 3.
+DEEPSEEK_API_KEY=your-deepseek-api-key
 DEEPSEEK_REASONING_EFFORT=high
 
-# Context compaction — default Gemini (requires ADC); can use DeepSeek with DEEPSEEK_API_KEY
-COMPACTION_MODEL=gemini-3.5-flash   # model used for session summarization
-COMPACTION_INTERVAL=30              # events before triggering compaction
-COMPACTION_OVERLAP=2                # events retained after compaction
 
-# Telegram (optional — only for Telegram integration)
+# ===========================================================================
+# 📡 SECTION 6: TELEGRAM INTEGRATION
+# ===========================================================================
+# Configurazione di connessione per l'adattatore Telegram.
 TELEGRAM_BOT_TOKEN=your-bot-token
 TELEGRAM_BOT_USERNAME=your_bot_username
 TELEGRAM_GROUP_LINK=https://t.me/your-group
-
-# Image Generation (Isolde)
-IMAGE_MODEL=gemini-3.1-flash-lite-image
-# Optional: Google AI Studio API key to bypass Vertex AI for image generation
-# GEMINI_API_KEY=your-api-key-here
 ```
 
 ---

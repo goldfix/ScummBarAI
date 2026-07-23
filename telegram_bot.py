@@ -101,23 +101,48 @@ def _check_env() -> bool:
     model = os.getenv("LLM_MODEL", "gemini-3.5-flash")
     compaction_model = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")
 
-    # Verifica Service Account / ADC se si usano modelli Gemini
+    # Verifica Credenziali se si usano modelli Gemini per Dialogo/Compattazione
     uses_gemini = (not model.startswith("deepseek/")) or (not compaction_model.startswith("deepseek/"))
     if uses_gemini:
-        sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
-        if sa_path:
-            sa_file = Path(sa_path)
-            if not sa_file.is_absolute():
-                # Se relativo, risolviamo rispetto alla root del progetto
-                sa_file = (ROOT_DIR / sa_path).resolve()
-            
-            if not sa_file.exists():
-                log.error("❌  GOOGLE_APPLICATION_CREDENTIALS è impostato ma il file JSON non esiste: %s", sa_path)
-                ok = False
-            else:
-                log.info("🔑  Google Service Account rilevato e valido: %s", sa_file)
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if api_key:
+            log.info("🔑  Google API Key rilevata per Chat/Compattazione. Utilizzo diretto di Google AI Studio.")
         else:
-            log.info("ℹ️   GOOGLE_APPLICATION_CREDENTIALS non impostato. Gemini utilizzerà le Application Default Credentials (ADC) o IAM di istanza.")
+            sa_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+            if sa_path:
+                sa_file = Path(sa_path)
+                if not sa_file.is_absolute():
+                    # Se relativo, risolviamo rispetto alla root del progetto
+                    sa_file = (ROOT_DIR / sa_path).resolve()
+                
+                if not sa_file.exists():
+                    log.error("❌  GOOGLE_APPLICATION_CREDENTIALS è impostato ma il file JSON non esiste: %s", sa_path)
+                    ok = False
+                else:
+                    log.info("🔑  Google Service Account rilevato e valido per Chat/Compattazione: %s", sa_file)
+            else:
+                log.info("ℹ️   Nessuna API Key o Service Account espliciti per Chat/Compattazione. Verranno utilizzate le Application Default Credentials (ADC).")
+
+    # Verifica Credenziali Indipendenti per Modello Immagini
+    image_model = os.getenv("IMAGE_MODEL", "")
+    if image_model and (not image_model.startswith("deepseek/")):
+        img_api_key = os.getenv("IMAGE_GEMINI_API_KEY") or os.getenv("IMAGE_GOOGLE_API_KEY")
+        if img_api_key:
+            log.info("🖼️   Google API Key indipendente rilevata per la generazione immagini. Utilizzo diretto di Google AI Studio.")
+        else:
+            img_sa_path = os.getenv("IMAGE_GOOGLE_APPLICATION_CREDENTIALS", "")
+            if img_sa_path:
+                img_sa_file = Path(img_sa_path)
+                if not img_sa_file.is_absolute():
+                    img_sa_file = (ROOT_DIR / img_sa_path).resolve()
+                
+                if not img_sa_file.exists():
+                    log.error("❌  IMAGE_GOOGLE_APPLICATION_CREDENTIALS è impostato ma il file JSON non esiste: %s", img_sa_path)
+                    ok = False
+                else:
+                    log.info("🖼️   Google Service Account indipendente rilevato e valido per la generazione immagini: %s", img_sa_file)
+            else:
+                log.info("ℹ️   Nessuna API Key o Service Account espliciti per la generazione immagini. Verranno utilizzate le Application Default Credentials (ADC) o l'ambiente globale.")
 
     log.info("🤖  LLM_MODEL        = %s", model)
     log.info("🧠  COMPACTION_MODEL = %s", compaction_model)
