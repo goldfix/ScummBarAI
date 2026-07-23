@@ -12,7 +12,6 @@
 - Architettura dettagliata di tutti i componenti
 - Decisioni architetturali già prese e la loro motivazione
 - Roadmap e attività aperte
-- Indice completo della documentazione disponibile in `docs/`
 - Log delle sessioni di lavoro significative
 - Tabella dei problemi noti e le relative soluzioni
 
@@ -40,6 +39,7 @@ scummbar/
 │   ├── world/scummbar.md              # world context + regole Narratore (prompt)
 │   ├── bots/barnaby/                  # agente Barnaby
 │   ├── bots/barnacle/                 # agente Barnacle
+│   ├── bots/isolde/                   # agente Isolde
 │   ├── skills/                        # ADK skills auto-discovery
 │   └── telegram/                      # adapter Telegram (adapter, formatter, runner)
 ├── data/sessions.db                   # SQLite persistence (auto-creato)
@@ -66,6 +66,11 @@ scummbar/
 - **Non committare mai `.env`** — contiene token Telegram, API key DeepSeek, credenziali GCP.
 - Il file `.env` è in `.gitignore`. Verificare sempre prima di fare commit.
 - `GOOGLE_APPLICATION_CREDENTIALS` (se usato) deve puntare a un percorso **assoluto** in produzione.
+
+## 🤖 Pi-Agent Skills
+Il progetto fornisce delle skill di sistema sotto `.agents/skills/` che devi invocare o consultare:
+- `/skill:scummbar-docs-analyzer`: Per esplorare la documentazione tecnica.
+- `/skill:scummbar-memory-updater`: Per aggiornare `MEMORY.md`, `README.md` e `AGENTS.md` alla fine di una sessione di sviluppo o per modifiche rilevanti.
 
 ---
 
@@ -98,7 +103,7 @@ python telegram_bot.py --debug      # DEBUG su console + file
 |------|------|
 | Nuova skill per Barnaby | `mkdir src/scummbar_chat/skills/nome/` + `SKILL.md` → riavviare |
 | Cambiare il mondo / atmosfera | Modificare `world/scummbar.md` |
-| Cambiare personalità di un bot | Modificare `bots/barnaby/persona.md` o `bots/barnacle/persona.md` |
+| Cambiare personalità di un bot | Modificare `bots/barnaby/persona.md`, `bots/barnacle/persona.md` o `bots/isolde/persona.md` |
 | Nuovo tipo di grog | Modificare `skills/grog/SKILL.md` |
 | Nuovo piatto nel menu | Modificare `skills/menu/SKILL.md` |
 
@@ -136,16 +141,8 @@ LLM_MODEL=deepseek/deepseek-v4-pro   # DeepSeek Pro
 
 ## 📚 Dove Trovare la Documentazione
 
-Tutta la documentazione è in `docs/`. L'indice completo con i file rilevanti per ogni
-argomento si trova in **`MEMORY.md`**, sezione *"Indice della Documentazione ADK"*.
-
-Riferimenti rapidi:
-- **ADK** → `docs/Agent Development Kit.md`, `docs/Simple agents with LlmAgent.md`
-- **DeepSeek** → `docs/deepseek/`
-- **Telegram Bot API** → `docs/telegram/`
-- **Session & State** → `docs/Session- Tracking individual conversations.md`, `docs/State- The Session's Scratchpad.md`
-- **Skills** → `docs/Skills for ADK agents.md`
-- **Artifacts** → `docs/Artifacts.md`
+Tutta la documentazione è nella cartella `docs/`.
+Usa la skill di Pi-Agent **`scummbar-docs-analyzer`** (`/skill:scummbar-docs-analyzer`) per consultare l'indice completo ed effettuare ricerche mirate sulla documentazione dei framework ADK, Gemini, DeepSeek e Telegram.
 
 ---
 

@@ -12,14 +12,15 @@ This is a **study project** — no commercial purpose, just learning how to buil
 
 The **Scummbar** is a Caribbean pirate tavern. A place where tired sailors put down their swords, order a mug of grog, and sit down to listen.
 
-Two characters run the bar:
+Three characters run the bar:
 
 | Character | Role | Personality |
 |-----------|------|-------------|
 | 🍺 **Barnaby** | Bartender | Always listening, knows the sea, makes unforgettable grogs |
 | 🐱 **Barnacle** | The bar cat | Mysterious, solitary, speaks rarely — but when he does, it's worth hearing |
+| 🔮 **Isolde** | Fortune Teller | Sitting in the shadow corner, she reads tarot cards and sees the unspoken truth |
 
-Both are AI-powered. Both have a story.
+All of them are AI-powered. All of them have a story.
 
 ---
 
