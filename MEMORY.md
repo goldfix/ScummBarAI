@@ -458,11 +458,15 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Supporto duale autenticazione (Service Account ↔ API Key) | 🔲 | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |
 | Autenticazione Gemini via Service Account | ✅ | `.env` + `GOOGLE_APPLICATION_CREDENTIALS`; pre-flight check in `telegram_bot.py` |
 | Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
+| Sistema Pi-Agent Skills (`scummbar-*`) | ✅ | Introduzione di skill per progressive disclosure documentale |
+| Unificazione API Immagini | ✅ | Deprecato branch Imagen, architettura unificata su `generate_content` Gemini Nano |
 
 ---
 
 ### 💡 Decisioni architetturali
 
+- **Progressive Disclosure tramite Pi-Agent Skills**: Le istruzioni gravose per l'Agente AI (come l'esplorazione dei manuali o l'aggiornamento strutturato del progetto) sono incapsulate in skill specifiche (`scummbar-docs-analyzer`, `scummbar-memory-updater`). L'indice documentale è stato migrato dentro la skill dell'analyzer. Questo svuota il system prompt base (`AGENTS.md` e `MEMORY.md`), riducendo il consumo di token e migliorando il focus dell'LLM.
+- **Unificazione API Immagini**: Abbiamo deprecato il branch "Imagen" per l'estrazione dei Tarocchi, uniformando tutto al metodo moderno `generate_content` di Gemini 3.1 Flash Image. Questo azzera il debito tecnico legato alle regioni Vertex AI (`IMAGE_LOCATION`) e supporta nativamente l'auth duale (Service Account e API Key).
 - **Lingua Mista (Code vs Prompts)**: Tutti i commenti tecnici in Python e la documentazione del codice (`#` o `"""`) sono in **Inglese** (per mantenere lo standard di sviluppo). I messaggi di ritorno dei tools per l'LLM e i file Markdown dei prompt sono in **Italiano** (perché fanno parte dell'input/output del modello).
 - **Prompt in Markdown** — editabili senza toccare codice
 - **`global_instruction` = InstructionProvider** — world context + orario aggiornato ad ogni turno, cachabile da Gemini
@@ -831,157 +835,6 @@ response.usage.prompt_cache_miss_tokens   # token calcolati ex novo
 
 ---
 
-## 📚 Indice della Documentazione ADK (`docs/`)
-
-### 1. 🚀 Getting Started
-
-| File | Contenuto |
-|------|-----------|
-| `Agent Development Kit.md` | Panoramica ADK: Agent, Tool, Session, Memory, Artifact, Event, Runner |
-| `Python Quickstart for ADK.md` | Installazione, struttura progetto, `adk run`, `adk web` |
-| `Build a multi-tool agent.md` | Tutorial completo con più tools |
-
----
-
-### 2. 🤖 Agenti
-
-| File | Contenuto |
-|------|-----------|
-| `Agents.md` | Tipi di agenti, quando usare workflow |
-| `Simple agents with LlmAgent.md` | `name`, `description`, `model`, `instruction`, `tools`, `input_schema`, `output_schema`, `output_key`, `include_contents`, `global_instruction`, planner |
-| `Managed agents.md` | `ManagedAgent` Google first-party |
-| `Build agents with Agent Config.md` | Agenti via YAML (`adk create --type=config`) |
-| `Build collaborative agent teams.md` | ADK 2.0+: modalità `chat`, `task`, `single_turn` |
-
-**📌 Quando consultare:**
-- Configurare `LlmAgent` → `Simple agents with LlmAgent.md`
-- `global_instruction` e `InstructionProvider` → `Simple agents with LlmAgent.md` + `State- The Session's Scratchpad.md`
-
----
-
-### 3. 🔧 Tools
-
-| File | Contenuto |
-|------|-----------|
-| `Function tools.md` | `FunctionTool`, parametri, `LongRunningFunctionTool`, `AgentTool` |
-| `Increase tool performance with parallel execution.md` | `async def` per tool paralleli |
-| `Get action confirmation for ADK Tools.md` | Conferma utente: Boolean / Advanced / Remote |
-
----
-
-### 4. 🧠 Contesto, Sessioni, Stato e Memoria
-
-| File | Contenuto |
-|------|-----------|
-| `Conversational Context- Session, State, and Memory.md` | Session vs State vs Memory |
-| `Context.md` | `InvocationContext`, `ReadonlyContext`, `CallbackContext`, `ToolContext` |
-| `Session- Tracking individual conversations.md` | `SessionService`, `InMemorySessionService`, `DatabaseSessionService`, `VertexAiSessionService` |
-| `State- The Session's Scratchpad.md` | Prefissi (`user:`, `app:`, `temp:`), `output_key`, `{key}` template, `InstructionProvider` |
-| `Memory- Long-Term Knowledge with MemoryService.md` | `InMemoryMemoryService`, `VertexAiMemoryBankService`, `load_memory` |
-| `Session database schema migration.md` | Migrazione schema DB (ADK Python v1.22.0) |
-
-**📌 Quando consultare:**
-- Session persistence (Telegram/Slack) → `Session- Tracking individual conversations.md` (DatabaseSessionService)
-- `InstructionProvider` con state → `State- The Session's Scratchpad.md`
-
----
-
-### 5. 📡 Events
-
-| File | Contenuto |
-|------|-----------|
-| `Events.md` | Struttura eventi, `is_final_response()`, `state_delta`, `transfer_to_agent`, `escalate` |
-
----
-
-### 6. 📦 Artifacts
-
-| File | Contenuto |
-|------|-----------|
-| `Artifacts.md` | `ArtifactService`, `types.Part`, namespacing, versioning, `save_artifact`, `load_artifact` |
-
----
-
-### 7. 🔄 Workflow e Multi-Agent
-
-| File | Contenuto |
-|------|-----------|
-| `Workflows- multi-agent, multi-node applications.md` | Tipi workflow |
-| `Sequential template workflow agent.md` | `SequentialAgent` |
-| `Parallel template workflow agent.md` | `ParallelAgent` |
-| `Loop template workflow agent.md` | `LoopAgent`, `max_iterations`, `escalate` |
-| `Multi-agent workflow patterns.md` | Coordinator, Pipeline, Fan-out, Hierarchical, Human-in-the-loop |
-| `Build collaborative agent teams.md` | Modalità collaborative ADK 2.0+ |
-
----
-
-### 8. ⚙️ Runtime e Configurazione
-
-| File | Contenuto |
-|------|-----------|
-| `Runtime Event Loop.md` | Event Loop, Runner, yield/pause/resume |
-| `Runtime Configuration.md` | `RunConfig`: `streaming_mode`, `max_llm_calls` |
-| `Agent activity logging.md` | Logging, OpenTelemetry, `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` |
-| `Compress agent context for performance.md` | Context compaction: token-based, sliding window |
-| `Context caching with Gemini.md` | Cache: `min_tokens`, `ttl_seconds`, `cache_intervals` |
-| `Resume stopped agents.md` | `ResumabilityConfig`, resume via API/Runner |
-
-**📌 Quando consultare:**
-- Warning "System instructions modified" → usare `global_instruction` con parte statica comune
-- Performance sessioni lunghe → `Compress agent context for performance.md`
-
----
-
-### 9. 🛠️ Developer Tools
-
-| File | Contenuto |
-|------|-----------|
-| `Use the Command Line.md` | `adk run`, `--save_session`, `--resume` |
-| `Use the Web Interface.md` | `adk web`, `--port`, `--host`, `--reload` |
-| `Use the API Server.md` | `adk api_server`, `/run`, `/run_sse`, Swagger su `/docs` |
-
----
-
-### 10. 🌐 Models & Integrations
-
-| File | Contenuto |
-|------|-----------|
-| `Google Gemini models for ADK agents.md` | Modelli, auth, Live API, retry 429 |
-| `ai-google-dev-gemini-api-docs-whats-new-gemini-3-5.md` | **Gemini 3.5**: `thinking_level` (non `thinking_budget`), no temperature, 1M context |
-
-#### 🖼️ Nano Banana / Image Generation (`docs/gemini-nano-img/`)
-
-| File | Contenuto |
-|------|-----------|
-| `ai-google-dev-gemini-api-docs-image-generation.md` | Guida completa: text-to-image, image editing, multi-turn, video-to-image, aspect ratio, modelli disponibili |
-| `ai-google-dev-gemini-api-docs-models-gemini-3-1-flash-image.md` | **Nano Banana 2** (`gemini-3.1-flash-image`): 1K-4K, Search Grounding, no Function calling, no Caching |
-| `ai-google-dev-gemini-api-docs-models-gemini-3-1-flash-lite-i.md` | **Nano Banana 2 Lite** (`gemini-3.1-flash-lite-image`): sub-2s latency, Function calling ✅, Thinking ✅, 1K only |
-
-**📌 Note sulla generazione di immagini (Google GenAI):**
-- **Generazione Nativa Gemini**: Il tool utilizza direttamente l'API standard `client.models.generate_content` impostando `response_modalities=["IMAGE"]`, per generare immagini tramite i modelli della famiglia Gemini 3.1 Flash Image (es. `gemini-3.1-flash-lite-image`).
-- **Rilevamento Formato Dinamico**: Il tool analizza l'intestazione dei byte generati (PNG o JPEG) per applicare l'estensione di file corretta (`.png` o `.jpg`) e il rispettivo MIME-type.
-- **Integrazione API Key**: Il client viene inizializzato usando la configurazione standard di `google-genai`. Se nel `.env` è presente `GEMINI_API_KEY` (Google AI Studio), il tool si connette direttamente ad AI Studio.
-- **Fallback PIL Robusto**: Se la generazione AI fallisce, interviene immediatamente il fallback PIL (`_draw_tarot_card_fallback`) che genera splendide carte dei tarocchi in-character in RAM (con dettagli di onde, stelle e lune), funzionante al 100% offline.
-
----
-
-### 11. 🔌 A2A
-
-| File | Contenuto |
-|------|-----------|
-| `Introduction to A2A.md` | Quando usarlo, `A2AServer`, `RemoteA2aAgent` |
-| `Quickstart- Exposing a remote agent via A2A.md` | Esporre agente come servizio |
-| `Quickstart- Consuming a remote agent via A2A.md` | Consumare agente remoto |
-
----
-
-### 12. ✨ Skills
-
-| File | Contenuto |
-|------|-----------|
-| `Skills for ADK agents.md` | `SkillToolset`, struttura `SKILL.md` (L1/L2/L3), `load_skill_from_dir`, inline vs filesystem |
-
----
 
 ## 🔑 Reference rapido
 
@@ -1066,6 +919,26 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 ---
 
 ## 📋 Log delle Sessioni di Lavoro
+
+### 2026-07-23 — Semplificazione Immagini e Pi-Agent Skills
+
+**Obiettivo**: Unificare la pipeline di generazione immagini, rimuovere debito tecnico legato a Vertex AI per le immagini e introdurre le Skill di Pi-Agent per ottimizzare il workflow documentale.
+
+**Attività svolte**:
+1. **Generazione Immagini Unificata**:
+   - Rimossa la dipendenza dai modelli "Imagen" (`imagen-3.0-generate-002`) e le configurazioni `IMAGE_LOCATION` da `tools.py` e `.env`.
+   - La pipeline ora utilizza unicamente l'API standard `generate_content` con `response_modalities=["IMAGE"]` e i modelli multimodali Gemini Nano (es. `gemini-3.1-flash-lite-image`).
+   - Il client Google GenAI viene ora inizializzato in modo neutro (`client = genai.Client()`), offrendo supporto implicito sia per Service Account che per `GEMINI_API_KEY`.
+2. **Integrazione Pi-Agent Skills**:
+   - Creata la skill `.agents/skills/scummbar-docs-analyzer` contenente l'indice della documentazione tecnica, rimuovendolo da `MEMORY.md` per alleggerire il context-window.
+   - Creata la skill `.agents/skills/scummbar-memory-updater` per standardizzare gli aggiornamenti alla documentazione.
+3. **Aggiornamento Documentazione**:
+   - Aggiunta Isolde alla tabella introduttiva del `README.md`.
+   - Aggiornato l'esempio del file `.env` nel `README.md` includendo `IMAGE_MODEL` e `GEMINI_API_KEY`.
+   - Pulito e snellito `AGENTS.md` grazie all'introduzione delle skill.
+
+---
+
 
 ### 2026-07-21 — Service Account + Riorganizzazione Documentazione
 
