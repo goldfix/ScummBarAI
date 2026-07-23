@@ -26,6 +26,60 @@ COMPACTION_OVERLAP: int = int(os.getenv("COMPACTION_OVERLAP", "2"))
 
 IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
 
+def get_gemini_client_kwargs(prefix: str = "") -> dict:
+    """Prepare client_kwargs for Gemini/Google GenAI constructor based on .env config.
+    
+    Supports both standard API Key (Google AI Studio) and Vertex AI (Service Account/ADC).
+    If a prefix is supplied (e.g. 'IMAGE_'), it looks up independent variables.
+    """
+    kwargs = {}
+    
+    # Resolve keys dynamically based on the prefix (e.g. "", "IMAGE_")
+    api_key_var = f"{prefix}GEMINI_API_KEY" if prefix else "GEMINI_API_KEY"
+    alt_api_key_var = f"{prefix}GOOGLE_API_KEY" if prefix else "GOOGLE_API_KEY"
+    use_vertex_var = f"{prefix}GOOGLE_GENAI_USE_VERTEXAI" if prefix else "GOOGLE_GENAI_USE_VERTEXAI"
+    alt_use_vertex_var = f"{prefix}GOOGLE_GENAI_USE_ENTERPRISE" if prefix else "GOOGLE_GENAI_USE_ENTERPRISE"
+    project_var = f"{prefix}GOOGLE_CLOUD_PROJECT" if prefix else "GOOGLE_CLOUD_PROJECT"
+    location_var = f"{prefix}GOOGLE_CLOUD_LOCATION" if prefix else "GOOGLE_CLOUD_LOCATION"
+    sa_var = f"{prefix}GOOGLE_APPLICATION_CREDENTIALS" if prefix else "GOOGLE_APPLICATION_CREDENTIALS"
+    
+    api_key = os.getenv(api_key_var) or os.getenv(alt_api_key_var)
+    use_vertex_env = os.getenv(use_vertex_var) or os.getenv(alt_use_vertex_var)
+    
+    if api_key:
+        kwargs["api_key"] = api_key
+        kwargs["vertexai"] = False
+        # Force project and location to None to override any inherited environment variables
+        # which would otherwise trigger 'mutually exclusive' conflicts in the SDK constructor.
+        kwargs["project"] = None
+        kwargs["location"] = None
+    else:
+        # If no API Key is found, we fall back to Vertex AI / GCP Service Account
+        project = os.getenv(project_var)
+        if project or (use_vertex_env and use_vertex_env.lower() in ("true", "1")):
+            kwargs["vertexai"] = True
+            if project:
+                kwargs["project"] = project
+            kwargs["location"] = os.getenv(location_var, "us-central1")
+            
+            # Load credentials object explicitly from SA path if specified and exists
+            sa_path = os.getenv(sa_var)
+            if sa_path:
+                import pathlib
+                sa_file = pathlib.Path(sa_path)
+                if not sa_file.is_absolute():
+                    # Resolve relative to project root
+                    sa_file = (pathlib.Path(__file__).parent.parent.parent / sa_path).resolve()
+                
+                if sa_file.exists():
+                    from google.oauth2 import service_account
+                    kwargs["credentials"] = service_account.Credentials.from_service_account_file(
+                        str(sa_file),
+                        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                    )
+            
+    return kwargs
+
 def _build_model_instance(model_name: str, is_main_model: bool = False) -> BaseLlm:
     """Factory to build the appropriate ADK BaseLlm instance based on the provider prefix."""
     if model_name.startswith("deepseek/"):
@@ -41,9 +95,9 @@ def _build_model_instance(model_name: str, is_main_model: bool = False) -> BaseL
             drop_params=True,
         )
     else:
-        # Default fallback to Google's native Gemini models
+        # Default fallback to Google's native Gemini models with parameterized auth
         from google.adk.models import Gemini
-        return Gemini(model=model_name)
+        return Gemini(model=model_name, client_kwargs=get_gemini_client_kwargs())
 
 # --- Exported Ready-to-Use Model Instances ---
 MODEL: BaseLlm = _build_model_instance(LLM_MODEL, is_main_model=True)

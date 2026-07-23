@@ -455,7 +455,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
 | Integrazione Slack | 🔲 | Future |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
-| Supporto duale autenticazione (Service Account ↔ API Key) | 🔲 | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |
+| Supporto duale autenticazione (Service Account ↔ API Key) | ✅ | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |
 | Autenticazione Gemini via Service Account | ✅ | `.env` + `GOOGLE_APPLICATION_CREDENTIALS`; pre-flight check in `telegram_bot.py` |
 | Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
 | Sistema Pi-Agent Skills (`scummbar-*`) | ✅ | Introduzione di skill per progressive disclosure documentale |
@@ -478,6 +478,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 - **`_build_model_instance()` factory** in `utils.py` — restituisce `BaseLlm` corretto dal prefisso del modello
 - **`MODEL` vs `COMPACTION_LLM`** — istanze separate: conversazione vs riassunto sessioni
 - **`COMPACTION_LLM`** — segue `COMPACTION_MODEL` nel `.env`; default `gemini-3.5-flash` (richiede ADC); supporta anche DeepSeek
+- **Isolamento dell'Autenticazione delle Immagini**: Abbiamo progettato l'autenticazione del modello di generazione delle immagini (`IMAGE_MODEL`) in modo che sia indipendente rispetto alla conversazione principale e alla compattazione. La factory `get_gemini_client_kwargs()` accetta un prefisso (es: `IMAGE_`) che isola le chiavi API o i Service Account dedicati. Per Vertex AI, le credenziali del Service Account per le immagini vengono istanziate in RAM come oggetto, evitando modifiche globali distruttive alle variabili di ambiente e garantendo una perfetta stabilità multi-thread.
 - **`thinking_level=medium`** / **`reasoning_effort=high`** per Gemini/DeepSeek
 - **`include_thoughts=False`** / filtro `part.thought=True` — reasoning rimane interno
 - **`location=global`** per `gemini-3.5-flash` su Vertex AI
@@ -936,6 +937,18 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
    - Aggiunta Isolde alla tabella introduttiva del `README.md`.
    - Aggiornato l'esempio del file `.env` nel `README.md` includendo `IMAGE_MODEL` e `GEMINI_API_KEY`.
    - Pulito e snellito `AGENTS.md` grazie all'introduzione delle skill.
+4. **Autenticazione Duale Parametrizzabile (GCP/Vertex ↔ API Key)**:
+   - Creata la funzione `get_gemini_client_kwargs()` in `utils.py` per raccogliere dinamicamente i parametri di connessione in base a ciò che è presente in `.env`.
+   - Se nel `.env` è presente `GEMINI_API_KEY` (o `GOOGLE_API_KEY`), forza `vertexai=False` e imposta esplicitamente `project=None` e `location=None` per superare i conflitti di mutua esclusione nativi dell'SDK di Google.
+   - Se non è presente un'API key, imposta `vertexai=True` abilitando l'autenticazione tramite Service Account (JSON in `GOOGLE_APPLICATION_CREDENTIALS` o credenziali ADC), impostando correttamente `project` e `location`.
+   - Modificato `_build_model_instance()` in `utils.py` per passare questi parametri al costruttore `Gemini` di ADK tramite `client_kwargs`.
+   - Modificato il tool di generazione delle immagini (`draw_tarot_card` in `tools.py`) per usare lo stesso inizializzatore parametrizzato `genai.Client(**get_gemini_client_kwargs())`.
+   - Aggiornato il pre-flight check in `telegram_bot.py` (`_check_env`) per bypassare la validazione del file JSON del Service Account se viene rilevata una `GEMINI_API_KEY` valida.
+5. **Isolamento dell'Autenticazione delle Immagini**:
+   - Parametrizzata `get_gemini_client_kwargs(prefix="")` per accettare un prefisso. Se chiamata con `prefix="IMAGE_"`, risolve variabili d'ambiente dedicate ed indipendenti (`IMAGE_GEMINI_API_KEY`, `IMAGE_GOOGLE_CLOUD_PROJECT`, ecc.) per la Sezione 4 della generazione immagini.
+   - Aggiornato `draw_tarot_card` in `tools.py` per usare `prefix="IMAGE_"` eliminando ogni accoppiamento o dipendenza con le credenziali principali della chat.
+   - Per l'opzione Vertex AI dedicata delle immagini, le credenziali del Service Account JSON vengono ora caricate direttamente come oggetto in memoria (`google.oauth2.service_account.Credentials.from_service_account_file`) eliminando la necessità di mutare le variabili d'ambiente globali e garantendo la massima stabilità in cicli asincroni multi-thread.
+   - Suddiviso e documentato il file `.env` e `README.md` in 6 sezioni logiche distinte per finalità.
 
 ---
 
