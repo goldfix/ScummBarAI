@@ -949,6 +949,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
    - Aggiornato `draw_tarot_card` in `tools.py` per usare `prefix="IMAGE_"` eliminando ogni accoppiamento o dipendenza con le credenziali principali della chat.
    - Per l'opzione Vertex AI dedicata delle immagini, le credenziali del Service Account JSON vengono ora caricate direttamente come oggetto in memoria (`google.oauth2.service_account.Credentials.from_service_account_file`) eliminando la necessità di mutare le variabili d'ambiente globali e garantendo la massima stabilità in cicli asincroni multi-thread.
    - Suddiviso e documentato il file `.env` e `README.md` in 6 sezioni logiche distinte per finalità.
+   - Risolto il bug `invalid_scope` in modalità Vertex AI (Service Account) forzando esplicitamente lo scope OAuth `cloud-platform` durante il caricamento del file JSON.
 
 ---
 
