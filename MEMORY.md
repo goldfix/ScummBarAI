@@ -916,6 +916,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 | `patron_memories` righe duplicate con user_id inventati | `user_id` viene da `ToolContext`, non dall'LLM — se succede, `DELETE FROM patron_memories WHERE user_id NOT GLOB '[0-9]*'` |
 | Gemini: auth fallisce in produzione senza ADC | Usare `GOOGLE_APPLICATION_CREDENTIALS=/path/assoluto/key.json` nel `.env`; il bot verifica il file al boot |
 | Service Account: file JSON non trovato al boot | `telegram_bot.py` stampa errore esplicito e si arresta — verificare il path in `.env` |
+| Il Narratore si attiva ad ogni messaggio invece che 1 volta su 3 | Il modello leggeva le regole di attivazione generiche in `scummbar.md` e provava a simulare la probabilità del 33% di sua iniziativa. Risolto impostando un divieto di iniziativa esplicito in `scummbar.md` e vincolando l'attivazione solo alla presenza dell'esplicita `[NOTA DI SISTEMA: È il momento del Narratore...]` iniettata dall'adapter Telegram. |
 
 ---
 
@@ -950,6 +951,10 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
    - Per l'opzione Vertex AI dedicata delle immagini, le credenziali del Service Account JSON vengono ora caricate direttamente come oggetto in memoria (`google.oauth2.service_account.Credentials.from_service_account_file`) eliminando la necessità di mutare le variabili d'ambiente globali e garantendo la massima stabilità in cicli asincroni multi-thread.
    - Suddiviso e documentato il file `.env` e `README.md` in 6 sezioni logiche distinte per finalità.
    - Risolto il bug `invalid_scope` in modalità Vertex AI (Service Account) forzando esplicitamente lo scope OAuth `cloud-platform` durante il caricamento del file JSON.
+6. **Risoluzione Bug Attivazione Narratore**:
+   - Risolto il problema per cui il Narratore si attivava ad ogni messaggio invece che 1 volta su 3.
+   - Il modello leggeva le regole di attivazione descrittive in `scummbar.md` e provava a simulare la probabilità del 33% di sua iniziativa a causa della mancanza di vincoli espliciti.
+   - Modificato `scummbar.md` impostando un divieto di iniziativa esplicito e vincolando l'attivazione del Narratore unicamente alla presenza della nota di sistema `[NOTA DI SISTEMA: È il momento del Narratore...]` iniettata dall'adapter.
 
 ---
 
