@@ -185,7 +185,7 @@ We wanted the agents to be able to "hand over" items to players:
 
 ## 🤖 AI-Assisted Development: The Pi-Agent Autopilot
 
-This repository was designed to be developed, refactored, and maintained **collaboratively with an AI coding assistant (Pi-Agent)**. 
+This repository was designed to be developed, refactored, and maintained **collaboratively with an AI coding assistant (Pi-Agent)**.
 
 To achieve this, we configured a specialized autonomous system directly in the codebase using **Agent Skills**.
 
@@ -227,6 +227,10 @@ If you are developing this repository using Pi-Agent, you can invoke these skill
 ```
 
 By combining Google ADK for multi-agent execution and Pi-Agent Skills for autonomous workspace organization, this repository stands as a **state-of-the-art template for modern, AI-collaborative software engineering**.
+
+---
+
+![scummbar](scummbar.png)
 
 ---
 
