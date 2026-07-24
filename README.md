@@ -1,505 +1,233 @@
-# 🍺 ScummBar AI
+# 🍺 ScummBar AI — A Collaborative Multi-Agent Study Project
 
-> *"Here sabers rest, and stories float."*
+> *"Where sabers rest, stories float, and agents run the bar."*
 
-A multi-bot interactive chat set in a Caribbean pirate tavern, built with **Google Agent Development Kit (ADK)** and integrated with **Telegram**.
+Welcome to the **Scummbar AI**! This is an open-source, hands-on **study repository** designed to teach developers how to build, orchestrate, and maintain a complex, multi-agent conversational application using the **Google Agent Development Kit (ADK)**, Gemini, and DeepSeek, integrated directly into **Telegram**.
 
-This is a **study project** — no commercial purpose, just learning how to build multi-agent systems with AI.
-
----
-
-## The Story
-
-The **Scummbar** is a Caribbean pirate tavern. A place where tired sailors put down their swords, order a mug of grog, and sit down to listen.
-
-Three characters run the bar:
-
-| Character | Role | Personality |
-|-----------|------|-------------|
-| 🍺 **Barnaby** | Bartender | Always listening, knows the sea, makes unforgettable grogs |
-| 🐱 **Barnacle** | The bar cat | Mysterious, solitary, speaks rarely — but when he does, it's worth hearing |
-| 🔮 **Isolde** | Fortune Teller | Sitting in the shadow corner, she reads tarot cards and sees the unspoken truth |
-
-All of them are AI-powered. All of them have a story.
+Instead of a dry reference manual, this documentation is structured **didactically** to guide you through the architectural decisions, the code design, and the modern AI-assisted workflows used to build and evolve this project.
 
 ---
 
-## Getting Started
+## 🗺️ Table of Contents
+1. [📖 The Story & The Characters](#-the-story--the-characters)
+2. [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
+3. [🏗️ Architectural Blueprint & Technical Choices](#️-architectural-blueprint--technical-choices)
+4. [🤖 AI-Assisted Development: The Pi-Agent Autopilot](#-ai-assisted-development-the-pi-agent-autopilot)
 
-### Prerequisites
+---
 
+## 📖 The Story & The Characters
+
+The **Scummbar** is a legendary Caribbean pirate tavern. It is a shared Telegram group session where multiple AI-powered characters live, listen, and interact with patrons in real-time.
+
+| Character | Role | Didactic Purpose | Personality Vibe |
+|-----------|------|------------------|------------------|
+| 🍺 **Barnaby** | Bartender | Demonstrates **Tool Calling** (Memory Read/Write, Text Artifact generation) and ADK **Skills Auto-Discovery** | Empathetic, quiet, knows every pirate's secret, mixes unforgettable custom grogs. |
+| 🐱 **Barnacle** | Tavern Cat | Demonstrates **Read-Only Shared Memory** and **Ephemeral Telegram Messaging** (whispering to specific users) | Crotchety, speaks rarely, sleeps on ammo crates, dislikes loud patrons. |
+| 🔮 **Isolde** | Fortune Teller | Demonstrates **Independent Multi-Auth Routing** and **Multimodal Image Generation** (native Gemini 3.1 Flash Image + Pillow PIL fallback) | Criptic, majestic, sits in the Shadow Corner, extracts mystical tarot cards. |
+
+---
+
+## 🚀 Quick Start (Run First, Learn Later)
+
+Follow these steps to get the Scummbar running on your local machine or Telegram group in minutes.
+
+### 1. Prerequisites
 - Python 3.11+
-- [Google Cloud ADC](https://cloud.google.com/docs/authentication/application-default-credentials) (for Gemini on Vertex AI)
-- A [DeepSeek API key](https://platform.deepseek.com/api_keys) (optional, for DeepSeek models)
+- A Google Gemini API Key (from [Google AI Studio](https://aistudio.google.com/)) OR a Google Cloud Service Account (Vertex AI).
+- A Telegram Bot Token from [@BotFather](https://t.me/botfather) (optional, for Telegram delivery).
 
-### Setup
-
+### 2. Installation
 ```bash
-# 1. Clone the repository
+# Clone the repository
 git clone https://github.com/goldfix/ScummBarAI.git
 cd ScummBarAI
 
-# 2. Initialize the environment (creates py-env/, installs dependencies)
+# Initialize and create the virtual environment
 bash py_env.sh init_py
 
-# 3. Activate it (each new terminal session)
-bash py_env.sh active
-
-# 4. Configure the environment
-# Edit src/scummbar_chat/.env with your API keys and project settings
+# Activate the environment
+source py-env/bin/activate  # or: bash py_env.sh active
 ```
 
-### Quick activate (existing environment)
-
-```bash
-bash py_env.sh active
-```
-
-### Environment File
-
-Configure `src/scummbar_chat/.env`:
+### 3. Environment Configuration
+Copy `.env.example` or create a file named `src/scummbar_chat/.env`. This file is divided into **6 logical sections** based on purpose:
 
 ```env
 # ===========================================================================
 # 🔐 SECTION 1: CORE GEMINI AUTHENTICATION (Chat & Compaction Auth)
 # ===========================================================================
-# Configura le credenziali di connessione per la Chat e la Compattazione (Sez. 2 e Sez. 3).
-# Scegli UNA sola delle due opzioni (A o B) e commenta l'altra.
+# Choose ONE of the two options (A or B) and comment out the other.
 
-# --- OPZIONE A: Google AI Studio (API Key) — simplest, no GCP project needed ---
+# --- OPTION A: Google AI Studio (API Key) — Simple, no GCP project needed ---
 GEMINI_API_KEY=your-api-key-here
 
-# --- OPZIONE B: Vertex AI / Google Cloud (Service Account) — for GCP users ---
+# --- OPTION B: Vertex AI / Google Cloud (Service Account) — GCP Enterprise ---
 # GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 # GOOGLE_CLOUD_LOCATION=global
 # GOOGLE_GENAI_USE_VERTEXAI=True
 # GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/key.json
 
-
 # ===========================================================================
 # 💬 SECTION 2: CHAT CONVERSATION (Core LLM Settings)
 # ===========================================================================
-# Il modello principale usato dai bot per chattare con gli avventori.
-# Supporta: modelli Gemini (usa Auth Sez. 1) o DeepSeek (richiega Sez. 5).
 LLM_MODEL=gemini-3.1-flash-lite
 LLM_THINKING_LEVEL=medium
-
 
 # ===========================================================================
 # 🗜️ SECTION 3: CONTEXT COMPACTION (Compression Settings)
 # ===========================================================================
-# Configurazione del sistema di riassunto automatico per risparmiare memoria.
-# NOTA: Se si usa un modello Gemini, eredita automaticamente le credenziali della Sez. 1.
+# Summarization settings (inherits credentials automatically from Section 1)
 COMPACTION_MODEL=gemini-3.5-flash
 COMPACTION_INTERVAL=30
 COMPACTION_OVERLAP=2
 
-
 # ===========================================================================
 # 🔮 SECTION 4: IMAGE GENERATION (Isolde Settings & INDEPENDENT AUTH)
 # ===========================================================================
-# Modello usato da Isolde per generare le immagini dei Tarocchi.
+# Isolde's Tarot model and its FULLY INDEPENDENT, isolated authentication.
 IMAGE_MODEL=gemini-3.1-flash-lite-image
 
-# Configura le credenziali di connessione INDIPENDENTI per la generazione immagini.
-# Scegli UNA sola delle due opzioni (A o B) e commenta l'altra.
+# --- OPTION A: Google AI Studio (Dedicated API Key for Images) ---
+IMAGE_GEMINI_API_KEY=your-dedicated-image-api-key-here
 
-# --- OPZIONE A: Google AI Studio (API Key Dedicata per Immagini) ---
-IMAGE_GEMINI_API_KEY=your-image-api-key-here
-
-# --- OPZIONE B: Vertex AI / Google Cloud (Service Account Dedicato per Immagini) ---
+# --- OPTION B: Vertex AI / Google Cloud (Dedicated Service Account for Images) ---
 # IMAGE_GOOGLE_CLOUD_PROJECT=another-gcp-project-id
 # IMAGE_GOOGLE_CLOUD_LOCATION=europe-west1
 # IMAGE_GOOGLE_GENAI_USE_VERTEXAI=True
 # IMAGE_GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/another-key.json
 
-
 # ===========================================================================
 # 🧠 SECTION 5: DEEPSEEK PROVIDER OVERRIDES (Optional)
 # ===========================================================================
-# Da compilare SOLO se imposti modelli che iniziano con "deepseek/" in Sez. 2 o 3.
-DEEPSEEK_API_KEY=your-deepseek-api-key
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
 DEEPSEEK_REASONING_EFFORT=high
 
-
 # ===========================================================================
-# 📡 SECTION 6: TELEGRAM INTEGRATION
+# 📡 SECTION 6: TELEGRAM INTEGRATION (Optional)
 # ===========================================================================
-# Configurazione di connessione per l'adattatore Telegram.
-TELEGRAM_BOT_TOKEN=your-bot-token
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 TELEGRAM_BOT_USERNAME=your_bot_username
-TELEGRAM_GROUP_LINK=https://t.me/your-group
+TELEGRAM_GROUP_LINK=https://t.me/your-group-link
+```
+
+### 4. Running the Tavern
+
+#### Option A: Web Interface (ADK Web)
+Perfect for rapid testing and prototyping.
+```bash
+./start.sh  # Launches with persistent SQLite session tracking
+```
+Open `http://localhost:8000` to chat with the coordinator and characters in your browser.
+
+#### Option B: Telegram Bot (Group Delivery)
+```bash
+python telegram_bot.py --debug
 ```
 
 ---
 
-## Running
+## 🏗️ Architectural Blueprint & Technical Choices
 
-### Web Interface (ADK Web)
+The Scummbar is designed around clean software engineering and multi-agent patterns. Here is how the system is organized:
+
+### 1. Collaborative Multi-Agent Coordination
+Instead of a single monolith prompt, the Scummbar uses a **Hierarchical Router-Delegate** pattern using Google ADK's `root_agent` and `sub_agents`.
+
+```
+                    [Telegram / Web Input]
+                              │
+                              ▼
+                        [root_agent]
+                    (Shared Coordinator)
+                              │
+         ┌────────────────────┼────────────────────┐
+         ▼                    ▼                    ▼
+    [Barnaby]             [Barnacle]            [Isolde]
+ (The Bartender)         (The Tavern Cat)    (The Fortune Teller)
+  - Memory read/write     - Read-only Memory   - Independent Auth
+  - Auto-discovered       - Ephemeral replies  - Gemini Nano Image
+    Skills (Grog/Menu)                           generation tool
+```
+
+*   **How routing works**: In `src/scummbar_chat/telegram/adapter.py`, the function `_resolve_intent()` applies two priority levels:
+    1.  **Explicit Mention**: `@barnaby`, `@barnacle`, `@isolde` (always wins).
+    2.  **Semantic Keyword Matching**: The message is scanned against `_INTENT_MAP` (e.g., `grog` routes to Barnaby, `tarocchi` or `carte` to Isolde).
+*   **Routing Prefix**: Once resolved, the router prepends `[Risponde NAME]` to the text, which instructs the coordinator (`root_agent`) to route the call to the corresponding sub-agent.
+
+### 2. Core Architectural Choices
+
+#### A. Centralized Temporal World Context (InstructionProvider)
+To create an immersive atmosphere, the bar never closes but changes its mood in real-time. In `src/scummbar_chat/time_context.py`, the day is split into 6 periods (Dawn, Noon, Sunset, Night, etc.).
+*   **The Choice**: Instead of passing the world description statically, we use ADK's `global_instruction` bound to an **`InstructionProvider`** function. This dynamically updates the bar's description *at every model turn* based on the actual system hour.
+*   **Why**: This is cache-friendly for Gemini and ensures the agents always know if it's sunset or dawn without manual prompt editing.
+
+#### B. SQLite Session Persistence & Database Compaction
+All group chats are mapped to a single persistent SQLite database (`data/sessions.db`) via ADK's `DatabaseSessionService`.
+*   **Context Compaction**: As history grows, the context window fills up. We configured an automated, LLM-based compaction scheme (`EventsCompactionConfig` + `LlmEventSummarizer`):
+    *   After every **30 events**, the older portion of the conversation is replaced by an LLM-generated summary (`COMPACTION_MODEL`).
+    *   The last **2 events** are kept verbatim to maintain immediate conversational context.
+
+#### C. Smart Dual-Authentication & Isolation
+One of the key technical highlights of this repository is how authentication is parameterized:
+*   **The Problem**: The standard Google GenAI SDK throws a fatal error if you supply both an API Key and Vertex AI variables globally in the environment (they are mutually exclusive).
+*   **The Solution**: We built `get_gemini_client_kwargs(prefix="")` in `utils.py`.
+    *   If `GEMINI_API_KEY` is present, it forces `vertexai=False` and programmatically overrides `project=None` and `location=None`, shielding the client from environment pollution.
+    *   If `prefix="IMAGE_"` is specified, it isolates the **Image Generation** auth entirely, allowing Isolde to run on a separate billing project, key, or Vertex regional project without affecting Chat/Compaction!
+    *   **Thread Safety**: For Vertex AI Service Accounts, we load the JSON directly as an in-memory `Credentials` object rather than mutating `os.environ` globally, ensuring perfect safety during async concurrent loops.
+
+#### D. Tangible Media Delivery (Artifacts)
+We wanted the agents to be able to "hand over" items to players:
+*   **Barnaby's Scrolls**: Generates recipes as `.txt` files using ADK's `InMemoryArtifactService` via the `write_secret_scroll` tool. Delivered as downloadable Telegram documents.
+*   **Isolde's Tarot Images**: Uses `draw_tarot_card` tool via Gemini's native `response_modalities=["IMAGE"]` or a customized **Pillow (PIL) local rendering fallback** if the API is offline. Automatically detects the file format (PNG vs. JPEG) via byte headers and delivers it as an inline native photo via `/sendPhoto`.
+
+---
+
+## 🤖 AI-Assisted Development: The Pi-Agent Autopilot
+
+This repository was designed to be developed, refactored, and maintained **collaboratively with an AI coding assistant (Pi-Agent)**. 
+
+To achieve this, we configured a specialized autonomous system directly in the codebase using **Agent Skills**.
+
+```
+                           [.agents/skills/]
+                                   │
+         ┌─────────────────────────┴─────────────────────────┐
+         ▼                                                   ▼
+[scummbar-docs-analyzer]                            [scummbar-memory-updater]
+  - Progressive disclosure of docs                    - Automated logging rules
+  - Offloads docs index from prompt                   - Roadmap state compiler
+  - Handles multi-directory searches                  - Markdown fence validator
+```
+
+### 1. What is an Agent Skill?
+A Pi-Agent skill is a self-contained, capability package located in `.agents/skills/`. At startup, Pi-Agent scans this directory and learns about the available capabilities via the skill's description. The full instructions are kept separate and loaded **on-demand** when the skill is called.
+
+This implements **Progressive Disclosure**: it keeps the AI's initial context window incredibly clean, saving tokens, speeding up response times, and maximizing the LLM's reasoning focus.
+
+### 2. Our Customized Skills
+
+#### A. Documentation Analyzer (`/skill:scummbar-docs-analyzer`)
+-   **Why**: The `docs/` folder contains dozens of framework guides. Storing their indexes in the main developer instructions (`AGENTS.md` or `MEMORY.md`) wasted thousands of tokens.
+-   **What it does**: This skill encapsulates the entire documentation index. When the AI needs to understand an ADK concept (like *Memory Bank* or *Workflow Loops*), it invokes this skill, parses the local index, uses `rg` or `find` to find the exact markdown file under `docs/`, and reads it.
+
+#### B. Memory & Documentation Updater (`/skill:scummbar-memory-updater`)
+-   **Why**: Keeping architectural decisions (`MEMORY.md`), developer guides (`AGENTS.md`), and public manuals (`README.md`) synchronized across dozens of commits is extremely error-prone for humans and AIs alike.
+-   **What it does**: Standardizes how the AI must document changes. It enforces rules on how to append session logs, update the roadmap, register design decisions, and includes an automated Python validator to ensure no markdown code blocks are left open or broken.
+
+### 3. How to Use the Autopilot (For Developers)
+If you are developing this repository using Pi-Agent, you can invoke these skills directly:
 
 ```bash
-# With SQLite persistence:
-./start.sh
+# Explore framework documentation in the docs/ folder
+/skill:scummbar-docs-analyzer search "compaction"
 
-# Without persistence:
-adk web src/
-
-# Debug mode:
-adk web src/ --log_level DEBUG
+# Update memory, roadmap, and check markdown health after a refactoring
+/skill:scummbar-memory-updater log_changes
 ```
 
-Open [http://localhost:8000](http://localhost:8000) to chat with the bots.
-
-### Telegram Bot
-
-Start the Telegram long-polling adapter:
-
-```bash
-python telegram_bot.py
-```
-
-#### BotFather Setup
-
-On Telegram, chat with [@BotFather](https://t.me/botfather):
-
-```
-/newbot      → create your bot → get the token
-/setprivacy  → Disable (so the bot sees all messages)
-/setcommands → register commands:
-
-start - Enter the Scummbar
-grog - Order a special grog
-menu - Check the galley
-barnaby - Talk to the bartender
-barnacle - Bother the cat
-isolde - Seek a tarot vision from the shadow corner
-help - Help and available commands
-```
-
-Then make the bot a **group admin** (for Barnacle's ephemeral messages).
-
-#### How it works
-
-- Users can engage bots via **@mention** (`@barnaby`, `@barnacle`, `@isolde`) or **keywords** (e.g. `grog`, `gatto`, `carte`)
-- @mention always takes priority over keyword matching
-- Barnaby and Isolde reply publicly in the group
-- Barnacle replies with ephemeral messages (visible only to the requester)
-- Private messages to the bot get an in-character redirect to the group
-- One user at a time per bot (asyncio locks with 15s timeout)
+By combining Google ADK for multi-agent execution and Pi-Agent Skills for autonomous workspace organization, this repository stands as a **state-of-the-art template for modern, AI-collaborative software engineering**.
 
 ---
 
-## Architecture
-
-### Project Structure
-
-```
-src/scummbar_chat/
-├── agent.py                 # Root agent (coordinator)
-├── utils.py                 # Model factory, shared config, file loading
-├── time_context.py          # Real-time → bar atmosphere mapping
-├── tools.py                 # FunctionTools: recall_patron_memory, memorize_patron_chat, write_secret_scroll_tool
-├── .env                     # Environment configuration
-├── world/
-│   └── scummbar.md          # World context + narrator rules
-├── bots/
-│   ├── barnaby/
-│   │   ├── agent.py         # Barnaby agent + SkillToolset + memory/artifact tools
-│   │   └── persona.md       # Barnaby's personality prompt
-│   ├── barnacle/
-│   │   ├── agent.py         # Barnacle agent + recall_patron_tool
-│   │   └── persona.md       # Barnacle's personality prompt
-│   └── isolde/
-│       ├── agent.py         # Isolde agent + recall_patron_tool + draw_tarot_card_tool
-│       └── persona.md       # Isolde's personality prompt (mysterious tarot reader)
-├── skills/                  # Auto-discovered ADK skills
-│   ├── grog/SKILL.md        # Dynamic grog generation
-│   └── menu/SKILL.md        # Menu: quick serve + recipes
-└── telegram/                # Telegram adapter
-    ├── adapter.py           # Long polling, semantic routing, per-bot locks, narrator
-    ├── formatter.py         # ADK output → HTML for Telegram
-    └── runner.py            # ADK Runner + compaction + session pruning
-
-telegram_bot.py              # Telegram entry point (--debug flag, rotating logs)
-start.sh                     # ADK web + SQLite launcher
-data/sessions.db             # SQLite session persistence (auto-created)
-data/logs/bot.log            # Rotating log — all levels (auto-created)
-data/logs/errors.log         # Rotating log — WARNING+ only (auto-created)
-```
-
-### Agent Hierarchy
-
-```
-root_agent (scummbar_chat)
-├── global_instruction = InstructionProvider
-│   └── WORLD_CONTEXT + get_time_description()
-├── instruction = coordinator prompt
-└── sub_agents:
-    ├── barnaby → persona.md + SkillToolset (skills auto-discovery)
-    ├── barnacle → persona.md
-    └── isolde → persona.md
-```
-
-The root agent never responds directly — it **delegates** to the appropriate sub-agent
-based on a routing hint prepended to the message (`[Risponde BARNABY]`, `[Risponde BARNACLE]`, or `[Risponde ISOLDE]`).
-
-### Time Context
-
-`time_context.py` maps real time to six atmospheric moods in the bar:
-
-| Time | Period | Vibe |
-|------|--------|------|
-| 07–09 | Dawn | Bar opens, quiet, first pink light |
-| 09–12 | Morning | Bar wakes up, first customers |
-| 12–14 | Noon | Peak activity, crowded counter |
-| 14–16 | Afternoon | Post-lunch calm, Barnacle naps |
-| 16–18 | Sunset | Golden light, candles lit |
-| 18+ | Night | Bar never closes, candlelight |
-
-The description is injected into every model call via `InstructionProvider`,
-so the AI always knows the current bar atmosphere.
-
-### Skills (Auto-Discovery)
-
-Skills are modular prompt bundles loaded dynamically from the `skills/` directory.
-**Adding a new skill = creating a new folder with an `SKILL.md` file** — zero code changes.
-
-| Skill | Description |
-|-------|-------------|
-| `grog/` | Generates unique grogs based on user context, mood, and preferences |
-| `menu/` | Level 1: quick dish serve. Level 2: real recipe in pirate jargon |
-
-### Semantic Routing
-
-Messages are routed to the right bot through `_resolve_intent()`, which applies two
-priority levels in order:
-
-1. **Explicit @ tag** — `@barnaby`, `@barnacle`, or `@isolde` in the message text (always wins)
-2. **Keyword matching** — if no tag is found, the message is scanned against `_INTENT_MAP`
-
-```python
-_INTENT_MAP = {
-    "barnaby":  ["barnaby", "barista", "grog", "birra", "bere", "drink", ...],
-    "barnacle": ["barnacle", "micio", "gatto", "felino", "fusa", ...],
-    "isolde":   ["isolde", "carte", "giocare", "gioco", "dadi", "tarocchi", "segreto", ...]
-}
-```
-
-If neither matches, the message is silently ignored — bots don’t respond to
-conversations not addressed to them.
-
-Keywords are fully configurable: edit `_INTENT_MAP` in `adapter.py` to add or remove
-trigger words without touching any other logic.
-
----
-
-### Narrator System
-
-Every **3rd message** in a group session, the adapter automatically appends a system
-prompt to the bot’s input, asking it to add a short atmospheric description at the
-end of its reply.
-
-```
-message 1: Barnaby replies normally
-message 2: Barnaby replies normally
-message 3: Barnaby replies + adds an ambient description in italics
-message 4: Barnaby replies normally
-...
-```
-
-The narrator description is formatted as a full `_cursive line_` (mapped to
-`<blockquote><i>...</i></blockquote>` in Telegram HTML) so it visually stands apart
-from dialogue.
-
-Narrator rules and style guidelines live in `world/scummbar.md`, so the content can
-be tuned without touching code.
-
----
-
-### Telegram Adapter
-
-```
-src/scummbar_chat/telegram/
-├── adapter.py    # Long polling, semantic routing, per-bot locks, narrator injection
-├── formatter.py  # ADK output → HTML (3 formatting levels)
-└── runner.py     # ADK Runner + compaction + session pruning
-```
-
-**Message flow:**
-
-```
-Incoming group message
-        │
-        ▼
-  chat.type == "private"?
-        │ yes → in-character redirect to group, stop
-        ▼ no
-  _resolve_intent(text)
-        │ None → ignore (not addressed to any bot)
-        ▼ bot_name
-  asyncio.wait_for(lock.acquire(), timeout=15s)
-        │ timeout → send "bot is busy" message, stop
-        ▼ acquired
-  sendChatAction(typing)
-  message_counter[session] += 1
-        │ counter % 3 == 0 → append Narrator system prompt
-        ▼
-  augmented = "[Risponde BOT_NAME] {text}"
-  response  = run_agent(user_id, session_id, augmented)
-  formatted = format_response(response)
-        │
-        ▼
-  barnaby  → sendMessage(chat_id, HTML)                    # public
-  barnacle → sendMessage(chat_id, HTML, receiver=user_id)  # ephemeral
-             fallback: public + 🐱 whisper note if not admin
-        │
-  finally → lock.release()
-```
-
-**Text formatting (3 levels):**
-
-| Pattern in agent output | Telegram rendering |
-|-------------------------|--------------------|
-| `Plain text` | plain text (dialogue) |
-| `*action text*` | `<i>action text</i>` (character narration) |
-| `_full line_` | `<blockquote><i>full line</i></blockquote>` (atmosphere) |
-
----
-
-### Model Support
-
-Switching models = **one line** in `.env`. A factory function in `utils.py` builds the
-correct `BaseLlm` instance automatically based on the model name prefix.
-
-| `LLM_MODEL` | Provider | Notes |
-|-------------|----------|-------|
-| `gemini-3.5-flash` | Vertex AI (Gemini) | Requires ADC + enabled Vertex AI API |
-| `gemini-3.1-flash-lite` | Vertex AI (Gemini) | Faster, less powerful |
-| `deepseek/deepseek-v4-flash` | DeepSeek via LiteLlm | Requires `DEEPSEEK_API_KEY` |
-| `deepseek/deepseek-v4-pro` | DeepSeek via LiteLlm | More powerful, slower |
-
----
-
-### Context & Memory Management
-
-Managing context across long conversations is one of the core technical challenges
-this project explores. Four mechanisms work together:
-
-#### 1. Time-Aware Context (`time_context.py`)
-
-The `global_instruction` is an **`InstructionProvider`** — a function called at every
-model invocation that injects the current bar atmosphere alongside the world context.
-
-```
-global_instruction = WORLD_CONTEXT + get_time_description()
-                                            ↑
-                               updates every hour automatically
-```
-
-This means the AI always knows whether the bar is quiet at dawn or packed at noon,
-without storing this in the session.
-
-#### 2. Session Persistence (SQLite)
-
-Conversations are stored in a local SQLite database via ADK’s `DatabaseSessionService`.
-Each Telegram group maps to a single shared session (`session_id = chat_id`), so all
-patrons in the group share the same conversation history.
-
-```bash
-./start.sh  # Uses sqlite+aiosqlite:///data/sessions.db
-```
-
-A background task runs **hourly** to delete events older than 24 hours, keeping the
-database from growing unbounded.
-
-#### 3. Context Compaction (`runner.py`)
-
-Long sessions would eventually exceed the model’s context window. To prevent this,
-the runner wraps the ADK agent in an **`App`** with `EventsCompactionConfig`:
-
-```
-Conversation history (events)
-  ┌────────────────────────────┐
-  │  events 1 → 28        │─►  replaced by a compact summary
-  │  (summarized by LLM)  │    generated by COMPACTION_MODEL
-  └────────────────────────────┘
-  events 29–30  ─►  kept verbatim as narrative overlap
-```
-
-After every `COMPACTION_INTERVAL` events (default: 30), the older portion is replaced
-by a summary. The last `COMPACTION_OVERLAP` events are kept verbatim as a bridge.
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `COMPACTION_MODEL` | `gemini-3.5-flash` | Model used for summarization |
-| `COMPACTION_INTERVAL` | `30` | Events before compaction triggers |
-| `COMPACTION_OVERLAP` | `2` | Events kept verbatim after compaction |
-
-`COMPACTION_MODEL` supports both Gemini (requires ADC) and DeepSeek (requires
-`DEEPSEEK_API_KEY`). It is independent from `LLM_MODEL`.
-
-> `EventsCompactionConfig` is currently marked **experimental** by ADK.
-
-#### 4. Patron Memory (`tools.py` + `patron_memories`)
-
-Barnaby and Barnacle remember patrons across sessions using two ADK `FunctionTool`s
-that read and write a dedicated SQLite table.
-
-```
- patron_memories
- ┌───────────┬────────────┬────────────┬───────────────────┬─────────────────┐
- │ user_id   │ patron_name │ core_traits │ last_chat_summary  │ last_interaction │
- └───────────┴────────────┴────────────┴───────────────────┴─────────────────┘
-   ↑ PK
-   Telegram user ID (numeric)
-```
-
-A key design choice: the `user_id` is **never passed as an LLM parameter** —
-the model could hallucinate it. Instead, ADK injects the real Telegram user ID
-automatically via `ToolContext`:
-
-```python
-async def recall_patron_memory(tool_context: ToolContext) -> dict:
-    user_id = tool_context.user_id  # ← real Telegram ID from the ADK session
-```
-
-The table is created automatically on first use (`CREATE TABLE IF NOT EXISTS`).
-
-#### 5. Artifact & Media Delivery (`InMemoryArtifactService`, `write_secret_scroll`, `draw_tarot_card`)
-
-To support tangible digital handovers (like "Secret Recipes", "Treasure Maps", or "Tarot Card Visions"), we configured ADK's `InMemoryArtifactService` on the Runner.
-
-Depending on the mime type/extension, artifacts are delivered dynamically to Telegram:
-
-##### A. Text-Based Scrolls (Barnaby's Bartending Recipes / Maps)
-1. Barnaby calls the `write_secret_scroll` tool supplying `title` and `content`.
-2. The file is saved as an ADK Artifact (`types.Part.from_bytes` under `text/plain`).
-3. `runner.py` intercepts `event.actions.artifact_delta` during execution and extracts the raw bytes.
-4. `adapter.py` streams the file to Telegram as a downloadable attachment using the native `sendDocument` API:
-   ```python
-   # Streams from RAM as multipart/form-data
-   await _send_document(http, chat_id, filename, file_bytes)
-   ```
-
-##### B. Visual Images (Isolde's Mystic Tarot Card Visions)
-1. Isolde calls the `draw_tarot_card` tool supplying a `card_name` and a visual `scene_description`.
-2. The tool attempts to generate an AI image using the Google GenAI SDK. If `GEMINI_API_KEY` is provided in `.env`, the client will automatically authenticate and generate high-quality AI images.
-3. **Robust Fallback**: If the AI model fails or is blocked by network/security issues, the tool gracefully falls back to generating a beautiful, custom-drawn in-character tarot card `.png` in-memory using **Pillow**.
-4. The file is saved as a `.png` or `.jpg` artifact (automatically detected from the bytes) and intercepted.
-5. `adapter.py` detects the extension and uploads it as an inline, beautifully rendered chat photo using the Telegram `sendPhoto` API:
-   ```python
-   # Renders inline in the chat
-   await _send_photo(http, chat_id, filename, file_bytes)
-   ```
-
-All models are fully parameterized. All settings (e.g. `IMAGE_MODEL` and the API key) are configured centrally in `.env`. No cloud storage or Google GCS buckets are used, making the artifact generation fast, secure, and entirely locally-contained.
-
----
-
-## A Note
-
-The project — code and documentation — was built with the active support of **Generative AI** (Claude by Anthropic), used as a development assistant throughout the process. That too is part of the study.
-
----
-
-*Inspired by the Scumm Bar from Monkey Island. No affiliation with LucasArts.*
+*Inspired by the Scumm Bar from Monkey Island. Built for learning and study purposes. No commercial affiliation.*
