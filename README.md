@@ -1,5 +1,7 @@
 # 🍺 ScummBar AI — A Collaborative Multi-Agent Study Project
 
+![scummbar](scummbar.png)
+
 > *"Where sabers rest, stories float, and agents run the bar."*
 
 Welcome to the **Scummbar AI**! This is an open-source, hands-on **study repository** designed to teach developers how to build, orchestrate, and maintain a complex, multi-agent conversational application using the **Google Agent Development Kit (ADK)**, Gemini, and DeepSeek, integrated directly into **Telegram**.
@@ -227,10 +229,6 @@ If you are developing this repository using Pi-Agent, you can invoke these skill
 ```
 
 By combining Google ADK for multi-agent execution and Pi-Agent Skills for autonomous workspace organization, this repository stands as a **state-of-the-art template for modern, AI-collaborative software engineering**.
-
----
-
-![scummbar](scummbar.png)
 
 ---
 
