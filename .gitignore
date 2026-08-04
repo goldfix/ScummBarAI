@@ -1,0 +1,17 @@
+.env
+py-env/
+conda-env/
+tmp/
+poetry.lock
+__pycache__
+.DS_Store
+py_var.sh
+key.json
+
+src/scummbar_chat/.adk/
+data/scummbar_chat/sessions.db
+data/scummbar_chat/docs_rag.db
+.agents/skills/scummbar-docs-analyzer/data/
+data/scummbar_chat/logs/
+.pi-subagents/artifacts/
+uv.lock
