@@ -7,7 +7,7 @@ description: Strumento RAG ibrido (FTS5 BM25 + Vector Cosine Similarity gemini-e
 
 La cartella `docs/` contiene tutta la documentazione ufficiale dei framework e delle tecnologie utilizzate nel progetto (ADK, Gemini, DeepSeek, Telegram Bot API, Cheshire Cat AI, Pydantic, FastAPI, HTTPX, SQLite-Vector, BeautifulSoup4, html2text).
 
-Questa skill fornisce il **motore di ricerca RAG ibrido locale** per trovare istantaneamente informazioni pertinenti tra tutti i 406 documenti (11.647 chunk) senza dover scorrere manualmente indici o file statici.
+Questa skill fornisce il **motore di ricerca RAG ibrido locale** per trovare istantaneamente informazioni pertinenti tra tutti i 435 documenti (11.688 chunk) senza dover scorrere manualmente indici o file statici.
 
 ---
 

@@ -1,72 +1,63 @@
-PY_VER=3.12
-SCRIPT_DIR="$(pwd)"
+#!/usr/bin/env bash
+# Helper script to create and activate virtual environment using uv
 
-_abort_with_error() {
-    if [ -t 0 ]; then
-        echo ""
-        read -p "Premi Invio per continuare..." _dummy 2>/dev/null || true
-    fi
-    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-        return 1
-    else
-        exit 1
-    fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_VERSION="${2:-"3.12"}"
+VENV_DIR="${SCRIPT_DIR}/.venv"
+
+usage() {
+    echo "Usage: source py_env.sh [init|active] [python_version]"
+    echo ""
+    echo "Commands:"
+    echo "  init [version]   - Remove existing environment and create fresh .venv (default: 3.12)"
+    echo "  active           - Activate existing .venv and load py_var.sh"
+    echo ""
+    echo "Examples:"
+    echo "  source py_env.sh init 3.12"
+    echo "  source py_env.sh init 3.11"
+    echo "  source py_env.sh active"
 }
 
-if [[ "$1" != "init_conda" && "$1" != "init_py" && "$1" != "active" ]] ; then
-    echo "Please set param: 'init_py' or 'init_conda' or 'active'"
-    _abort_with_error
+if ! command -v uv &> /dev/null; then
+    echo "Error: 'uv' is not installed in system."
+    echo "Please install uv (e.g. 'brew install uv' or 'curl -LsSf https://astral.sh/uv/install.sh | sh')."
+    return 1 2>/dev/null || exit 1
 fi
 
-if [[ "$1" == "init_py" || "$1" == "init_conda" ]] ; then
-    if ! command -v uv >/dev/null 2>&1; then
-        echo "❌ 'uv' non è installato sul sistema."
-        echo "   Per favore installa uv (es. 'brew install uv' o 'curl -LsSf https://astral.sh/uv/install.sh') prima di proseguire."
-        _abort_with_error
+if [[ "$1" == "init" || "$1" == "init_py" ]]; then
+    echo "--> Creating fresh virtual environment in .venv using Python ${PYTHON_VERSION} (uv --clear removes any existing one)..."
+    uv venv --clear --python "${PYTHON_VERSION}" "${VENV_DIR}"
+
+    source "${VENV_DIR}/bin/activate"
+
+    echo "--> Syncing project dependencies with uv..."
+    uv sync --python "${PYTHON_VERSION}"
+    SYNC_STATUS=$?
+    if [ ${SYNC_STATUS} -ne 0 ]; then
+        echo "--> Error: 'uv sync' failed for Python ${PYTHON_VERSION}."
+        echo "--> Check that 'requires-python' in pyproject.toml allows this version."
+        return 1 2>/dev/null || exit 1
     fi
-fi
-
-if [[ "$1" == "init_py" ]] ; then
-    type deactivate >/dev/null 2>&1 && deactivate || true
-    unset VIRTUAL_ENV
-    PATH=$(echo "$PATH" | tr ':' '\n' | grep -v 'py-env' | tr '\n' ':' | sed 's/:$//')
-    export PATH
-
-    uv venv ${SCRIPT_DIR}/py-env --python ${PY_VER} --clear || _abort_with_error
-    source ${SCRIPT_DIR}/py-env/bin/activate
-fi
-
-if [[ "$1" == "init_conda" ]] ; then
-    type deactivate >/dev/null 2>&1 && deactivate || true
-    conda create -y -p ${SCRIPT_DIR}/conda-env python=${PY_VER} || _abort_with_error
-    conda activate ${SCRIPT_DIR}/conda-env
-fi
-
-if [[ "$1" == "init_conda" || "$1" == "init_py" ]] ; then
-    uv sync --active --directory ${SCRIPT_DIR} || _abort_with_error
 
     if [ -f "${SCRIPT_DIR}/py_var.sh" ]; then
-       source ${SCRIPT_DIR}/py_var.sh
-       echo Read env. file.
-    fi
-fi
-
-if [[ "$1" == "active" ]] ; then
-
-    if [ -d "${SCRIPT_DIR}/conda-env" ]; then
-        echo Conda Activated...
-        conda deactivate || true
-        conda activate ${SCRIPT_DIR}/conda-env
+        source "${SCRIPT_DIR}/py_var.sh"
+        echo "--> Environment variables loaded from py_var.sh"
     fi
 
-    if [ -d "${SCRIPT_DIR}/py-env" ]; then
-        type deactivate >/dev/null 2>&1 && deactivate || true
-        source ${SCRIPT_DIR}/py-env/bin/activate
-
-        if [ -f "${SCRIPT_DIR}/py_var.sh" ]; then
-            source ${SCRIPT_DIR}/py_var.sh
-            echo Read env. file.
-        fi
+elif [[ "$1" == "active" ]]; then
+    if [ -d "${VENV_DIR}" ]; then
+        source "${VENV_DIR}/bin/activate"
+        echo "--> Virtual environment (.venv) activated."
+    else
+        echo "--> No virtual environment found at .venv. Run 'source py_env.sh init [version]' first."
+        return 1 2>/dev/null || exit 1
     fi
 
+    if [ -f "${SCRIPT_DIR}/py_var.sh" ]; then
+        source "${SCRIPT_DIR}/py_var.sh"
+        echo "--> Environment variables loaded from py_var.sh"
+    fi
+
+else
+    usage
 fi
