@@ -823,6 +823,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 | Gemini: auth fallisce in produzione senza ADC | Usare `GOOGLE_APPLICATION_CREDENTIALS=/path/assoluto/key.json` nel `.env`; il bot verifica il file al boot |
 | Service Account: file JSON non trovato al boot | `telegram_bot.py` stampa errore esplicito e si arresta — verificare il path in `.env` |
 | Il Narratore si attiva ad ogni messaggio invece che 1 volta su 3 | Il modello leggeva le regole di attivazione generiche in `scummbar.md` e provava a simulare la probabilità del 33% di sua iniziativa. Risolto impostando un divieto di iniziativa esplicito in `scummbar.md` e vincolando l'attivazione solo alla presenza dell'esplicita `[NOTA DI SISTEMA: È il momento del Narratore...]` iniettata dall'adapter Telegram. |
+| `static_instruction` non sembra abilitare il caching | Per ADK 2.6+ il caching esplicito richiede `context_cache_config` a livello `App` (`ContextCacheConfig`); `static_instruction` da sola sfrutta solo l'implicit cache del provider. Vedere `docs/google-api/context_caching.md`. |
 
 ---
 
@@ -867,7 +868,27 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ---
 
-### 2026-07-25 — Revisione e Allineamento README.md
+### 2026-08-05 — Aggiornamento Documentazione Google ADK 2.6.0 e Refactoring Agenti
+
+**Obiettivo**: Scaricare, convertire ed indicizzare la documentazione aggiornata di Google ADK 2.6.0 da `adk.dev` in `docs/google-api/`, ed allineare l'architettura degli agenti con le nuove funzionalità ufficiali (`static_instruction` e `RetryConfig`).
+
+**Attività svolte**:
+- **Scarico e Conversione Documentazione ADK 2.6.0**:
+  - Convertite e salvate in `docs/google-api/` oltre 80 pagine ufficiali da `adk.dev` (Get Started, Tutorials, Agents, Workflows, Graphs, Models, Runtime, Deploy, Observability, Evaluation, Optimization, MCP, A2A, e l'intero API Reference Python `google-adk.html`).
+- **Indicizzazione RAG Vettoriale**:
+  - Eseguito `indexer.py`: database RAG aggiornato a **435 file Markdown (11.688 chunk)** con vettori `gemini-embedding-2`.
+- **Ottimizzazione Context Caching (`static_instruction`)**:
+  - Aggiornato `src/scummbar_chat/agent.py` per passare il contesto del mondo statico `WORLD_CONTEXT` (`scummbar.md`, ~6.2k chars) tramite il parametro nativo `static_instruction` di `Agent`/`LlmAgent`.
+  - Mantenuto dinamico solo il contesto atmosferico temporale (`get_time_description()`) in `global_instruction`, garantendo l'Hit automatico della Context Cache su Gemini e DeepSeek ad ogni richiesta.
+- **Resilienza API (`RetryConfig`)**:
+  - Introdotta la configurazione condivisa `DEFAULT_RETRY_CONFIG` (`RetryConfig(max_attempts=3, initial_delay=1.0, max_delay=10.0, backoff_factor=2.0)`) in `src/scummbar_chat/utils.py`.
+  - Applicato `retry_config=DEFAULT_RETRY_CONFIG` sia al `root_agent` sia a tutti i sub-agenti (`barnaby`, `barnacle`, `isolde`, `balthazar`), fornendo gestione nativa automatica di retry con backoff esponenziale per transient error o rate limits.
+- **Fix scoperto dal check documentazione: Explicit Context Caching (`ContextCacheConfig`)**:
+  - La doc ADK 2.6.0 (`docs/google-api/context_caching.md`) chiarisce che `static_instruction` da sola **NON abilita** il caching esplicito: serve configurare `context_cache_config` a livello `App`.
+  - Aggiunto in `src/scummbar_chat/utils.py` il builder `build_context_cache_config()` che restituisce `ContextCacheConfig(min_tokens=2048, ttl_seconds=600, cache_intervals=5)` per modelli Gemini, `None` per DeepSeek (KV cache server-side automatico).
+  - Passato `context_cache_config=CONTEXT_CACHE_CONFIG` all'`App` in `src/scummbar_chat/telegram/runner.py`.
+  - Aggiunte variabili `.env` `CONTEXT_CACHE_ENABLED`, `CONTEXT_CACHE_MIN_TOKENS`, `CONTEXT_CACHE_TTL_SECONDS`, `CONTEXT_CACHE_INTERVALS` (Sezione 3b).
+
 
 **Obiettivo**: Eseguire un controllo approfondito di `README.md` ed aggiornare schemi, riferimenti ed errori di battitura.
 

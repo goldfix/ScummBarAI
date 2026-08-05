@@ -86,7 +86,7 @@ _INTENT_MAP = {
     "balthazar": [
         "balthazar", "navigatore", "mappa", "rotta", "stelle", "bussola",
         "coordinate", "isole", "latitudine", "longitudine", "astrolabio",
-        "portolano", "sestante", "vento", "notizie", "news"
+        "portolano", "sestante", "vento", "notizie", "news", "viaggiatore"
     ]
 }
 

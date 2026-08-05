@@ -9,8 +9,8 @@ py_var.sh
 key.json
 
 src/scummbar_chat/.adk/
-data/scummbar_chat/sessions.db
-data/scummbar_chat/docs_rag.db
+data/scummbar_chat/
+.agents/skills/scummbar-docs-analyzer/data/
 .agents/skills/scummbar-docs-analyzer/data/
 data/scummbar_chat/logs/
 .pi-subagents/artifacts/

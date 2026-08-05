@@ -5,7 +5,7 @@ import pathlib
 from google.adk.agents import Agent
 from google.adk.tools import skill_toolset
 
-from ...utils import MODEL, THINKING_CONFIG, load_all_skills, load_md
+from ...utils import DEFAULT_RETRY_CONFIG, MODEL, THINKING_CONFIG, load_all_skills, load_md
 from ...tools import (
     recall_patron_tool,
     memorize_patron_tool,
@@ -29,6 +29,7 @@ balthazar_agent = Agent(
     description="Balthazar, il navigatore e cartografo dello Scummbar. Traccia rotte, legge le stelle e disegna mappe.",
     instruction=_PERSONA,
     generate_content_config=THINKING_CONFIG,
+    retry_config=DEFAULT_RETRY_CONFIG,
     tools=[
         _balthazar_toolset,
         recall_patron_tool,
