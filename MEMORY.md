@@ -6,12 +6,12 @@
 
 ---
 
-## 🍺 STATO DEL PROGETTO (aggiornato: 2026-07-25)
+## 🍺 STATO DEL PROGETTO (aggiornato: 2026-08-05)
 
 ### Cos'è Scummbar
 Chat interattiva multi-bot ambientata in una taverna piratesca caraibica.
 I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto, Isolde la veggente, Balthazar il navigatore).
-- **Applicazione Principale (Google ADK 2.4.0 + Telegram)**: **attiva e completata** ✅.
+- **Applicazione Principale (Google ADK 2.6.0 + Telegram)**: **attiva e completata** ✅.
 - **Cheshire Cat AI**: La cartella dell'esperimento `src/scummbar_cat/` è stata completamente rimossa per mantenere il progetto focalizzato al 100% su Google ADK + Telegram.
 
 ---
@@ -865,6 +865,36 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - Rilevati e indicizzati 81 nuovi documenti nella cartella `docs/uv/` (documentazione ufficiale del package manager UV).
   - Eseguito `rag/indexer.py` per l'indicizzazione incrementale: database aggiornato a **406 documenti (11.647 chunk)**.
   - Aggiornati `README.md`, `AGENTS.md` e `SKILL.md` di `scummbar-docs-analyzer` con i nuovi conteggi.
+
+---
+
+### 2026-08-05 — Download Documentazione Ufficiale DeepSeek API e Indicizzazione RAG
+
+**Obiettivo**: Scaricare la documentazione API completa di DeepSeek da `api-docs.deepseek.com`, salvarla in `docs/deepseek/` ed indicizzarla nel motore RAG locale.
+
+**Attività svolte**:
+- **Scarico ed Estrazione 14 Documenti**:
+  - Scaricate 14 pagine ufficiali via script `convert.py` della skill `scummbar-web-to-markdown`:
+    1. `api-docs_deepseek_com.md` (Homepage, base URLs, formati OpenAI/Anthropic)
+    2. `quick_start_pricing.md` (Prezzi `deepseek-v4-flash` / `deepseek-v4-pro`, token input/output/cache hit, regole)
+    3. `quick_start_token_usage.md` (Conteggio e dettagli token)
+    4. `quick_start_rate_limit.md` (Limiti di concorrenza 2500/500, isolamento `user_id`, keep-alive SSE)
+    5. `quick_start_error_codes.md` (Codici errore 400, 401, 402, 422, 429, 500, 503)
+    6. `guides_thinking_mode.md` (Thinking mode: toggle `thinking`, `reasoning_effort`, multi-turn, tool calls)
+    7. `guides_multi_round_chat.md` (Conversazioni multi-turno)
+    8. `guides_chat_prefix_completion.md` (Chat Prefix Completion Beta)
+    9. `guides_fim_completion.md` (FIM Completion Beta)
+    10. `guides_json_mode.md` (Output JSON strutturato)
+    11. `guides_tool_calls.md` (Tool calls in thinking e non-thinking mode, mode `strict`)
+    12. `guides_kv_cache.md` (KV Cache automatico server-side su disco)
+    13. `guides_responses_api.md` (Responses API per `deepseek-v4-flash`, integrazione Codex, SSE streaming)
+    14. `guides_anthropic_api.md` (Endpoint compatibile Anthropic `/anthropic`)
+- **Indicizzazione RAG SQLite (`docs_rag.db`)**:
+  - Eseguito `indexer.py`: indicizzati i 14 file (122 nuovi chunk) e purgati 6 documenti orfani.
+  - Verificato l'allineamento 1:1:1:1 su tutte e 4 le tabelle: **443 documenti**, **11.748 chunk**, **11.748 righe FTS5**, **11.748 vettori `sqlite-vec`** (768 dim, `gemini-embedding-2`).
+- **Aggiornamento Skill e Conoscenza**:
+  - Aggiornato `.agents/skills/scummbar-docs-analyzer/SKILL.md` con i nuovi conteggi (443 docs, 11.748 chunk).
+  - Verificato tramite lettura integrale dei documenti che la configurazione del progetto (`reasoning_effort=high`, `user_id` via `ToolContext`, `RetryConfig`) è al 100% conforme con le specifiche ufficiali DeepSeek.
 
 ---
 

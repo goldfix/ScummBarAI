@@ -94,6 +94,16 @@ COMPACTION_INTERVAL=30
 COMPACTION_OVERLAP=2
 
 # ===========================================================================
+# 💾 SECTION 3b: EXPLICIT CONTEXT CACHING (Gemini only, ADK 2.6+)
+# ===========================================================================
+# Explicit App-level caching (ContextCacheConfig). Requires Gemini 2.0+.
+# Automatically skipped for DeepSeek (server-side KV caching is automatic).
+CONTEXT_CACHE_ENABLED=true
+CONTEXT_CACHE_MIN_TOKENS=2048
+CONTEXT_CACHE_TTL_SECONDS=600
+CONTEXT_CACHE_INTERVALS=5
+
+# ===========================================================================
 # 🔮 SECTION 4: IMAGE GENERATION (Isolde Settings & INDEPENDENT AUTH)
 # ===========================================================================
 # Isolde's Tarot model and its FULLY INDEPENDENT, isolated authentication.
@@ -225,7 +235,7 @@ This implements **Progressive Disclosure**: it keeps the AI's initial context wi
 
 #### A. Documentation Analyzer & RAG Engine (`/skill:scummbar-docs-analyzer`)
 -   **Why**: The `docs/` folder contains dozens of framework guides. Storing their indexes in the main developer instructions (`AGENTS.md` or `MEMORY.md`) wasted thousands of tokens. Plain `rg`/`grep` searches can't capture semantic intent.
--   **What it does**: This skill provides a **local Hybrid RAG Search Engine** (`rag/`) that chunks all 406 Markdown documents (11,647 chunks), generates embeddings via Google `gemini-embedding-2`, stores vectors in SQLite (`sqlite-vec`), and performs hybrid search using **Reciprocal Rank Fusion (RRF)** between FTS5 keyword matching (BM25) and Vector Cosine Similarity — no manual index needed.
+-   **What it does**: This skill provides a **local Hybrid RAG Search Engine** (`rag/`) that chunks all 443 Markdown documents (11,748 chunks), generates embeddings via Google `gemini-embedding-2`, stores vectors in SQLite (`sqlite-vec`), and performs hybrid search using **Reciprocal Rank Fusion (RRF)** between FTS5 keyword matching (BM25) and Vector Cosine Similarity — no manual index needed.
 -   **How to use**:
     ```bash
     # Semantic + keyword search (returns ranked chunk results)
@@ -247,7 +257,7 @@ This implements **Progressive Disclosure**: it keeps the AI's initial context wi
 If you are developing this repository using Pi-Agent, you can invoke these skills or execute their CLI tools directly:
 
 ```bash
-# 1. Search framework documentation across 406 docs using Hybrid RAG (FTS5 + Cosine)
+# 1. Search framework documentation across 443 docs using Hybrid RAG (FTS5 + Cosine)
 PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 .agents/skills/scummbar-docs-analyzer/rag/search.py "agent evaluation custom metrics" --top_k 5
 
 # 2. Convert a web page to clean Markdown and auto-index into the RAG vector database
