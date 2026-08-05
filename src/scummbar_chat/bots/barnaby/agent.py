@@ -5,7 +5,7 @@ import pathlib
 from google.adk.agents import Agent
 from google.adk.tools import skill_toolset
 
-from ...utils import MODEL, THINKING_CONFIG, load_all_skills, load_md
+from ...utils import DEFAULT_RETRY_CONFIG, MODEL, THINKING_CONFIG, load_all_skills, load_md
 # Import the memory and artifact tools we created earlier
 from ...tools import recall_patron_tool, memorize_patron_tool, write_secret_scroll_tool
 
@@ -27,6 +27,7 @@ barnaby_agent = Agent(
     description="Barnaby, il barista dello Scummbar. Gestisce il bancone e interagisce con i clienti.",
     instruction=_PERSONA,
     generate_content_config=THINKING_CONFIG,
+    retry_config=DEFAULT_RETRY_CONFIG,
     # Inject both the dynamic skills and the database memory/artifact tools
     tools=[_barnaby_toolset, recall_patron_tool, memorize_patron_tool, write_secret_scroll_tool],
 )

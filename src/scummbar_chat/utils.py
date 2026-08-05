@@ -10,6 +10,7 @@ import pathlib
 from dotenv import load_dotenv
 from google.genai import types
 from google.adk.models import BaseLlm
+from google.adk.workflow import RetryConfig
 
 # --- Load .env (override=True so .env values take precedence over shell env vars) ---
 _ENV_PATH = pathlib.Path(__file__).parent / ".env"
@@ -23,6 +24,12 @@ DEEPSEEK_REASONING_EFFORT: str = os.getenv("DEEPSEEK_REASONING_EFFORT", "high")
 COMPACTION_MODEL: str = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")
 COMPACTION_INTERVAL: int = int(os.getenv("COMPACTION_INTERVAL", "30"))
 COMPACTION_OVERLAP: int = int(os.getenv("COMPACTION_OVERLAP", "2"))
+
+# --- Explicit Context Caching (Gemini only; DeepSeek uses automatic KV cache) ---
+CONTEXT_CACHE_ENABLED: bool = os.getenv("CONTEXT_CACHE_ENABLED", "true").lower() in ("true", "1")
+CONTEXT_CACHE_MIN_TOKENS: int = int(os.getenv("CONTEXT_CACHE_MIN_TOKENS", "2048"))
+CONTEXT_CACHE_TTL_SECONDS: int = int(os.getenv("CONTEXT_CACHE_TTL_SECONDS", "600"))
+CONTEXT_CACHE_INTERVALS: int = int(os.getenv("CONTEXT_CACHE_INTERVALS", "5"))
 
 IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
 
@@ -113,6 +120,32 @@ else:
             include_thoughts=False,
         )
     )
+
+# --- Standard Retry Configuration for ADK Agents ---
+DEFAULT_RETRY_CONFIG = RetryConfig(
+    max_attempts=3,
+    initial_delay=1.0,
+    max_delay=10.0,
+    backoff_factor=2.0,
+)
+
+# --- Explicit Context Caching config for the App (Gemini 2.0+ only) ---
+# static_instruction alone does NOT enable caching; per ADK docs you must
+# configure ContextCacheConfig at App level. DeepSeek skips this because it
+# provides automatic server-side KV caching.
+def build_context_cache_config():
+    """Return a ContextCacheConfig for Gemini models, None otherwise."""
+    if not CONTEXT_CACHE_ENABLED or LLM_MODEL.startswith("deepseek/"):
+        return None
+    from google.adk.agents.context_cache_config import ContextCacheConfig
+    return ContextCacheConfig(
+        min_tokens=CONTEXT_CACHE_MIN_TOKENS,
+        ttl_seconds=CONTEXT_CACHE_TTL_SECONDS,
+        cache_intervals=CONTEXT_CACHE_INTERVALS,
+    )
+
+
+CONTEXT_CACHE_CONFIG = build_context_cache_config()
 
 
 # --- Reference directories ---

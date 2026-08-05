@@ -27,7 +27,8 @@ from ..utils import (
     COMPACTION_LLM,
     COMPACTION_MODEL,
     COMPACTION_INTERVAL,
-    COMPACTION_OVERLAP
+    COMPACTION_OVERLAP,
+    CONTEXT_CACHE_CONFIG,
 )
 
 log = logging.getLogger(__name__)
@@ -89,7 +90,8 @@ def _get_runner() -> Runner:
         scummbar_app = App(
             name=APP_NAME,
             root_agent=root_agent,
-            events_compaction_config=compaction_config
+            events_compaction_config=compaction_config,
+            context_cache_config=CONTEXT_CACHE_CONFIG,
         )
 
         # Attach the App instance (with compaction config) and Artifacts to the Runner
@@ -99,8 +101,9 @@ def _get_runner() -> Runner:
             artifact_service=_artifact_service,
         )
         log.info(
-            "ADK Runner initialized (Model: %s, Interval: %d, Overlap: %d)",
-            COMPACTION_MODEL, COMPACTION_INTERVAL, COMPACTION_OVERLAP
+            "ADK Runner initialized (Model: %s, Compaction Interval: %d, Overlap: %d, Context Cache: %s)",
+            COMPACTION_MODEL, COMPACTION_INTERVAL, COMPACTION_OVERLAP,
+            "enabled" if CONTEXT_CACHE_CONFIG else "disabled"
         )
     return _runner
 
