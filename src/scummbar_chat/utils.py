@@ -33,9 +33,10 @@ CONTEXT_CACHE_INTERVALS: int = int(os.getenv("CONTEXT_CACHE_INTERVALS", "5"))
 
 IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
 
+
 def get_gemini_client_kwargs(prefix: str = "") -> dict:
     """Prepare client_kwargs for Gemini/Google GenAI constructor based on .env config.
-    
+
     Supports both standard API Key (Google AI Studio) and Vertex AI (Service Account/ADC).
     If a prefix is supplied (e.g. 'IMAGE_'), it looks up independent variables.
     """
@@ -73,6 +74,7 @@ def get_gemini_client_kwargs(prefix: str = "") -> dict:
             sa_path = os.getenv(sa_var)
             if sa_path:
                 import pathlib
+
                 sa_file = pathlib.Path(sa_path)
                 if not sa_file.is_absolute():
                     # Resolve relative to project root
@@ -80,17 +82,19 @@ def get_gemini_client_kwargs(prefix: str = "") -> dict:
 
                 if sa_file.exists():
                     from google.oauth2 import service_account
+
                     kwargs["credentials"] = service_account.Credentials.from_service_account_file(
-                        str(sa_file),
-                        scopes=["https://www.googleapis.com/auth/cloud-platform"]
+                        str(sa_file), scopes=["https://www.googleapis.com/auth/cloud-platform"]
                     )
 
     return kwargs
+
 
 def _build_model_instance(model_name: str, is_main_model: bool = False) -> BaseLlm:
     """Factory to build the appropriate ADK BaseLlm instance based on the provider prefix."""
     if model_name.startswith("deepseek/"):
         from google.adk.models import LiteLlm
+
         # We only enable heavy thinking mode for the main conversational agents
         thinking_cfg = {"type": "enabled"} if is_main_model else None
         effort_cfg = DEEPSEEK_REASONING_EFFORT if is_main_model else None
@@ -104,7 +108,9 @@ def _build_model_instance(model_name: str, is_main_model: bool = False) -> BaseL
     else:
         # Default fallback to Google's native Gemini models with parameterized auth
         from google.adk.models import Gemini
+
         return Gemini(model=model_name, client_kwargs=get_gemini_client_kwargs())
+
 
 # --- Exported Ready-to-Use Model Instances ---
 MODEL: BaseLlm = _build_model_instance(LLM_MODEL, is_main_model=True)
@@ -129,6 +135,7 @@ DEFAULT_RETRY_CONFIG = RetryConfig(
     backoff_factor=2.0,
 )
 
+
 # --- Explicit Context Caching config for the App (Gemini 2.0+ only) ---
 # static_instruction alone does NOT enable caching; per ADK docs you must
 # configure ContextCacheConfig at App level. DeepSeek skips this because it
@@ -138,6 +145,7 @@ def build_context_cache_config():
     if not CONTEXT_CACHE_ENABLED or LLM_MODEL.startswith("deepseek/"):
         return None
     from google.adk.agents.context_cache_config import ContextCacheConfig
+
     return ContextCacheConfig(
         min_tokens=CONTEXT_CACHE_MIN_TOKENS,
         ttl_seconds=CONTEXT_CACHE_TTL_SECONDS,
@@ -163,6 +171,7 @@ SESSION_DB_URI: str = f"sqlite+aiosqlite:///{_DB_PATH}"
 # COMPACTION_LLM defaults to Gemini (requires ADC). Can be set to deepseek/...
 # (requires DEEPSEEK_API_KEY) via COMPACTION_MODEL in .env.
 
+
 def load_md(path: pathlib.Path) -> str:
     """Load a markdown file and return the cleaned text."""
     if not path.exists():
@@ -177,6 +186,7 @@ def load_all_skills(skills_dir: pathlib.Path) -> list:
     Adding a new skill = create a new folder with SKILL.md.
     """
     from google.adk.skills import load_skill_from_dir
+
     skills = []
     if not skills_dir.exists():
         return skills

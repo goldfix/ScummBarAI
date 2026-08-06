@@ -40,6 +40,7 @@ _session_service: DatabaseSessionService | None = None
 _artifact_service: InMemoryArtifactService | None = None
 _runner: Runner | None = None
 
+
 async def purge_old_sessions(hours: int = 24) -> int:
     """Removes historical events older than X hours from the ADK SQLite backend."""
     cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
@@ -53,10 +54,7 @@ async def purge_old_sessions(hours: int = 24) -> int:
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
                 # Targets the standard ADK 'events' table to clear bulky raw dialogue rows
-                cursor.execute(
-                    "DELETE FROM events WHERE timestamp < ?",
-                    (cutoff_str,)
-                )
+                cursor.execute("DELETE FROM events WHERE timestamp < ?", (cutoff_str,))
                 conn.commit()
                 return cursor.rowcount
         except sqlite3.OperationalError as e:
@@ -69,6 +67,7 @@ async def purge_old_sessions(hours: int = 24) -> int:
 
     return deleted_rows
 
+
 def _get_runner() -> Runner:
     """Lazy initializer ensuring the ADK runner and DB session layer exist as a singleton."""
     global _session_service, _artifact_service, _runner
@@ -77,15 +76,9 @@ def _get_runner() -> Runner:
         _artifact_service = InMemoryArtifactService()
 
         # Inject the compaction model into the LLM-based summarizer
-        compaction_summarizer = LlmEventSummarizer(
-            llm=COMPACTION_LLM
-        )
+        compaction_summarizer = LlmEventSummarizer(llm=COMPACTION_LLM)
 
-        compaction_config = EventsCompactionConfig(
-            compaction_interval=COMPACTION_INTERVAL,
-            overlap_size=COMPACTION_OVERLAP,
-            summarizer=compaction_summarizer
-        )
+        compaction_config = EventsCompactionConfig(compaction_interval=COMPACTION_INTERVAL, overlap_size=COMPACTION_OVERLAP, summarizer=compaction_summarizer)
 
         scummbar_app = App(
             name=APP_NAME,
@@ -102,10 +95,13 @@ def _get_runner() -> Runner:
         )
         log.info(
             "ADK Runner initialized (Model: %s, Compaction Interval: %d, Overlap: %d, Context Cache: %s)",
-            COMPACTION_MODEL, COMPACTION_INTERVAL, COMPACTION_OVERLAP,
-            "enabled" if CONTEXT_CACHE_CONFIG else "disabled"
+            COMPACTION_MODEL,
+            COMPACTION_INTERVAL,
+            COMPACTION_OVERLAP,
+            "enabled" if CONTEXT_CACHE_CONFIG else "disabled",
         )
     return _runner
+
 
 async def _ensure_session(user_id: str, session_id: str) -> None:
     """Checks for active session tracking blocks and provisions them if missing."""
@@ -121,6 +117,7 @@ async def _ensure_session(user_id: str, session_id: str) -> None:
             user_id=user_id,
             session_id=session_id,
         )
+
 
 async def run_agent(
     user_id: str,
@@ -152,24 +149,15 @@ async def run_agent(
         if event.actions and event.actions.artifact_delta:
             for filename, version in event.actions.artifact_delta.items():
                 # Load the bytes from the in-memory service
-                part = await _artifact_service.load_artifact(
-                    app_name=APP_NAME,
-                    user_id=user_id,
-                    session_id=session_id,
-                    filename=filename,
-                    version=version
-                )
+                part = await _artifact_service.load_artifact(app_name=APP_NAME, user_id=user_id, session_id=session_id, filename=filename, version=version)
                 if part and part.inline_data:
-                    generated_files.append({
-                        "filename": filename,
-                        "bytes": part.inline_data.data
-                    })
+                    generated_files.append({"filename": filename, "bytes": part.inline_data.data})
 
         # 2. Extract final textual dialogue
         if event.is_final_response() and event.content and event.content.parts:
             for part in event.content.parts:
                 # Discard internal thoughts to preserve standard dialogue formatting
-                if part.text and not getattr(part, 'thought', False):
+                if part.text and not getattr(part, "thought", False):
                     response_parts.append(part.text)
 
     return "".join(response_parts).strip(), generated_files

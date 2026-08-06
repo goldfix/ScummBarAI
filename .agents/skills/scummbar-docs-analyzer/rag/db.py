@@ -92,9 +92,7 @@ class RAGDatabase:
         Returns the stored MD5 hash for a document if indexed, else None.
         """
         with self.get_connection() as conn:
-            row = conn.execute(
-                "SELECT md5_hash FROM documents WHERE doc_path = ?", (doc_path,)
-            ).fetchone()
+            row = conn.execute("SELECT md5_hash FROM documents WHERE doc_path = ?", (doc_path,)).fetchone()
             return row["md5_hash"] if row else None
 
     def get_all_doc_paths(self) -> list[str]:
@@ -110,9 +108,7 @@ class RAGDatabase:
         Deletes a document and all its associated chunks, FTS5 rows, and vectors.
         """
         with self.get_connection() as conn:
-            chunk_rows = conn.execute(
-                "SELECT id FROM chunks WHERE doc_path = ?", (doc_path,)
-            ).fetchall()
+            chunk_rows = conn.execute("SELECT id FROM chunks WHERE doc_path = ?", (doc_path,)).fetchall()
 
             for r in chunk_rows:
                 cid = r["id"]

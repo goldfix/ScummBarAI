@@ -54,26 +54,22 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT patron_name, core_traits, last_chat_summary FROM patron_memories WHERE user_id = ?",
-                (user_id,)
-            )
+            cursor.execute("SELECT patron_name, core_traits, last_chat_summary FROM patron_memories WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
             if row:
                 return dict(row)
 
             # Contextual prompt inject for new pirates
-            return {"status": "unknown_patron", "message": "Questo pirata è uno sconosciuto. Chiedigli cordialmente il suo nome!"}
+            return {
+                "status": "unknown_patron",
+                "message": "Questo pirata è uno sconosciuto. Chiedigli cordialmente il suo nome!",
+            }
     except sqlite3.Error as e:
         log.error("Database error in recall_patron_memory: %s", e)
         return {"status": "error", "message": "I tuoi ricordi sono confusi al momento. Saluta normalmente."}
 
-async def memorize_patron_chat(
-    tool_context: ToolContext,
-    patron_name: str,
-    new_traits_learned: str,
-    chat_summary: str
-) -> str:
+
+async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_traits_learned: str, chat_summary: str) -> str:
     """
     Aggiorna o crea la memoria a lungo termine di un avventore nel registro dello Scummbar.
     Esegui questo strumento solo quando una conversazione giunge a una conclusione naturale
@@ -110,7 +106,7 @@ async def memorize_patron_chat(
                     SET patron_name = ?, core_traits = ?, last_chat_summary = ?, last_interaction = ?
                     WHERE user_id = ?
                     """,
-                    (patron_name, updated_traits, chat_summary, now_str, user_id)
+                    (patron_name, updated_traits, chat_summary, now_str, user_id),
                 )
             else:
                 cursor.execute(
@@ -118,7 +114,7 @@ async def memorize_patron_chat(
                     INSERT INTO patron_memories (user_id, patron_name, core_traits, last_chat_summary, last_interaction)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (user_id, patron_name, new_traits_learned, chat_summary, now_str)
+                    (user_id, patron_name, new_traits_learned, chat_summary, now_str),
                 )
             conn.commit()
             return "Registro della taverna aggiornato con successo."
@@ -126,11 +122,8 @@ async def memorize_patron_chat(
         log.error("Database error in memorize_patron_chat: %s", e)
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
 
-async def write_secret_scroll(
-    tool_context: ToolContext,
-    title: str,
-    content: str
-) -> str:
+
+async def write_secret_scroll(tool_context: ToolContext, title: str, content: str) -> str:
     """
     Usa questo strumento per scrivere fisicamente una pergamena, una ricetta segreta o una
     mappa del tesoro da consegnare a mano al pirata. Genererà un file reale scaricabile in chat.
@@ -139,10 +132,7 @@ async def write_secret_scroll(
     """
     file_bytes = content.encode("utf-8")
 
-    artifact_part = types.Part.from_bytes(
-        data=file_bytes,
-        mime_type="text/plain"
-    )
+    artifact_part = types.Part.from_bytes(data=file_bytes, mime_type="text/plain")
 
     # Sanitize the title to make it a valid filename
     safe_title = "".join(c if c.isalnum() else "_" for c in title.strip().lower())
@@ -150,14 +140,12 @@ async def write_secret_scroll(
 
     try:
         # InMemoryArtifactService handles storage under the session/user namespace
-        version = await tool_context.save_artifact(
-            filename=filename,
-            artifact=artifact_part
-        )
+        version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
         return f"Pergamena {filename} (versione {version}) scritta e arrotolata con successo! Il cliente la riceverà a breve."
     except Exception as e:
         log.error("Errore salvataggio artifact in write_secret_scroll: %s", e)
         return "La penna si è rotta e l'inchiostro si è sparso! Non sono riuscito a scrivere la pergamena."
+
 
 def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     """Generates a stylized in-character tarot card PNG using PIL."""
@@ -209,14 +197,15 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     # Testo centrato
     tx = width // 2
     ty = height - 75
-    draw.text((tx - len(title_text)*3, ty), title_text, fill="#c5a059", font=font)
+    draw.text((tx - len(title_text) * 3, ty), title_text, fill="#c5a059", font=font)
 
     sub_text = "TAROCCO DELLO SCUMMBAR"
-    draw.text((tx - len(sub_text)*3, height - 30), sub_text, fill="#7d6c54", font=font)
+    draw.text((tx - len(sub_text) * 3, height - 30), sub_text, fill="#7d6c54", font=font)
 
     out = io.BytesIO()
     img.save(out, format="PNG")
     return out.getvalue()
+
 
 async def draw_tarot_card(
     tool_context: ToolContext,
@@ -284,26 +273,18 @@ async def draw_tarot_card(
         file_ext = "png"
         mime_type = "image/png"
 
-    artifact_part = types.Part.from_bytes(
-        data=img_bytes,
-        mime_type=mime_type
-    )
+    artifact_part = types.Part.from_bytes(data=img_bytes, mime_type=mime_type)
 
     safe_title = "".join(c if c.isalnum() else "_" for c in card_name.strip().lower())
     filename = f"tarocco_{safe_title}.{file_ext}"
 
     # Save the artifact to the current ADK session
-    version = await tool_context.save_artifact(
-        filename=filename,
-        artifact=artifact_part
-    )
+    version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
 
     return f"La carta '{card_name}' è stata svelata sul tavolo! L'immagine è ora visibile all'avventore (Salvata come {filename}, v{version})."
 
-async def fetch_news_feed(
-    tool_context: ToolContext,
-    category: str = "politica_italiana"
-) -> dict:
+
+async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_italiana") -> dict:
     """
     Recupera gli ultimi dispacci e notizie reali focalizzati esclusivamente su 3 argomenti:
     - Politica Italiana ('politica_italiana', 'politica', 'italia', 'governo')
@@ -368,12 +349,7 @@ async def fetch_news_feed(
                 elif guid_elem is not None and guid_elem.text and guid_elem.text.startswith("http"):
                     link = guid_elem.text.strip()
 
-                headlines.append({
-                    "titolo_originale": title,
-                    "sintesi_originale": desc,
-                    "ora_dispaccio": date,
-                    "link_sorgente": link
-                })
+                headlines.append({"titolo_originale": title, "sintesi_originale": desc, "ora_dispaccio": date, "link_sorgente": link})
 
             return {
                 "status": "success",
@@ -386,16 +362,17 @@ async def fetch_news_feed(
                     "fantasy-marittima (es: 'Il Senato dei Senatori Borbottanti', 'La Gilda della Mela d'Oro', "
                     "'Il Gran Mogol d'Oltreoceano'). "
                     "Includi SEMPRE per ogni notizia il link HTML originale fornito da 'link_sorgente' "
-                    '(es. \'<a href="LINK">Srotola il pergamena originale</a>\').'
-                )
+                    "(es. '<a href=\"LINK\">Srotola il pergamena originale</a>')."
+                ),
             }
 
     except Exception as e:
         log.error("Errore nel recupero feed RSS (%s): %s", url, e)
         return {
             "status": "error",
-            "message": "I venti si sono placati e le gagliotte delle staffette non sono giunte al porto. Nessun dispaccio disponibile al momento."
+            "message": "I venti si sono placati e le gagliotte delle staffette non sono giunte al porto. Nessun dispaccio disponibile al momento.",
         }
+
 
 # Esportazione degli strumenti ADK
 recall_patron_tool = FunctionTool(recall_patron_memory)

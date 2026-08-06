@@ -53,22 +53,16 @@ class RAGSearchEngine:
         for rank, item in enumerate(vector_results, start=1):
             cid = item["id"]
             chunks_map[cid] = item
-            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (
-                vector_weight * (1.0 / (rrf_k + rank))
-            )
+            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (vector_weight * (1.0 / (rrf_k + rank)))
 
         # Process FTS results
         for rank, item in enumerate(fts_results, start=1):
             cid = item["id"]
             chunks_map[cid] = item
-            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (
-                fts_weight * (1.0 / (rrf_k + rank))
-            )
+            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (fts_weight * (1.0 / (rrf_k + rank)))
 
         # 4. Sort candidates by final RRF score
-        sorted_candidates = sorted(
-            rrf_scores.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_candidates = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
 
         final_results = []
         for cid, score in sorted_candidates[:top_k]:
@@ -80,13 +74,9 @@ class RAGSearchEngine:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Search Scummbar documentation using Hybrid RAG (FTS5 + Vector)."
-    )
+    parser = argparse.ArgumentParser(description="Search Scummbar documentation using Hybrid RAG (FTS5 + Vector).")
     parser.add_argument("query", type=str, help="Search query string")
-    parser.add_argument(
-        "--top_k", "-k", type=int, default=5, help="Number of results to return (default: 5)"
-    )
+    parser.add_argument("--top_k", "-k", type=int, default=5, help="Number of results to return (default: 5)")
 
     args = parser.parse_args()
 

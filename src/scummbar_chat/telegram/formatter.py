@@ -11,10 +11,11 @@ import html
 import re
 
 # Inline markdown tokens: captures either *text* or _text_ blocks
-_INLINE_MD = re.compile(r'(\*[^*\n]+\*|_[^_\n]+_)')
+_INLINE_MD = re.compile(r"(\*[^*\n]+\*|_[^_\n]+_)")
 
 # Improved full-line check for environment atmosphere: matches if a line is solely wrapped in underscores
-_FULL_LINE_MD = re.compile(r'^\s*_\s*(.+?)\s*_\s*$', re.DOTALL)
+_FULL_LINE_MD = re.compile(r"^\s*_\s*(.+?)\s*_\s*$", re.DOTALL)
+
 
 def format_response(text: str) -> str:
     """Converts raw multi-line agent strings into Telegram HTML format."""
@@ -41,6 +42,7 @@ def format_response(text: str) -> str:
 
     return "\n".join(result)
 
+
 def _inline(text: str) -> str:
     """Escapes regular text and maps captured inline markdown markers to HTML italics."""
     parts: list[str] = []
@@ -48,7 +50,7 @@ def _inline(text: str) -> str:
 
     for match in _INLINE_MD.finditer(text):
         # Escape any standard characters occurring before the match
-        plain = text[last:match.start()]
+        plain = text[last : match.start()]
         if plain:
             parts.append(html.escape(plain))
 

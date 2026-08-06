@@ -42,7 +42,7 @@ class Embedder:
                 if attempt == max_retries - 1:
                     print(f"❌ Error generating embedding for text: {e}")
                     raise e
-                time.sleep(1.5 ** attempt)
+                time.sleep(1.5**attempt)
         return []
 
     def embed_batch(self, texts: list[str], max_workers: int = 8) -> list[list[float]]:

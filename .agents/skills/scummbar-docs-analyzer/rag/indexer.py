@@ -109,9 +109,7 @@ class RAGIndexer:
             stats["total_chunks"] += saved_count
 
         print(
-            f"✅ Indexing complete: {stats['indexed']} indexed, "
-            f"{stats['skipped']} skipped, {stats['deleted']} purged, "
-            f"{stats['total_chunks']} chunks stored."
+            f"✅ Indexing complete: {stats['indexed']} indexed, {stats['skipped']} skipped, {stats['deleted']} purged, {stats['total_chunks']} chunks stored."
         )
         return stats
 
