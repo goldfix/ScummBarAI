@@ -11,13 +11,15 @@ Features:
 - External image references preserved without local downloads.
 """
 
-import sys
 import os
 import re
-import urllib.request
+import sys
 import urllib.parse
-from bs4 import BeautifulSoup
+import urllib.request
+
 import html2text
+from bs4 import BeautifulSoup
+
 
 def extract_source_url_from_file(file_path: str) -> str:
     """Read the top header of a markdown file and extract the source URL."""
@@ -25,7 +27,7 @@ def extract_source_url_from_file(file_path: str) -> str:
         print(f"❌ ERROR: File '{file_path}' does not exist.")
         sys.exit(1)
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         # Read the first 25 lines
         lines = [f.readline() for _ in range(25)]
 
@@ -34,17 +36,18 @@ def extract_source_url_from_file(file_path: str) -> str:
     # Match standardized header patterns:
     # > Source: [URL](URL)
     # > **Source Page**: [URL](URL)
-    match = re.search(r'>\s*(?:\*\*Source Page\*\*|Source):\s*\[([^\]]+)\]\((https?://[^\)]+)\)', content)
+    match = re.search(r">\s*(?:\*\*Source Page\*\*|Source):\s*\[([^\]]+)\]\((https?://[^\)]+)\)", content)
     if match:
         return match.group(2)
 
     # Fallback: search for any standalone HTTP/HTTPS URL in the header lines
-    match_fallback = re.search(r'https?://[^\s\)\>\]]+', content)
+    match_fallback = re.search(r"https?://[^\s\)\>\]]+", content)
     if match_fallback:
         url = match_fallback.group(0).rstrip(">.]")
         return url
 
     return None
+
 
 def fetch_and_convert(url: str, output_folder: str, filename: str = None, force: bool = False) -> str:
     # Ensure URL has protocol
@@ -74,13 +77,8 @@ def fetch_and_convert(url: str, output_folder: str, filename: str = None, force:
     try:
         try:
             import httpx
-            headers = {
-                "User-Agent": (
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/120.0.0.0 Safari/537.36"
-                )
-            }
+
+            headers = {"User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")}
             res = httpx.get(url, follow_redirects=True, headers=headers, timeout=30.0)
             res.raise_for_status()
             raw_bytes = res.content
@@ -89,12 +87,8 @@ def fetch_and_convert(url: str, output_folder: str, filename: str = None, force:
             req = urllib.request.Request(
                 url,
                 headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/120.0.0.0 Safari/537.36"
-                    )
-                }
+                    "User-Agent": ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                },
             )
             with urllib.request.urlopen(req, timeout=30) as response:
                 raw_bytes = response.read()
@@ -158,6 +152,7 @@ def fetch_and_convert(url: str, output_folder: str, filename: str = None, force:
     print(f"✅ Markdown saved successfully to: {file_path}")
     return file_path
 
+
 def update_file(file_path: str) -> str:
     """Extract source URL from an existing markdown file and update it."""
     print(f"🔍 Searching for source URL in '{file_path}'...")
@@ -171,6 +166,7 @@ def update_file(file_path: str) -> str:
     filename = os.path.basename(file_path)
     print(f"🔄 Found source URL: {url}. Re-downloading and updating '{file_path}'...")
     return fetch_and_convert(url, folder, filename, force=True)
+
 
 if __name__ == "__main__":
     args = sys.argv[1:]

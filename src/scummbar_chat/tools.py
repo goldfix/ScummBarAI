@@ -6,14 +6,16 @@ Operations:
 - Translates ledger retrieval results into structured dictionaries for the LLM runner.
 """
 
+import logging
 import os
 import sqlite3
-import logging
+from datetime import UTC, datetime
+
 import google.genai.types as types
-from datetime import datetime, timezone
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
-from .utils import SESSION_DB_URI, IMAGE_MODEL, get_gemini_client_kwargs
+
+from .utils import SESSION_DB_URI, get_gemini_client_kwargs
 
 log = logging.getLogger(__name__)
 
@@ -52,26 +54,22 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
         with sqlite3.connect(db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT patron_name, core_traits, last_chat_summary FROM patron_memories WHERE user_id = ?",
-                (user_id,)
-            )
+            cursor.execute("SELECT patron_name, core_traits, last_chat_summary FROM patron_memories WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
             if row:
                 return dict(row)
 
             # Contextual prompt inject for new pirates
-            return {"status": "unknown_patron", "message": "Questo pirata è uno sconosciuto. Chiedigli cordialmente il suo nome!"}
+            return {
+                "status": "unknown_patron",
+                "message": "Questo pirata è uno sconosciuto. Chiedigli cordialmente il suo nome!",
+            }
     except sqlite3.Error as e:
         log.error("Database error in recall_patron_memory: %s", e)
         return {"status": "error", "message": "I tuoi ricordi sono confusi al momento. Saluta normalmente."}
 
-async def memorize_patron_chat(
-    tool_context: ToolContext,
-    patron_name: str,
-    new_traits_learned: str,
-    chat_summary: str
-) -> str:
+
+async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_traits_learned: str, chat_summary: str) -> str:
     """
     Aggiorna o crea la memoria a lungo termine di un avventore nel registro dello Scummbar.
     Esegui questo strumento solo quando una conversazione giunge a una conclusione naturale
@@ -87,7 +85,7 @@ async def memorize_patron_chat(
     user_id = tool_context.user_id
     _ensure_patron_memories_table()
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         with sqlite3.connect(db_path) as conn:
@@ -108,7 +106,7 @@ async def memorize_patron_chat(
                     SET patron_name = ?, core_traits = ?, last_chat_summary = ?, last_interaction = ?
                     WHERE user_id = ?
                     """,
-                    (patron_name, updated_traits, chat_summary, now_str, user_id)
+                    (patron_name, updated_traits, chat_summary, now_str, user_id),
                 )
             else:
                 cursor.execute(
@@ -116,7 +114,7 @@ async def memorize_patron_chat(
                     INSERT INTO patron_memories (user_id, patron_name, core_traits, last_chat_summary, last_interaction)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (user_id, patron_name, new_traits_learned, chat_summary, now_str)
+                    (user_id, patron_name, new_traits_learned, chat_summary, now_str),
                 )
             conn.commit()
             return "Registro della taverna aggiornato con successo."
@@ -124,11 +122,8 @@ async def memorize_patron_chat(
         log.error("Database error in memorize_patron_chat: %s", e)
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
 
-async def write_secret_scroll(
-    tool_context: ToolContext,
-    title: str,
-    content: str
-) -> str:
+
+async def write_secret_scroll(tool_context: ToolContext, title: str, content: str) -> str:
     """
     Usa questo strumento per scrivere fisicamente una pergamena, una ricetta segreta o una
     mappa del tesoro da consegnare a mano al pirata. Genererà un file reale scaricabile in chat.
@@ -136,46 +131,42 @@ async def write_secret_scroll(
     - content: Il testo completo che vuoi scrivere sulla pergamena. Sii creativo e descrittivo.
     """
     file_bytes = content.encode("utf-8")
-    
-    artifact_part = types.Part.from_bytes(
-        data=file_bytes,
-        mime_type="text/plain"
-    )
-    
+
+    artifact_part = types.Part.from_bytes(data=file_bytes, mime_type="text/plain")
+
     # Sanitize the title to make it a valid filename
     safe_title = "".join(c if c.isalnum() else "_" for c in title.strip().lower())
     filename = f"{safe_title}.txt"
-    
+
     try:
         # InMemoryArtifactService handles storage under the session/user namespace
-        version = await tool_context.save_artifact(
-            filename=filename,
-            artifact=artifact_part
-        )
+        version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
         return f"Pergamena {filename} (versione {version}) scritta e arrotolata con successo! Il cliente la riceverà a breve."
     except Exception as e:
         log.error("Errore salvataggio artifact in write_secret_scroll: %s", e)
         return "La penna si è rotta e l'inchiostro si è sparso! Non sono riuscito a scrivere la pergamena."
 
+
 def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     """Generates a stylized in-character tarot card PNG using PIL."""
-    from PIL import Image, ImageDraw, ImageFont
     import io
     import math
-    
+
+    from PIL import Image, ImageDraw, ImageFont
+
     width, height = 400, 600
     img = Image.new("RGB", (width, height), color="#161412")
     draw = ImageDraw.Draw(img)
-    
+
     # Bordo esterno dorato a doppia linea
     draw.rectangle([(10, 10), (width - 10, height - 10)], outline="#c5a059", width=2)
     draw.rectangle([(18, 18), (width - 18, height - 18)], outline="#c5a059", width=1)
-    
+
     # Decorazioni agli angoli: piccole stelle dorate (*)
     font = ImageFont.load_default()
     for sx, sy in [(25, 25), (width - 35, 25), (25, height - 35), (width - 35, height - 35)]:
         draw.text((sx, sy), "*", fill="#c5a059", font=font)
-    
+
     # Glifo mistico al centro
     cx, cy = width // 2, height // 2 - 20
     r = 80
@@ -186,34 +177,35 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
         x2 = cx - int(r * math.cos(angle_rad))
         y2 = cy - int(r * math.sin(angle_rad))
         draw.line([(x1, y1), (x2, y2)], fill="#c5a059", width=1)
-    
+
     draw.ellipse([(cx - r // 2, cy - r // 2), (cx + r // 2, cy + r // 2)], outline="#c5a059", width=2)
-    
+
     # Onde marittime stilizzate all'interno del glifo centrale
     draw.arc([(cx - r // 3, cy + r // 8), (cx, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
     draw.arc([(cx, cy + r // 8), (cx + r // 3, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
-    
+
     # Luna crescente stilizzata in alto a sinistra del glifo
     draw.arc([(cx - r // 2, cy - r // 2), (cx - r // 4, cy - r // 4)], start=90, end=270, fill="#c5a059", width=1)
-    
+
     draw.ellipse([(cx - 10, cy - 10), (cx + 10, cy + 10)], fill="#c5a059")
-    
+
     title_text = card_name.strip().upper()
-    
+
     # Title banner rectangle at the bottom
     draw.rectangle([(30, height - 100), (width - 30, height - 40)], outline="#c5a059", width=2, fill="#1e1b18")
-    
+
     # Testo centrato
     tx = width // 2
     ty = height - 75
-    draw.text((tx - len(title_text)*3, ty), title_text, fill="#c5a059", font=font)
-    
+    draw.text((tx - len(title_text) * 3, ty), title_text, fill="#c5a059", font=font)
+
     sub_text = "TAROCCO DELLO SCUMMBAR"
-    draw.text((tx - len(sub_text)*3, height - 30), sub_text, fill="#7d6c54", font=font)
-    
+    draw.text((tx - len(sub_text) * 3, height - 30), sub_text, fill="#7d6c54", font=font)
+
     out = io.BytesIO()
     img.save(out, format="PNG")
     return out.getvalue()
+
 
 async def draw_tarot_card(
     tool_context: ToolContext,
@@ -225,26 +217,27 @@ async def draw_tarot_card(
     - card_name: Il titolo o nome dell'arcano (es. 'Il Leviatano', 'La Taverna', 'Il Naufragio').
     - scene_description: Dettagliata descrizione visiva e marinaresca di ciò che appare nell'illustrazione della carta.
     """
-    from google import genai
     import os
-    
+
+    from google import genai
+
     # Retrieve the configured image model
     image_model = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
-    
+
     log.info("Isolde draws tarot card: %s (%s)", card_name, scene_description)
-    
+
     img_bytes = None
-    
+
     try:
         # Initialize the standard Google GenAI Client with independent image credentials
         client = genai.Client(**get_gemini_client_kwargs(prefix="IMAGE_"))
-        
+
         tarot_prompt = (
             f"A vintage mystical tarot card showing {scene_description}. "
             f"Card title at the bottom: {card_name}. "
             "Hand-drawn 2d pirate cartoon style, esoteric gold borders, dark parchment paper texture."
         )
-        
+
         # Use the modern Gemini 3.1 Flash Image API to generate native images
         response = client.models.generate_content(
             model=image_model,
@@ -263,11 +256,11 @@ async def draw_tarot_card(
                 img_bytes = part.inline_data.data
                 log.info("Tarot card generated successfully via Gemini multimodal generate_content.")
                 break
-            
+
     except Exception as e:
         log.warning("Errore generazione immagine AI: %s. Attivazione fallback PIL.", e)
         img_bytes = _draw_tarot_card_fallback(card_name, scene_description)
-        
+
     # 2. Register the image as an Artifact in ADK
     # Dynamically detect if the bytes represent PNG or JPEG to apply the correct extension and mime type
     if img_bytes.startswith(b"\x89PNG"):
@@ -279,27 +272,19 @@ async def draw_tarot_card(
     else:
         file_ext = "png"
         mime_type = "image/png"
-        
-    artifact_part = types.Part.from_bytes(
-        data=img_bytes,
-        mime_type=mime_type
-    )
-    
+
+    artifact_part = types.Part.from_bytes(data=img_bytes, mime_type=mime_type)
+
     safe_title = "".join(c if c.isalnum() else "_" for c in card_name.strip().lower())
     filename = f"tarocco_{safe_title}.{file_ext}"
-    
+
     # Save the artifact to the current ADK session
-    version = await tool_context.save_artifact(
-        filename=filename,
-        artifact=artifact_part
-    )
-    
+    version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
+
     return f"La carta '{card_name}' è stata svelata sul tavolo! L'immagine è ora visibile all'avventore (Salvata come {filename}, v{version})."
 
-async def fetch_news_feed(
-    tool_context: ToolContext,
-    category: str = "politica_italiana"
-) -> dict:
+
+async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_italiana") -> dict:
     """
     Recupera gli ultimi dispacci e notizie reali focalizzati esclusivamente su 3 argomenti:
     - Politica Italiana ('politica_italiana', 'politica', 'italia', 'governo')
@@ -309,8 +294,9 @@ async def fetch_news_feed(
     Usa questo strumento quando un avventore ti chiede notizie sui bisticci dei governanti,
     sulle dispute dei consigli italiani o americani, o sulle invenzioni e specchi incantati della tecnologia.
     """
-    import httpx
     import xml.etree.ElementTree as ET
+
+    import httpx
 
     RSS_FEEDS = {
         "politica_italiana": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
@@ -363,12 +349,7 @@ async def fetch_news_feed(
                 elif guid_elem is not None and guid_elem.text and guid_elem.text.startswith("http"):
                     link = guid_elem.text.strip()
 
-                headlines.append({
-                    "titolo_originale": title,
-                    "sintesi_originale": desc,
-                    "ora_dispaccio": date,
-                    "link_sorgente": link
-                })
+                headlines.append({"titolo_originale": title, "sintesi_originale": desc, "ora_dispaccio": date, "link_sorgente": link})
 
             return {
                 "status": "success",
@@ -381,16 +362,17 @@ async def fetch_news_feed(
                     "fantasy-marittima (es: 'Il Senato dei Senatori Borbottanti', 'La Gilda della Mela d'Oro', "
                     "'Il Gran Mogol d'Oltreoceano'). "
                     "Includi SEMPRE per ogni notizia il link HTML originale fornito da 'link_sorgente' "
-                    '(es. \'<a href="LINK">Srotola il pergamena originale</a>\').'
-                )
+                    "(es. '<a href=\"LINK\">Srotola il pergamena originale</a>')."
+                ),
             }
 
     except Exception as e:
         log.error("Errore nel recupero feed RSS (%s): %s", url, e)
         return {
             "status": "error",
-            "message": "I venti si sono placati e le gagliotte delle staffette non sono giunte al porto. Nessun dispaccio disponibile al momento."
+            "message": "I venti si sono placati e le gagliotte delle staffette non sono giunte al porto. Nessun dispaccio disponibile al momento.",
         }
+
 
 # Esportazione degli strumenti ADK
 recall_patron_tool = FunctionTool(recall_patron_memory)

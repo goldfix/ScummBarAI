@@ -3,7 +3,7 @@
 from google.adk.agents import Agent
 from google.adk.agents.readonly_context import ReadonlyContext
 
-from .bots import barnaby_agent, barnacle_agent, isolde_agent, balthazar_agent
+from .bots import balthazar_agent, barnaby_agent, barnacle_agent, isolde_agent
 from .time_context import get_time_description
 from .utils import DEFAULT_RETRY_CONFIG, MODEL, THINKING_CONFIG, WORLD_CONTEXT
 

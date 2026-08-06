@@ -18,23 +18,23 @@ import aiohttp
 from dotenv import load_dotenv
 
 from .formatter import format_response
-from .runner import run_agent, purge_old_sessions
+from .runner import purge_old_sessions, run_agent
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 log = logging.getLogger(__name__)
 
 # --- Config ---
-TOKEN     = os.getenv("TELEGRAM_BOT_TOKEN", "")
-BOT_USER  = os.getenv("TELEGRAM_BOT_USERNAME", "").lower()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+BOT_USER = os.getenv("TELEGRAM_BOT_USERNAME", "").lower()
 GROUP_URL = os.getenv("TELEGRAM_GROUP_LINK", "")
-BASE      = f"https://api.telegram.org/bot{TOKEN}"
+BASE = f"https://api.telegram.org/bot{TOKEN}"
 
 # --- Per-bot lock: serializes updates to prevent race conditions in LLM session history ---
 _locks: dict[str, asyncio.Lock] = {
-    "barnaby":   asyncio.Lock(),
-    "barnacle":  asyncio.Lock(),
-    "isolde":    asyncio.Lock(),
+    "barnaby": asyncio.Lock(),
+    "barnacle": asyncio.Lock(),
+    "isolde": asyncio.Lock(),
     "balthazar": asyncio.Lock(),
 }
 
@@ -42,53 +42,59 @@ _locks: dict[str, asyncio.Lock] = {
 _message_counters: dict[str, int] = {}
 
 # --- In-character messages ---
-_PRIVATE_REDIRECT = (
-    "🍺 <i>La porta dello Scummbar è sempre aperta, compagno, "
-    "ma le conversazioni private non fanno per me. "
-    f"Vieni al bancone!</i>"
-    + (f"\n👉 {GROUP_URL}" if GROUP_URL else "")
+_PRIVATE_REDIRECT = "🍺 <i>La porta dello Scummbar è sempre aperta, compagno, ma le conversazioni private non fanno per me. Vieni al bancone!</i>" + (
+    f"\n👉 {GROUP_URL}" if GROUP_URL else ""
 )
 
 _BOT_BUSY = {
-    "barnaby": (
-        "<i>Barnaby alza un dito senza smettere di versare. "
-        "«Un momento, compagno, sto servendo qualcuno...»</i>"
-    ),
-    "barnacle": (
-        "<i>Barnacle ti lancia un'occhiataccia con l'occhio grigio. "
-        "È occupato. Riprova tra poco.</i>"
-    ),
-    "isolde": (
-        "<i>Isolde giocherella con le carte senza alzare lo sguardo. "
-        "«Il tavolo è pieno, pirata. Aspetta il tuo turno...»</i>"
-    ),
+    "barnaby": ("<i>Barnaby alza un dito senza smettere di versare. «Un momento, compagno, sto servendo qualcuno...»</i>"),
+    "barnacle": ("<i>Barnacle ti lancia un'occhiataccia con l'occhio grigio. È occupato. Riprova tra poco.</i>"),
+    "isolde": ("<i>Isolde giocherella con le carte senza alzare lo sguardo. «Il tavolo è pieno, pirata. Aspetta il tuo turno...»</i>"),
     "balthazar": (
-        "<i>Balthazar china la testa sulle sue mappe senza alzare gli occhi. "
-        "«Sto calcolando la latitudine di un'isola, compagno. Un attimo di pazienza...»</i>"
+        "<i>Balthazar china la testa sulle sue mappe senza alzare gli occhi. «Sto calcolando la latitudine di un'isola, compagno. Un attimo di pazienza...»</i>"
     ),
 }
 
 # --- Semantic router: defines which bot should respond ---
 _INTENT_MAP = {
-    "barnaby": [
-        "barnaby", "barista", "grog", "birra", "bere", "drink",
-        "ordinare", "conto", "pulire", "servire"
-    ],
-    "barnacle": [
-        "barnacle", "micio", "gatto", "felino", "bestia",
-        "peloso", "dormire", "fusa", "soffia"
-    ],
+    "barnaby": ["barnaby", "barista", "grog", "birra", "bere", "drink", "ordinare", "conto", "pulire", "servire"],
+    "barnacle": ["barnacle", "micio", "gatto", "felino", "bestia", "peloso", "dormire", "fusa", "soffia"],
     "isolde": [
-        "isolde", "carte", "giocare", "gioco", "dadi", "tarocchi",
-        "barare", "trucco", "scommessa", "predizione", "segreto", "pettegolezzo",
-        "maga"
+        "isolde",
+        "carte",
+        "giocare",
+        "gioco",
+        "dadi",
+        "tarocchi",
+        "barare",
+        "trucco",
+        "scommessa",
+        "predizione",
+        "segreto",
+        "pettegolezzo",
+        "maga",
     ],
     "balthazar": [
-        "balthazar", "navigatore", "mappa", "rotta", "stelle", "bussola",
-        "coordinate", "isole", "latitudine", "longitudine", "astrolabio",
-        "portolano", "sestante", "vento", "notizie", "news", "viaggiatore"
-    ]
+        "balthazar",
+        "navigatore",
+        "mappa",
+        "rotta",
+        "stelle",
+        "bussola",
+        "coordinate",
+        "isole",
+        "latitudine",
+        "longitudine",
+        "astrolabio",
+        "portolano",
+        "sestante",
+        "vento",
+        "notizie",
+        "news",
+        "viaggiatore",
+    ],
 }
+
 
 def _resolve_intent(text: str) -> str | None:
     """
@@ -98,10 +104,14 @@ def _resolve_intent(text: str) -> str | None:
     tl = text.lower()
 
     # 1. Explicit @ tags take priority
-    if "@barnacle" in tl:  return "barnacle"
-    if "@barnaby" in tl:   return "barnaby"
-    if "@isolde" in tl:    return "isolde"
-    if "@balthazar" in tl: return "balthazar"
+    if "@barnacle" in tl:
+        return "barnacle"
+    if "@barnaby" in tl:
+        return "barnaby"
+    if "@isolde" in tl:
+        return "isolde"
+    if "@balthazar" in tl:
+        return "balthazar"
 
     # 2. Semantic routing (keyword matching)
     for bot, keywords in _INTENT_MAP.items():
@@ -109,6 +119,7 @@ def _resolve_intent(text: str) -> str | None:
             return bot
 
     return None
+
 
 async def _send_typing(http: aiohttp.ClientSession, chat_id: int) -> None:
     """Sends the standard Telegram 'typing...' chat action."""
@@ -119,6 +130,7 @@ async def _send_typing(http: aiohttp.ClientSession, chat_id: int) -> None:
         )
     except Exception:
         pass
+
 
 async def _send_document(
     http: aiohttp.ClientSession,
@@ -133,12 +145,7 @@ async def _send_document(
     """
     data = aiohttp.FormData()
     data.add_field("chat_id", str(chat_id))
-    data.add_field(
-        "document",
-        file_bytes,
-        filename=filename,
-        content_type="text/plain"
-    )
+    data.add_field("document", file_bytes, filename=filename, content_type="text/plain")
     if receiver_user_id:
         data.add_field("receiver_user_id", str(receiver_user_id))
 
@@ -153,6 +160,7 @@ async def _send_document(
         log.error("Error in sendDocument: %s", e)
         return False
 
+
 async def _send_photo(
     http: aiohttp.ClientSession,
     chat_id: int,
@@ -166,12 +174,7 @@ async def _send_photo(
     """
     data = aiohttp.FormData()
     data.add_field("chat_id", str(chat_id))
-    data.add_field(
-        "photo",
-        file_bytes,
-        filename=filename,
-        content_type="image/png"
-    )
+    data.add_field("photo", file_bytes, filename=filename, content_type="image/png")
     if receiver_user_id:
         data.add_field("receiver_user_id", str(receiver_user_id))
 
@@ -186,6 +189,7 @@ async def _send_photo(
         log.error("Error in sendPhoto: %s", e)
         return False
 
+
 async def _send_message(
     http: aiohttp.ClientSession,
     chat_id: int,
@@ -194,8 +198,8 @@ async def _send_message(
 ) -> bool:
     """Helper to dispatch HTML messages, supporting ephemeral targets via receiver_user_id."""
     payload: dict = {
-        "chat_id":    chat_id,
-        "text":       text,
+        "chat_id": chat_id,
+        "text": text,
         "parse_mode": "HTML",
     }
     if receiver_user_id:
@@ -212,10 +216,12 @@ async def _send_message(
         log.error("Error in sendMessage: %s", e)
         return False
 
+
 def _augment_text(text: str, bot_name: str, user_id: str) -> str:
     """Prepends routing hint and patron ID for context. user_id is used by tools via ToolContext."""
     label = bot_name.upper()
     return f"[Risponde {label}] [avventore_id: {user_id}] {text}"
+
 
 def _on_task_done(task: asyncio.Task) -> None:
     """Callback attached to every update task — logs unhandled exceptions."""
@@ -225,9 +231,11 @@ def _on_task_done(task: asyncio.Task) -> None:
     if exc:
         log.exception(
             "Unhandled exception in update task [%s]: %s",
-            task.get_name(), exc,
+            task.get_name(),
+            exc,
             exc_info=exc,
         )
+
 
 async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
     """Processes a single incoming Telegram update under a concurrency lock."""
@@ -236,8 +244,10 @@ async def _handle_update(http: aiohttp.ClientSession, update: dict) -> None:
     except Exception as exc:
         log.exception(
             "Unhandled exception in _handle_update (update_id=%s): %s",
-            update.get("update_id"), exc,
+            update.get("update_id"),
+            exc,
         )
+
 
 async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> None:
     """Core update processing logic — called by _handle_update."""
@@ -245,11 +255,11 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
     if not message or not message.get("text"):
         return
 
-    chat      = message["chat"]
+    chat = message["chat"]
     from_user = message["from"]
-    chat_id   = int(chat["id"])
-    user_id   = str(from_user["id"])
-    text      = message["text"]
+    chat_id = int(chat["id"])
+    user_id = str(from_user["id"])
+    text = message["text"]
     chat_type = chat["type"]
 
     # Redirect private messages to preserve the public tavern structure
@@ -270,7 +280,7 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
     try:
         await asyncio.wait_for(lock.acquire(), timeout=TIMEOUT_CODA)
         lock_acquired = True
-    except asyncio.TimeoutError:
+    except TimeoutError:
         # Notify user that the character is currently busy (lock timeout)
         await _send_message(http, chat_id, _BOT_BUSY[bot_name])
         return
@@ -301,7 +311,7 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
             log.warning("[%s] empty response from agent", bot_name)
             return
 
-        log.info("[%s] %s: %s", bot_name, from_user.get('username', user_id), text[:60])
+        log.info("[%s] %s: %s", bot_name, from_user.get("username", user_id), text[:60])
         formatted = format_response(response)
 
         # Barnacle answers ephemerally (visible only to target), Barnaby/Isolde answer publicly
@@ -328,6 +338,7 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
         if lock_acquired:
             lock.release()
 
+
 async def _session_cleaner_cron() -> None:
     """Background loop that executes the database pruning every hour."""
     while True:
@@ -336,6 +347,7 @@ async def _session_cleaner_cron() -> None:
         except Exception as exc:
             log.exception("Error in session cleaner background task: %s", exc)
         await asyncio.sleep(3600)
+
 
 async def run_polling() -> None:
     """Start the Telegram long-polling loop. Blocks until interrupted."""
@@ -353,11 +365,7 @@ async def run_polling() -> None:
     async with aiohttp.ClientSession() as http:
         while True:
             try:
-                url = (
-                    f"{BASE}/getUpdates"
-                    f"?offset={offset}&timeout=30"
-                    f'&allowed_updates=["message"]'
-                )
+                url = f'{BASE}/getUpdates?offset={offset}&timeout=30&allowed_updates=["message"]'
                 async with http.get(url, timeout=aiohttp.ClientTimeout(total=40)) as resp:
                     data = await resp.json()
 

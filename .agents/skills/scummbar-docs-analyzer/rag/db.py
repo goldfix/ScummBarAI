@@ -5,10 +5,10 @@ Manages SQLite database initialization, incremental indexing tracking (MD5 hashe
 Full-Text Search (FTS5 BM25), and Vector Search via the `sqlite-vec` extension.
 """
 
-import sqlite3
 import datetime
+import sqlite3
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 import sqlite_vec
 
@@ -87,17 +87,15 @@ class RAGDatabase:
 
             conn.commit()
 
-    def get_doc_hash(self, doc_path: str) -> Optional[str]:
+    def get_doc_hash(self, doc_path: str) -> str | None:
         """
         Returns the stored MD5 hash for a document if indexed, else None.
         """
         with self.get_connection() as conn:
-            row = conn.execute(
-                "SELECT md5_hash FROM documents WHERE doc_path = ?", (doc_path,)
-            ).fetchone()
+            row = conn.execute("SELECT md5_hash FROM documents WHERE doc_path = ?", (doc_path,)).fetchone()
             return row["md5_hash"] if row else None
 
-    def get_all_doc_paths(self) -> List[str]:
+    def get_all_doc_paths(self) -> list[str]:
         """
         Returns a list of all indexed document paths stored in the database.
         """
@@ -110,9 +108,7 @@ class RAGDatabase:
         Deletes a document and all its associated chunks, FTS5 rows, and vectors.
         """
         with self.get_connection() as conn:
-            chunk_rows = conn.execute(
-                "SELECT id FROM chunks WHERE doc_path = ?", (doc_path,)
-            ).fetchall()
+            chunk_rows = conn.execute("SELECT id FROM chunks WHERE doc_path = ?", (doc_path,)).fetchall()
 
             for r in chunk_rows:
                 cid = r["id"]
@@ -127,8 +123,8 @@ class RAGDatabase:
         self,
         doc_path: str,
         md5_hash: str,
-        chunks: List[Dict[str, Any]],
-        embeddings: List[List[float]],
+        chunks: list[dict[str, Any]],
+        embeddings: list[list[float]],
     ) -> int:
         """
         Saves document metadata, chunks, FTS5 rows, and vector embeddings in a single transaction.
@@ -140,7 +136,7 @@ class RAGDatabase:
             # First, clean any existing entries for this doc_path
             self.delete_doc(doc_path)
 
-            now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            now = datetime.datetime.now(datetime.UTC).isoformat()
             conn.execute(
                 "INSERT INTO documents (doc_path, md5_hash, last_indexed) VALUES (?, ?, ?)",
                 (doc_path, md5_hash, now),
@@ -191,7 +187,7 @@ class RAGDatabase:
             conn.commit()
             return inserted_count
 
-    def search_fts(self, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
+    def search_fts(self, query: str, top_k: int = 10) -> list[dict[str, Any]]:
         """
         Executes Full-Text Search (BM25) over chunks.
         """
@@ -224,7 +220,7 @@ class RAGDatabase:
                 rows = conn.execute(fallback_sql, (pattern, pattern, top_k)).fetchall()
                 return [dict(r) for r in rows]
 
-    def search_vector(self, query_embedding: List[float], top_k: int = 10) -> List[Dict[str, Any]]:
+    def search_vector(self, query_embedding: list[float], top_k: int = 10) -> list[dict[str, Any]]:
         """
         Executes Vector Cosine Similarity Search using sqlite-vec.
         """

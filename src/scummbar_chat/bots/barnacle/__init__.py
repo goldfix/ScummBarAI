@@ -1,1 +1,1 @@
-from .agent import barnacle_agent  # noqa: F401
+from .agent import barnacle_agent

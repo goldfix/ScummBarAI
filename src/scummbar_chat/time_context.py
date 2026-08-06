@@ -6,21 +6,19 @@ Used by the InstructionProvider in global_instruction.
 
 import datetime
 
-
 # ---------------------------------------------------------------------------
 # Hour → time period mapping
 # ---------------------------------------------------------------------------
 
 _TIME_PERIODS = [
-    (7,  9,  "alba"),
-    (9,  12, "mattino"),
+    (7, 9, "alba"),
+    (9, 12, "mattino"),
     (12, 14, "mezzogiorno"),
     (14, 16, "pomeriggio"),
     (16, 18, "tramonto"),
 ]
 
 _DESCRIPTIONS = {
-
     "alba": """\
 ## Il Momento: L'Alba
 
@@ -31,7 +29,6 @@ si muove silenzioso tra i tavoli vuoti sistemando boccali e raddrizzando sedie. 
 Il rumore della risacca è il suono dominante. Barnacle è raggomitolato sul bancone,
 ancora mezzo addormentato, con le orecchie abbassate.
 """,
-
     "mattino": """\
 ## Il Momento: Il Mattino
 
@@ -42,7 +39,6 @@ Barnaby è al bancone, attivo e presente, pronto ad ascoltare le prime storie
 della giornata. Barnacle, stiracchiandosi lentamente, ha aperto un occhio
 e osserva i nuovi arrivati con la sua aria distaccata.
 """,
-
     "mezzogiorno": """\
 ## Il Momento: Il Mezzogiorno
 
@@ -54,7 +50,6 @@ il suo "clack-clack" ritmato quasi inaudibile nel frastuono generale.
 Barnacle si è rifugiato nell'angolo più buio, infastidito dalla confusione,
 e lancia occhiatacce a chiunque si avvicini troppo.
 """,
-
     "pomeriggio": """\
 ## Il Momento: Il Pomeriggio
 
@@ -65,7 +60,6 @@ boccali con movimenti lenti e meccanici, lo sguardo che ogni tanto vaga
 verso l'oblò e il mare oltre il vetro. Barnacle è profondamente addormentato
 sul bancone, emettendo un sottile russare ritmico.
 """,
-
     "tramonto": """\
 ## Il Momento: Il Tramonto
 
@@ -76,7 +70,6 @@ portando con sé storie di giornate difficili e il bisogno muto di un posto
 dove sedersi. L'aria si fa più densa di fumo di tabacco. Barnacle si è svegliato,
 e siede dritto vicino al camino, fissando la porta ogni volta che si apre.
 """,
-
     "notte": """\
 ## Il Momento: La Notte
 
@@ -94,6 +87,7 @@ debolmente alla luce del fuoco.
 # ---------------------------------------------------------------------------
 # Public functions
 # ---------------------------------------------------------------------------
+
 
 def get_time_description(now: datetime.datetime | None = None) -> str:
     """Return the current time of day description for the Scummbar.

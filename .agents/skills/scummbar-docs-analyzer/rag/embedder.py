@@ -7,14 +7,13 @@ for document chunks and search queries with ThreadPoolExecutor for speed.
 
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import List
 
 from google.genai import types
 
 try:
-    from .config import EMBEDDING_MODEL, EMBEDDING_DIM, get_genai_client
+    from .config import EMBEDDING_DIM, EMBEDDING_MODEL, get_genai_client
 except ImportError:
-    from rag.config import EMBEDDING_MODEL, EMBEDDING_DIM, get_genai_client
+    from rag.config import EMBEDDING_DIM, EMBEDDING_MODEL, get_genai_client
 
 
 class Embedder:
@@ -27,7 +26,7 @@ class Embedder:
         self.dim = dim
         self.client = get_genai_client()
 
-    def embed_text(self, text: str, max_retries: int = 3) -> List[float]:
+    def embed_text(self, text: str, max_retries: int = 3) -> list[float]:
         """
         Embeds a single string of text.
         """
@@ -43,10 +42,10 @@ class Embedder:
                 if attempt == max_retries - 1:
                     print(f"❌ Error generating embedding for text: {e}")
                     raise e
-                time.sleep(1.5 ** attempt)
+                time.sleep(1.5**attempt)
         return []
 
-    def embed_batch(self, texts: List[str], max_workers: int = 8) -> List[List[float]]:
+    def embed_batch(self, texts: list[str], max_workers: int = 8) -> list[list[float]]:
         """
         Embeds a list of strings concurrently using a thread pool.
         """

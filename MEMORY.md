@@ -156,7 +156,7 @@ if _message_counters[session_id] % 3 == 0:
 ```python
 _INTENT_MAP = {
     "barnaby": ["barnaby", "barista", "grog", "birra", "bere", "drink", ...],
-    "barnacle": ["barnacle", "micio", "gatto", "felino", "fusa", ...]
+    "barnacle": ["barnacle", "micio", "gatto", "felino", "fusa", ...],
 }
 ```
 
@@ -198,7 +198,7 @@ Il `user_id` Telegram (numerico) non viene mai passato come parametro LLM
 
 ```python
 async def recall_patron_memory(tool_context: ToolContext) -> dict:
-    user_id = tool_context.user_id   # ← Telegram ID reale, dalla sessione ADK
+    user_id = tool_context.user_id  # ← Telegram ID reale, dalla sessione ADK
     ...
 ```
 
@@ -366,7 +366,7 @@ eventi come contesto attivo.
 compaction_summarizer = LlmEventSummarizer(llm=COMPACTION_LLM)
 compaction_config = EventsCompactionConfig(
     compaction_interval=COMPACTION_INTERVAL,  # default: 30
-    overlap_size=COMPACTION_OVERLAP,          # default: 2
+    overlap_size=COMPACTION_OVERLAP,  # default: 2
     summarizer=compaction_summarizer,
 )
 scummbar_app = App(
@@ -500,7 +500,7 @@ Update
 **Session mapping ADK ← Telegram:**
 ```python
 session_id = str(update["message"]["chat"]["id"])  # per chat
-user_id    = str(update["message"]["from"]["id"])   # per utente
+user_id = str(update["message"]["from"]["id"])  # per utente
 ```
 
 **Implementazione senza librerie (aiohttp):**
@@ -512,12 +512,10 @@ async with session.get(f"{BASE}/getUpdates?offset={offset}&timeout=30") as r:
     updates = (await r.json())["result"]
 
 # "sta scrivendo..."
-await session.post(f"{BASE}/sendChatAction",
-    json={"chat_id": chat_id, "action": "typing"})
+await session.post(f"{BASE}/sendChatAction", json={"chat_id": chat_id, "action": "typing"})
 
 # Invia messaggio (HTML più semplice di MarkdownV2)
-await session.post(f"{BASE}/sendMessage",
-    json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
+await session.post(f"{BASE}/sendMessage", json={"chat_id": chat_id, "text": text, "parse_mode": "HTML"})
 ```
 
 ---
@@ -557,7 +555,7 @@ await send_message(
     chat_id=chat_id,
     text="Solo tu puoi leggere questo...",
     receiver_user_id=user_id,
-    callback_query_id=query_id   # entro 15 secondi
+    callback_query_id=query_id,  # entro 15 secondi
 )
 ```
 
@@ -724,8 +722,8 @@ DeepSeek ha un sistema di caching su disco **abilitato di default**, senza modif
 
 **Verifica hit nella risposta:**
 ```python
-response.usage.prompt_cache_hit_tokens    # token serviti dalla cache
-response.usage.prompt_cache_miss_tokens   # token calcolati ex novo
+response.usage.prompt_cache_hit_tokens  # token serviti dalla cache
+response.usage.prompt_cache_miss_tokens  # token calcolati ex novo
 ```
 
 ---
@@ -917,6 +915,16 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - La doc ADK 2.6.0 (`docs/google-api/context_caching.md`) chiarisce che `static_instruction` da sola **NON abilita** il caching esplicito: serve configurare `context_cache_config` a livello `App`.
   - Aggiunto in `src/scummbar_chat/utils.py` il builder `build_context_cache_config()` che restituisce `ContextCacheConfig(min_tokens=2048, ttl_seconds=600, cache_intervals=5)` per modelli Gemini, `None` per DeepSeek (KV cache server-side automatico).
   - Passato `context_cache_config=CONTEXT_CACHE_CONFIG` all'`App` in `src/scummbar_chat/telegram/runner.py`.
+- **Riorganizzazione Dipendenze Pi-Agent Skills (`pyproject.toml` e `py_env.sh`)**:
+  - Spostate le librerie per le skill Pi-Agent (`html2text`, `beautifulsoup4`, `sqlite-vec`, `ruff`) ed aggiunta `jupyter` (`>=1.1.1`) nel gruppo `[dependency-groups.dev]` in `pyproject.toml`.
+  - Aggiornato `py_env.sh` per eseguire esplicitamente `uv sync --group dev` in fase di inizializzazione locale dell'ambiente virtuale (`init` / `init_py`).
+  - Sincronizzato l'ambiente virtuale tramite `uv lock` e `uv sync --active --group dev`.
+- **Revisione e Ottimizzazione `ruff.toml`**:
+  - Aggiornata la configurazione di `ruff.toml` integrando le direttive della documentazione ufficiale (`docs/ruff/`):
+    - `known-first-party = ["scummbar_chat", "rag"]`
+    - Attivati i plugin `ASYNC`, `RUF`, `C4`, `SIM`, `S`, `A`, `PTH` in `select`
+    - Abilitato `docstring-code-format = true` per la formattazione del codice nelle docstring
+    - Eseguito `ruff check --fix` e `ruff format` con 124 correzioni automatiche applicate.
   - Aggiunte variabili `.env` `CONTEXT_CACHE_ENABLED`, `CONTEXT_CACHE_MIN_TOKENS`, `CONTEXT_CACHE_TTL_SECONDS`, `CONTEXT_CACHE_INTERVALS` (Sezione 3b).
 
 

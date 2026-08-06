@@ -6,7 +6,7 @@ using Reciprocal Rank Fusion (RRF) for optimal precision and recall.
 """
 
 import argparse
-from typing import List, Dict, Any
+from typing import Any
 
 try:
     from .db import RAGDatabase
@@ -32,7 +32,7 @@ class RAGSearchEngine:
         vector_weight: float = 1.0,
         fts_weight: float = 1.0,
         rrf_k: int = 60,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Performs hybrid search (FTS5 + Vector Similarity) using Reciprocal Rank Fusion (RRF).
         """
@@ -46,29 +46,23 @@ class RAGSearchEngine:
         fts_results = self.db.search_fts(query, top_k=top_k * 3)
 
         # 3. Reciprocal Rank Fusion (RRF)
-        rrf_scores: Dict[int, float] = {}
-        chunks_map: Dict[int, Dict[str, Any]] = {}
+        rrf_scores: dict[int, float] = {}
+        chunks_map: dict[int, dict[str, Any]] = {}
 
         # Process Vector results
         for rank, item in enumerate(vector_results, start=1):
             cid = item["id"]
             chunks_map[cid] = item
-            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (
-                vector_weight * (1.0 / (rrf_k + rank))
-            )
+            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (vector_weight * (1.0 / (rrf_k + rank)))
 
         # Process FTS results
         for rank, item in enumerate(fts_results, start=1):
             cid = item["id"]
             chunks_map[cid] = item
-            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (
-                fts_weight * (1.0 / (rrf_k + rank))
-            )
+            rrf_scores[cid] = rrf_scores.get(cid, 0.0) + (fts_weight * (1.0 / (rrf_k + rank)))
 
         # 4. Sort candidates by final RRF score
-        sorted_candidates = sorted(
-            rrf_scores.items(), key=lambda x: x[1], reverse=True
-        )
+        sorted_candidates = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
 
         final_results = []
         for cid, score in sorted_candidates[:top_k]:
@@ -80,13 +74,9 @@ class RAGSearchEngine:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Search Scummbar documentation using Hybrid RAG (FTS5 + Vector)."
-    )
+    parser = argparse.ArgumentParser(description="Search Scummbar documentation using Hybrid RAG (FTS5 + Vector).")
     parser.add_argument("query", type=str, help="Search query string")
-    parser.add_argument(
-        "--top_k", "-k", type=int, default=5, help="Number of results to return (default: 5)"
-    )
+    parser.add_argument("--top_k", "-k", type=int, default=5, help="Number of results to return (default: 5)")
 
     args = parser.parse_args()
 
