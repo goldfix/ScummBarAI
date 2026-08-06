@@ -7,16 +7,16 @@ extracts contextualized chunks, generates Gemini embeddings, and populates SQLit
 
 import hashlib
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 try:
-    from .config import DOCS_DIR
     from .chunker import MarkdownChunker
+    from .config import DOCS_DIR
     from .db import RAGDatabase
     from .embedder import Embedder
 except ImportError:
-    from rag.config import DOCS_DIR
     from rag.chunker import MarkdownChunker
+    from rag.config import DOCS_DIR
     from rag.db import RAGDatabase
     from rag.embedder import Embedder
 
@@ -42,7 +42,7 @@ class RAGIndexer:
                 hasher.update(chunk)
         return hasher.hexdigest()
 
-    def index_all(self, force_reindex: bool = False) -> Dict[str, Any]:
+    def index_all(self, force_reindex: bool = False) -> dict[str, Any]:
         """
         Scans docs/ directory recursively, indexes new or modified markdown files,
         and purges documents deleted from disk from the database.

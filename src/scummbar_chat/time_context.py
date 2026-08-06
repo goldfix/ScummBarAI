@@ -6,7 +6,6 @@ Used by the InstructionProvider in global_instruction.
 
 import datetime
 
-
 # ---------------------------------------------------------------------------
 # Hour → time period mapping
 # ---------------------------------------------------------------------------

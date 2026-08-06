@@ -72,7 +72,7 @@ scummbar/
 
 ## 🤖 Pi-Agent Skills
 Il progetto fornisce delle skill di sistema sotto `.agents/skills/` che devi invocare o consultare:
-- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra i 406 documenti nella cartella `docs/`.
+- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra i 443 documenti nella cartella `docs/`.
 - `/skill:scummbar-memory-updater`: Per aggiornare `MEMORY.md`, `README.md` e `AGENTS.md` alla fine di una sessione di sviluppo o per modifiche rilevanti.
 - `/skill:scummbar-web-to-markdown`: Per convertire una pagina web in un file Markdown salvato nella cartella specificata dall'utente e auto-indicizzarlo nel RAG.
 

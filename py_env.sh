@@ -30,8 +30,8 @@ if [[ "$1" == "init" || "$1" == "init_py" ]]; then
 
     source "${VENV_DIR}/bin/activate"
 
-    echo "--> Syncing project dependencies with uv..."
-    uv sync --python "${PYTHON_VERSION}"
+    echo "--> Syncing project dependencies (including dev group) with uv..."
+    uv sync --group dev --python "${PYTHON_VERSION}"
     SYNC_STATUS=$?
     if [ ${SYNC_STATUS} -ne 0 ]; then
         echo "--> Error: 'uv sync' failed for Python ${PYTHON_VERSION}."

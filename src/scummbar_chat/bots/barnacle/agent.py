@@ -5,9 +5,9 @@ import pathlib
 from google.adk.agents import Agent
 from google.adk.tools import skill_toolset
 
-from ...utils import DEFAULT_RETRY_CONFIG, MODEL, THINKING_CONFIG, load_all_skills, load_md
 # The cat only needs the read-only recall tool (sense of smell)
 from ...tools import recall_patron_tool
+from ...utils import DEFAULT_RETRY_CONFIG, MODEL, THINKING_CONFIG, load_all_skills, load_md
 
 _PERSONA = load_md(pathlib.Path(__file__).parent / "persona.md")
 

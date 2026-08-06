@@ -18,7 +18,7 @@ import aiohttp
 from dotenv import load_dotenv
 
 from .formatter import format_response
-from .runner import run_agent, purge_old_sessions
+from .runner import purge_old_sessions, run_agent
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -45,7 +45,7 @@ _message_counters: dict[str, int] = {}
 _PRIVATE_REDIRECT = (
     "🍺 <i>La porta dello Scummbar è sempre aperta, compagno, "
     "ma le conversazioni private non fanno per me. "
-    f"Vieni al bancone!</i>"
+    "Vieni al bancone!</i>"
     + (f"\n👉 {GROUP_URL}" if GROUP_URL else "")
 )
 
@@ -270,7 +270,7 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
     try:
         await asyncio.wait_for(lock.acquire(), timeout=TIMEOUT_CODA)
         lock_acquired = True
-    except asyncio.TimeoutError:
+    except TimeoutError:
         # Notify user that the character is currently busy (lock timeout)
         await _send_message(http, chat_id, _BOT_BUSY[bot_name])
         return

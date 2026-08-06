@@ -6,7 +6,7 @@ using Reciprocal Rank Fusion (RRF) for optimal precision and recall.
 """
 
 import argparse
-from typing import List, Dict, Any
+from typing import Any
 
 try:
     from .db import RAGDatabase
@@ -32,7 +32,7 @@ class RAGSearchEngine:
         vector_weight: float = 1.0,
         fts_weight: float = 1.0,
         rrf_k: int = 60,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Performs hybrid search (FTS5 + Vector Similarity) using Reciprocal Rank Fusion (RRF).
         """
@@ -46,8 +46,8 @@ class RAGSearchEngine:
         fts_results = self.db.search_fts(query, top_k=top_k * 3)
 
         # 3. Reciprocal Rank Fusion (RRF)
-        rrf_scores: Dict[int, float] = {}
-        chunks_map: Dict[int, Dict[str, Any]] = {}
+        rrf_scores: dict[int, float] = {}
+        chunks_map: dict[int, dict[str, Any]] = {}
 
         # Process Vector results
         for rank, item in enumerate(vector_results, start=1):

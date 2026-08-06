@@ -917,6 +917,16 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - La doc ADK 2.6.0 (`docs/google-api/context_caching.md`) chiarisce che `static_instruction` da sola **NON abilita** il caching esplicito: serve configurare `context_cache_config` a livello `App`.
   - Aggiunto in `src/scummbar_chat/utils.py` il builder `build_context_cache_config()` che restituisce `ContextCacheConfig(min_tokens=2048, ttl_seconds=600, cache_intervals=5)` per modelli Gemini, `None` per DeepSeek (KV cache server-side automatico).
   - Passato `context_cache_config=CONTEXT_CACHE_CONFIG` all'`App` in `src/scummbar_chat/telegram/runner.py`.
+- **Riorganizzazione Dipendenze Pi-Agent Skills (`pyproject.toml` e `py_env.sh`)**:
+  - Spostate le librerie per le skill Pi-Agent (`html2text`, `beautifulsoup4`, `sqlite-vec`, `ruff`) ed aggiunta `jupyter` (`>=1.1.1`) nel gruppo `[dependency-groups.dev]` in `pyproject.toml`.
+  - Aggiornato `py_env.sh` per eseguire esplicitamente `uv sync --group dev` in fase di inizializzazione locale dell'ambiente virtuale (`init` / `init_py`).
+  - Sincronizzato l'ambiente virtuale tramite `uv lock` e `uv sync --active --group dev`.
+- **Revisione e Ottimizzazione `ruff.toml`**:
+  - Aggiornata la configurazione di `ruff.toml` integrando le direttive della documentazione ufficiale (`docs/ruff/`):
+    - `known-first-party = ["scummbar_chat", "rag"]`
+    - Attivati i plugin `ASYNC`, `RUF`, `C4`, `SIM`, `S`, `A`, `PTH` in `select`
+    - Abilitato `docstring-code-format = true` per la formattazione del codice nelle docstring
+    - Eseguito `ruff check --fix` e `ruff format` con 124 correzioni automatiche applicate.
   - Aggiunte variabili `.env` `CONTEXT_CACHE_ENABLED`, `CONTEXT_CACHE_MIN_TOKENS`, `CONTEXT_CACHE_TTL_SECONDS`, `CONTEXT_CACHE_INTERVALS` (Sezione 3b).
 
 

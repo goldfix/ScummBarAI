@@ -10,25 +10,25 @@ Operations:
 import asyncio
 import logging
 import sqlite3
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from google.adk.runners import Runner
-from google.adk.sessions import DatabaseSessionService
-from google.adk.artifacts import InMemoryArtifactService
 from google.adk.apps.app import App, EventsCompactionConfig
 from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
+from google.adk.artifacts import InMemoryArtifactService
+from google.adk.runners import Runner
+from google.adk.sessions import DatabaseSessionService
 from google.genai import types
 
 from ..agent import root_agent
 
 # Utilities imports: pre-built model instances for agents and compaction
 from ..utils import (
-    SESSION_DB_URI,
+    COMPACTION_INTERVAL,
     COMPACTION_LLM,
     COMPACTION_MODEL,
-    COMPACTION_INTERVAL,
     COMPACTION_OVERLAP,
     CONTEXT_CACHE_CONFIG,
+    SESSION_DB_URI,
 )
 
 log = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ _runner: Runner | None = None
 
 async def purge_old_sessions(hours: int = 24) -> int:
     """Removes historical events older than X hours from the ADK SQLite backend."""
-    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff_time = datetime.now(UTC) - timedelta(hours=hours)
     cutoff_str = cutoff_time.strftime("%Y-%m-%d %H:%M:%S")
 
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
@@ -141,7 +141,7 @@ async def run_agent(
 
     response_parts: list[str] = []
     generated_files: list[dict] = []
-    
+
     # Async stream loop consuming real-time tokens and events
     async for event in runner.run_async(
         user_id=user_id,
@@ -164,7 +164,7 @@ async def run_agent(
                         "filename": filename,
                         "bytes": part.inline_data.data
                     })
-                    
+
         # 2. Extract final textual dialogue
         if event.is_final_response() and event.content and event.content.parts:
             for part in event.content.parts:

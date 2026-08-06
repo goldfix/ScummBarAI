@@ -36,6 +36,7 @@ def get_genai_client():
     """
     try:
         from google import genai
+
         from src.scummbar_chat.utils import get_gemini_client_kwargs
 
         kwargs = get_gemini_client_kwargs()

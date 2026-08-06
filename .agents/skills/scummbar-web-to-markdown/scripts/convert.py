@@ -11,13 +11,15 @@ Features:
 - External image references preserved without local downloads.
 """
 
-import sys
 import os
 import re
-import urllib.request
+import sys
 import urllib.parse
-from bs4 import BeautifulSoup
+import urllib.request
+
 import html2text
+from bs4 import BeautifulSoup
+
 
 def extract_source_url_from_file(file_path: str) -> str:
     """Read the top header of a markdown file and extract the source URL."""
@@ -25,7 +27,7 @@ def extract_source_url_from_file(file_path: str) -> str:
         print(f"❌ ERROR: File '{file_path}' does not exist.")
         sys.exit(1)
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, encoding="utf-8") as f:
         # Read the first 25 lines
         lines = [f.readline() for _ in range(25)]
 

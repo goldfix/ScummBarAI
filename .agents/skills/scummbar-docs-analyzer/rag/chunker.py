@@ -9,7 +9,7 @@ following Google GenAI RAG best practices:
 
 import re
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import Any
 
 try:
     from .config import MAX_CHUNK_CHARS, MIN_CHUNK_CHARS
@@ -27,19 +27,19 @@ class MarkdownChunker:
         self.max_chars = max_chars
         self.min_chars = min_chars
 
-    def chunk_file(self, file_path: Path, rel_path: str) -> List[Dict[str, Any]]:
+    def chunk_file(self, file_path: Path, rel_path: str) -> list[dict[str, Any]]:
         """
         Reads a markdown file and returns a list of contextualized chunks.
         """
         if not file_path.exists():
             return []
 
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(file_path, encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         return self.chunk_text(content, rel_path)
 
-    def chunk_text(self, markdown_text: str, rel_path: str) -> List[Dict[str, Any]]:
+    def chunk_text(self, markdown_text: str, rel_path: str) -> list[dict[str, Any]]:
         """
         Parses raw Markdown text, tracks header breadcrumbs, and generates
         chunks enriched with Google's RAG formatting.
@@ -48,8 +48,8 @@ class MarkdownChunker:
         chunks = []
 
         # Current state
-        breadcrumb_stack: List[Tuple[int, str]] = []  # (header_level, header_text)
-        current_lines: List[str] = []
+        breadcrumb_stack: list[tuple[int, str]] = []  # (header_level, header_text)
+        current_lines: list[str] = []
         current_start_line = 1
         in_code_block = False
 
@@ -111,10 +111,10 @@ class MarkdownChunker:
         self,
         text_block: str,
         rel_path: str,
-        breadcrumb_stack: List[Tuple[int, str]],
+        breadcrumb_stack: list[tuple[int, str]],
         start_line: int,
         end_line: int,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Splits text_block if it exceeds max_chars, ensuring code blocks aren't broken,
         and builds the contextualized dictionary for each chunk.
@@ -145,7 +145,7 @@ class MarkdownChunker:
 
         return built_chunks
 
-    def _subdivide_text(self, text: str) -> List[str]:
+    def _subdivide_text(self, text: str) -> list[str]:
         """
         Subdivides long text blocks into smaller pieces under max_chars,
         respecting paragraph breaks and code blocks.

@@ -83,6 +83,7 @@ def _dump_exception(exc: BaseException) -> None:
 def _check_env() -> bool:
     """Verify critical environment variables are set before starting the bot."""
     import os
+
     from dotenv import load_dotenv
     load_dotenv(ROOT_DIR / "src" / "scummbar_chat" / ".env")
 
@@ -114,7 +115,7 @@ def _check_env() -> bool:
                 if not sa_file.is_absolute():
                     # Se relativo, risolviamo rispetto alla root del progetto
                     sa_file = (ROOT_DIR / sa_path).resolve()
-                
+
                 if not sa_file.exists():
                     log.error("❌  GOOGLE_APPLICATION_CREDENTIALS è impostato ma il file JSON non esiste: %s", sa_path)
                     ok = False
@@ -135,7 +136,7 @@ def _check_env() -> bool:
                 img_sa_file = Path(img_sa_path)
                 if not img_sa_file.is_absolute():
                     img_sa_file = (ROOT_DIR / img_sa_path).resolve()
-                
+
                 if not img_sa_file.exists():
                     log.error("❌  IMAGE_GOOGLE_APPLICATION_CREDENTIALS è impostato ma il file JSON non esiste: %s", img_sa_path)
                     ok = False
