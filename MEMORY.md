@@ -931,8 +931,16 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - Creata cartella ad-hoc `src/scummbar_chat/streamlit/` con `app.py` (entry point UI) e `components.py` (componenti di rendering e sidebar).
   - Implementata l'esperienza di gioco RPG single-player: identità pirata con ID numerico per `patron_memories`, header atmosfera dinamica (`time_context.py`), chat interattiva (`st.chat_message`) e renderizzatore di artefatti (pergamene scaricabili ed immagini tarocchi).
   - Rimosso il selettore manuale dal menu laterale ed integrato l'instradamento semantico automatico `_resolve_intent()` per nomi o appellativi (*maga, veggente, navigatore, cartografo, gatto, micio, barista, oste*).
-  - Perfezionata la funzione `format_streamlit_narrative()`: sia la narrazione ambientale (`_testo_`) che le azioni dei personaggi (`*azione*`) forzano il font monospaziato di colore **nero puro (`color: #000000 !important;`)** su uno sfondo neutro chiaro leggibile, mentre il testo parlato del bot rimane nel font normale sans-serif per la massima leggibilità.
-  - **Recupero Automatico Storico Chat & Iniezione Narratore**: Implementato `session_id` deterministico legato al nome del pirata (`st_session_{user_id}`) e la funzione `load_session_chat_history()`. Allineato il contatore `narrator_counter` per iniettare la `[NOTA DI SISTEMA: È il momento del Narratore...]` ogni 3 messaggi anche su Streamlit, attivando le descrizioni d'ambiente renderizzate nel box dorato.
+  - Perfezionata la funzione `format_streamlit_narrative()`: la narrazione ambientale (`_testo_`) e le azioni dei personaggi (`*azione*`) vengono renderizzate in **corsivo, racchiuse tra apicini (`«...»`) e con background grigio chiaro** (`#e9ecef`), mentre il testo parlato del bot rimane nel font normale sans-serif non stilizzato per la massima leggibilità.
+  - **Campo "Nome Avventore" Obbligatorio**: Impostato `value=""` di default al boot dell'interfaccia Streamlit. Inserito un guard bloccante `if not patron_name:` che mostra un avviso piratesco (`st.warning`) e disabilita `st.chat_input`, costringendo il giocatore ad inserire il proprio nome nella sidebar prima di poter accedere allo Scummbar.
+  - **Check Generale & Hardening dell'Implementazione Streamlit**:
+    - Corretto il parsing della narrazione: nuovi pattern `_FULL_LINE_ENV_EMPH_PATTERN` e `_extract_env_text()` per gestire sia `_testo_` che `_*testo*_` (wrapper annidato prodotto talvolta dal modello) senza lasciare asterischi interni; ordinati i pattern (prima l'annidato, poi il semplice).
+    - Escluso il markdown bold `**...**` dal match delle azioni inline tramite lookaround negativi (`(?<!\*)\*([^*\n]+)\*(?!\*)`): `**Barnaby**` non viene più trasformato in badge mono.
+    - Corretto il messaggio di benvenuto in `app.py` (da `_*...*_` a `_..._` puro) per essere riconosciuto correttamente dal formatter.
+    - Rimossa la nota `[NOTA DI SISTEMA: È il momento del Narratore...]` residua dal testo utente ripristinato dallo storico (`_NARRATOR_NOTE_PATTERN`), evitando che il prompt iniettato riapparisse nella chat ripristinata.
+    - Reso robusto il cleanup dei tag di prefisso (`_AUGMENT_PREFIX_PATTERN` con regex `^(?:\[[^\]]+\]\s*)+`) al posto del fragile `rfind("] ")` che troncava testo utente contenente `] `.
+    - Rimosso il codice morto (`BOT_DISPLAY_NAMES` inutilizzato e la chiave `st.session_state.artifacts` non necessaria nel clear button).
+    - Verificato il funzionamento con loop eventi multipli (`asyncio.run` consecutivi come da rerun Streamlit), avvio server headless OK, e ripristino storico reale (42 messaggi dalla sessione `st_session_795704699102`).
   - Creato script di avvio `./start_streamlit.sh`.
 
 ---
@@ -951,6 +959,11 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - Creata la funzione `format_streamlit_narrative()` con resa visiva distinta: narrazione d'ambiente (`_testo_`) in box scuro monospaziato con bordo dorato (`📜`), azioni fisiche del personaggio (`*azione*`) in font monospaziato nero su badge chiaro (`color: #000000 !important; font-weight: 600`), e dialogo parlato in font normale sans-serif.
   - Implementata la funzione `load_session_chat_history()` e `session_id` deterministico (`st_session_{user_id}`): inserendo o cambiando il "Nome Avventore" nella sidebar, Streamlit ripristina all'istante l'intera cronologia della conversazione passata da SQLite.
   - Sincronizzato il contatore `narrator_counter` per iniettare la nota di sistema `[NOTA DI SISTEMA: È il momento del Narratore...]` ogni 3 turni.
+  - **Check Finale contro Documentazione Ufficiale Streamlit (`docs/Streamlit/`)**:
+    - Verificata la conformità API della versione installata (1.61.1) per tutti i componenti usati: `st.chat_message(name, avatar)`, `st.chat_input(placeholder)`, `st.markdown(unsafe_allow_html)`, `st.download_button`, `st.expander`, `st.spinner`.
+    - Corretto `st.image`: sostituito `use_container_width=True` (deprecato e in rimozione) con il nuovo parametro `width="stretch"`, come raccomandato dalla docstring ufficiale.
+    - Confermata la sicurezza di `unsafe_allow_html=True` sul testo LLM: Streamlit sanifica con DOMPurify e ignora il JavaScript di default.
+    - Validato il pattern di `st.session_state.messages` con dizionari `role`/`content` contro i tutorial ufficiali (chat-response-feedback/revision).
 - **Sicurezza e Concorrenza Database Multi-Processo**:
   - Forzata la modalità WAL (`PRAGMA journal_mode=WAL;`) e `PRAGMA busy_timeout=10000;` con `timeout=10.0` su `data/scummbar_chat/sessions.db`, garantendo la perfetta coesistenza e scrittura simultanea senza blocchi tra Telegram e Streamlit.
 - **Documentazione Pubblica (`README.md`)**:

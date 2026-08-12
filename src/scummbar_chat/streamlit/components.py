@@ -19,16 +19,12 @@ BOT_AVATARS = {
     "system": "📜",
 }
 
-BOT_DISPLAY_NAMES = {
-    "barnaby": "Barnaby (Il Barista)",
-    "barnacle": "Barnacle (Il Gatto)",
-    "isolde": "Isolde (La Veggente / Maga)",
-    "balthazar": "Balthazar (Il Navigatore)",
-}
-
-# Regex patterns for parsing narrative vs speech
-_FULL_LINE_ENV_PATTERN = re.compile(r"^\s*_\s*(.+?)\s*_\s*$")
-_INLINE_ACTION_PATTERN = re.compile(r"\*([^*]+)\*")
+# Regex patterns for parsing narrative vs speech.
+# Full-line env: matches _text_ and _*text*_ (optional inner asterisks for emphasis).
+# Inline actions: matches *action* but NOT **bold** markdown (negative lookarounds).
+_FULL_LINE_ENV_PATTERN = re.compile(r"^_\s*(.+?)\s*_$")
+_FULL_LINE_ENV_EMPH_PATTERN = re.compile(r"^_\*\s*(.+?)\s*\*_$")
+_INLINE_ACTION_PATTERN = re.compile(r"(?<!\*)\*([^*\n]+)\*(?!\*)")
 
 
 def get_avatar_for_role(role: str, bot_name: str | None = None) -> str:
@@ -40,11 +36,22 @@ def get_avatar_for_role(role: str, bot_name: str | None = None) -> str:
     return BOT_AVATARS["system"]
 
 
+def _extract_env_text(line: str) -> str | None:
+    """Extracts narration text from a full-line environment line (_text_ or _*text*_)."""
+    # Order matters: _*...*_ must be tried first, otherwise _..._ captures it
+    # and leaves the inner asterisks in the extracted text.
+    for pattern in (_FULL_LINE_ENV_EMPH_PATTERN, _FULL_LINE_ENV_PATTERN):
+        match = pattern.match(line.strip())
+        if match:
+            return match.group(1).strip() or None
+    return None
+
+
 def format_streamlit_narrative(text: str) -> str:
     """
     Transforms agent response text into visually distinct layers:
-    1. Full-line Environmental Narration (_text_): Monospace dark callout box with gold left border.
-    2. Character Physical Actions (*action*): Monospace code badge with action symbols (✦).
+    1. Full-line Environmental Narration (_text_): Italic quoted text on a light grey box.
+    2. Character Physical Actions (*action*): Italic quoted text on a light grey inline badge.
     3. Spoken Dialogue: Normal, unstyled sans-serif text so speech stands out prominently.
     """
     if not text:
@@ -59,27 +66,24 @@ def format_streamlit_narrative(text: str) -> str:
             formatted_lines.append("")
             continue
 
-        # 1. Full-line Environmental Narration (_text_) -> Monospace Box with Black Text
-        m_full = _FULL_LINE_ENV_PATTERN.match(stripped)
-        if m_full:
-            inner_text = m_full.group(1).strip()
+        # 1. Full-line Environmental Narration (_text_ or _*text*_) -> Grey italic quoted box
+        env_text = _extract_env_text(stripped)
+        if env_text:
             formatted_lines.append(
-                f'<div style="font-family: monospace !important; font-size: 0.9em; '
-                f"color: #000000 !important; background-color: #f8fafc; "
-                f"border: 1px solid #cbd5e1; border-left: 4px solid #d4af37; "
-                f'padding: 10px 14px; margin: 8px 0; border-radius: 6px; line-height: 1.5;">'
-                f"📜 <i>{inner_text}</i></div>"
+                f'<div style="font-style: italic; color: #333333 !important; '
+                f"background-color: #e9ecef; padding: 8px 12px; margin: 6px 0; "
+                f'border-radius: 6px; line-height: 1.5;">'
+                f"«{env_text}»</div>"
             )
             continue
 
-        # 2. Inline Character Physical Actions (*action*) -> Monospace Black Text Badge
+        # 2. Inline Character Physical Actions (*action*) -> Grey italic quoted badge
         def _replace_action(match: re.Match) -> str:
             action_text = match.group(1).strip()
             return (
-                f'<code style="font-family: monospace !important; font-size: 0.88em; '
-                f"color: #000000 !important; background-color: #e2e8f0; "
-                f"padding: 2px 6px; border-radius: 4px; font-weight: 600; "
-                f'border: 1px solid #cbd5e1;">✦ {action_text} ✦</code>'
+                f'<span style="font-style: italic; color: #333333 !important; '
+                f'background-color: #e9ecef; padding: 2px 6px; border-radius: 4px;">'
+                f"«{action_text}»</span>"
             )
 
         formatted_line = _INLINE_ACTION_PATTERN.sub(_replace_action, line)
@@ -96,12 +100,13 @@ def render_sidebar() -> dict:
     st.sidebar.title("🏴‍☠️ Scummbar Tavern")
     st.sidebar.markdown("---")
 
-    # 1. Player Identity
+    # 1. Player Identity (Mandatory)
     st.sidebar.subheader("👤 Il Tuo Pirata")
     patron_name = st.sidebar.text_input(
-        "Nome Avventore:",
-        value=st.session_state.get("patron_name", "Guybrush"),
-        help="Il nome con cui Barnaby e la taverna ti ricorderanno.",
+        "Nome Avventore (Obbligatorio):",
+        value=st.session_state.get("patron_name", ""),
+        placeholder="Es. Guybrush Threepwood...",
+        help="Inserisci il tuo nome da pirata per entrare nello Scummbar e farti riconoscere dal barista.",
     )
     st.session_state["patron_name"] = patron_name
 
@@ -122,8 +127,8 @@ def render_sidebar() -> dict:
     # 3. Session Controls
     st.sidebar.subheader("🛠️ Gestione Partita")
     if st.sidebar.button("🧹 Pulisci Cronologia Chat", use_container_width=True):
+        # Artifacts live inside messages[i]["artifacts"], so clearing messages is enough.
         st.session_state.messages = []
-        st.session_state.artifacts = []
         st.rerun()
 
     return {
@@ -145,8 +150,9 @@ def render_artifacts(artifacts: list[dict]) -> None:
         data = artifact.get("bytes", b"")
 
         # Handle Images (e.g. Tarot cards or generated artwork)
+        # Note: use_container_width is deprecated in Streamlit >= 1.4x; use width="stretch".
         if filename.lower().endswith((".png", ".jpg", ".jpeg")):
-            st.image(data, caption=f"🖼️ {filename}", use_container_width=True)
+            st.image(data, caption=f"🖼️ {filename}", width="stretch")
         else:
             # Handle Text Artifacts (Scrolls, recipes, portolans)
             try:
