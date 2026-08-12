@@ -27,6 +27,12 @@ from src.scummbar_chat.telegram.runner import run_agent
 from src.scummbar_chat.time_context import get_time_description
 from src.scummbar_chat.utils import SESSION_DB_URI
 
+NARRATOR_SYSTEM_PROMPT = (
+    "\n\n[NOTA DI SISTEMA: È il momento del Narratore. Alla fine assoluta della tua risposta, "
+    "DEVI aggiungere una riga vuota e poi una singola descrizione d'ambiente in corsivo, "
+    "racchiusa ESATTAMENTE tra due trattini bassi, seguendo le regole del file scummbar.md.]"
+)
+
 # Configure page layout and title
 st.set_page_config(
     page_title="ScummBar AI — Taverna dei Pirati",
@@ -180,6 +186,12 @@ def main() -> None:
 
         # Inject patron ID context for memory recall
         augmented_prompt = f"[avventore: {patron_name}] [avventore_id: {user_id}] {augmented_prompt}"
+
+        # Increment session message counter to trigger Narrator prompt every 3 turns
+        st.session_state["narrator_counter"] = st.session_state.get("narrator_counter", 0) + 1
+        if st.session_state["narrator_counter"] % 3 == 0:
+            st.session_state["narrator_counter"] = 0
+            augmented_prompt += NARRATOR_SYSTEM_PROMPT
 
         # C. Execute ADK agent turn asynchronously with a spinner
         active_avatar = BOT_AVATARS.get(detected_bot, "🍺") if detected_bot else "🍺"
