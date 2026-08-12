@@ -1,9 +1,11 @@
 """
 Module: components.py
 Description: UI components and rendering helpers for the Streamlit Scummbar frontend.
-Provides avatar mapping, message formatting, artifact rendering (scrolls/images),
+Provides avatar mapping, custom narrative & action formatting, artifact rendering,
 and sidebar controls.
 """
+
+import re
 
 import streamlit as st
 
@@ -20,10 +22,13 @@ BOT_AVATARS = {
 BOT_DISPLAY_NAMES = {
     "barnaby": "Barnaby (Il Barista)",
     "barnacle": "Barnacle (Il Gatto)",
-    "isolde": "Isolde (La Veggente)",
+    "isolde": "Isolde (La Veggente / Maga)",
     "balthazar": "Balthazar (Il Navigatore)",
-    "auto": "🎯 Routing Automatico",
 }
+
+# Regex patterns for parsing narrative vs speech
+_FULL_LINE_ENV_PATTERN = re.compile(r"^\s*_\s*(.+?)\s*_\s*$")
+_INLINE_ACTION_PATTERN = re.compile(r"\*([^*]+)\*")
 
 
 def get_avatar_for_role(role: str, bot_name: str | None = None) -> str:
@@ -35,9 +40,56 @@ def get_avatar_for_role(role: str, bot_name: str | None = None) -> str:
     return BOT_AVATARS["system"]
 
 
+def format_streamlit_narrative(text: str) -> str:
+    """
+    Transforms agent response text into visually distinct layers:
+    1. Full-line Environmental Narration (_text_): Monospace dark box with gold left border.
+    2. Character Physical Actions (*action*): Monospace code badge with action symbols (✦).
+    3. Spoken Dialogue: Clean, unstyled text that stands out prominently.
+    """
+    if not text:
+        return ""
+
+    lines = text.split("\n")
+    formatted_lines: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            formatted_lines.append("")
+            continue
+
+        # 1. Full-line Environmental Narration (_text_) -> Monospace Box
+        m_full = _FULL_LINE_ENV_PATTERN.match(stripped)
+        if m_full:
+            inner_text = m_full.group(1).strip()
+            formatted_lines.append(
+                f'<div style="background-color: #1a202c; border: 1px solid #2d3748; '
+                f"border-left: 4px solid #d4af37; padding: 10px 14px; margin: 8px 0; "
+                f"border-radius: 6px; font-family: 'Courier New', Courier, monospace; "
+                f'font-size: 0.9em; color: #cbd5e0; line-height: 1.5;">📜 {inner_text}</div>'
+            )
+            continue
+
+        # 2. Inline Character Physical Actions (*action*) -> Monospace Code Block
+        def _replace_action(match: re.Match) -> str:
+            action_text = match.group(1).strip()
+            return (
+                f'<code style="background-color: rgba(224, 169, 109, 0.15); '
+                f"color: #f6ad55; font-family: 'Courier New', Courier, monospace; "
+                f"font-size: 0.88em; padding: 2px 6px; border-radius: 4px; "
+                f'border: 1px solid rgba(246, 173, 85, 0.3);">✦ {action_text} ✦</code>'
+            )
+
+        formatted_line = _INLINE_ACTION_PATTERN.sub(_replace_action, line)
+        formatted_lines.append(formatted_line)
+
+    return "\n".join(formatted_lines)
+
+
 def render_sidebar() -> dict:
     """
-    Renders the Streamlit sidebar containing player identity, bot selector,
+    Renders the Streamlit sidebar containing player identity, tavern legend,
     and game session management controls.
     """
     st.sidebar.title("🏴‍☠️ Scummbar Tavern")
@@ -54,13 +106,14 @@ def render_sidebar() -> dict:
 
     st.sidebar.markdown("---")
 
-    # 2. Target Bot Selector
-    st.sidebar.subheader("💬 Chi vuoi interpellare?")
-    selected_bot = st.sidebar.radio(
-        "Seleziona interlocutore:",
-        options=["auto", "barnaby", "barnacle", "isolde", "balthazar"],
-        format_func=lambda x: BOT_DISPLAY_NAMES.get(x, x),
-        help="Forza la risposta di un bot specifico o lascia che la taverna decida in base al contesto.",
+    # 2. Informational Tavern Legend (Automatic Routing)
+    st.sidebar.subheader("📍 Personaggi in Taverna")
+    st.sidebar.markdown(
+        "Rivolgiti liberamente alla taverna usando **nomi o appellativi**:\n\n"
+        "- 🍺 **Barnaby** (*barista, grog, menu, oste*)\n"
+        "- 🐱 **Barnacle** (*gatto, micio, fusa*)\n"
+        "- 🔮 **Isolde** (*veggente, maga, tarocchi, oracolo*)\n"
+        "- 🧭 **Balthazar** (*navigatore, cartografo, mappe, notizie*)"
     )
 
     st.sidebar.markdown("---")
@@ -74,7 +127,6 @@ def render_sidebar() -> dict:
 
     return {
         "patron_name": patron_name,
-        "selected_bot": selected_bot,
     }
 
 

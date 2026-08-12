@@ -21,10 +21,12 @@ log = logging.getLogger(__name__)
 
 
 def _ensure_patron_memories_table() -> None:
-    """Create the patron_memories table if it does not exist yet."""
+    """Create the patron_memories table if it does not exist yet and enable WAL mode for concurrent processes."""
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    with sqlite3.connect(db_path) as conn:
+    with sqlite3.connect(db_path, timeout=10.0) as conn:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout=10000;")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS patron_memories (
                 user_id           TEXT PRIMARY KEY,
@@ -51,7 +53,7 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
 
     try:
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect(db_path, timeout=10.0) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute("SELECT patron_name, core_traits, last_chat_summary FROM patron_memories WHERE user_id = ?", (user_id,))
@@ -88,7 +90,7 @@ async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        with sqlite3.connect(db_path) as conn:
+        with sqlite3.connect(db_path, timeout=10.0) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT core_traits FROM patron_memories WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
@@ -298,7 +300,7 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
 
     import httpx
 
-    RSS_FEEDS = {
+    rss_feeds = {
         "politica_italiana": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "politica": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "italia": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
@@ -316,7 +318,7 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
     }
 
     cat_key = category.lower().strip()
-    url = RSS_FEEDS.get(cat_key, "https://www.ansa.it/sito/notizie/politica/politica_rss.xml")
+    url = rss_feeds.get(cat_key, "https://www.ansa.it/sito/notizie/politica/politica_rss.xml")
     headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
     try:

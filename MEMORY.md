@@ -924,9 +924,12 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - Verificato tramite `uv lock && uv sync` la corretta risoluzione dei pacchetti e confermata l'inizializzazione priva di errori sia dei modelli Gemini che dei modelli DeepSeek via `LiteLlm`.
   - Aggiunte variabili `.env` `CONTEXT_CACHE_ENABLED`, `CONTEXT_CACHE_MIN_TOKENS`, `CONTEXT_CACHE_TTL_SECONDS`, `CONTEXT_CACHE_INTERVALS` (Sezione 3b).
 - **Realizzazione Frontend Web Single-Player Streamlit (`src/scummbar_chat/streamlit/`)**:
-  - Aggiunta dipendenza `streamlit>=1.40.0` in `pyproject.toml` e sincronizzato l'ambiente con `uv sync`.
+  - Aggiunte dipendenze `streamlit>=1.40.0` e `greenlet>=3.1.0` (richiesta da SQLAlchemy/aiosqlite async engine in Python 3.12 per l'ispezione DB di ADK) in `pyproject.toml` e sincronizzato l'ambiente con `uv sync`.
   - Creata cartella ad-hoc `src/scummbar_chat/streamlit/` con `app.py` (entry point UI) e `components.py` (componenti di rendering e sidebar).
-  - Implementata l'esperienza di gioco RPG single-player: identità pirata con ID numerico per `patron_memories`, header atmosfera dinamica (`time_context.py`), selettore interlocutore (`barnaby`, `barnacle`, `isolde`, `balthazar`, `auto`), chat interattiva (`st.chat_message`) e renderizzatore di artefatti (pergamene scaricabili ed immagini tarocchi).
+  - Implementata l'esperienza di gioco RPG single-player: identità pirata con ID numerico per `patron_memories`, header atmosfera dinamica (`time_context.py`), chat interattiva (`st.chat_message`) e renderizzatore di artefatti (pergamene scaricabili ed immagini tarocchi).
+  - Rimosso il selettore manuale dal menu laterale ed integrato l'instradamento semantico automatico `_resolve_intent()` per nomi o appellativi (*maga, veggente, navigatore, cartografo, gatto, micio, barista, oste*).
+  - Creata la funzione `format_streamlit_narrative()`: la narrazione ambientale (`_testo_`) viene renderizzata in un box scuro con font monospaziato e bordo dorato (`📜`), le azioni dei personaggi (`*azione*`) in un badge monospaziato rame (`✦ azione ✦`), rendendo il dialogo parlato il solo testo standard ben in evidenza.
+  - **Recupero Automatico Storico Chat per Nome Avventore**: Implementato `session_id` deterministico legato al nome del pirata (`st_session_{user_id}`) e la funzione `load_session_chat_history()`. Quando l'utente inserisce o cambia il proprio "Nome Avventore" nella sidebar di Streamlit, l'interfaccia ripristina all'istante l'intera cronologia della conversazione precedente da SQLite.
   - Creato script di avvio `./start_streamlit.sh`.
 
 

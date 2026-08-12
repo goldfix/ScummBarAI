@@ -273,12 +273,12 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
         return
 
     lock = _locks[bot_name]
-    TIMEOUT_CODA = 15.0
+    timeout_coda = 15.0
     lock_acquired = False
 
     # Attempt to acquire lock within a 15-second window to prevent Telegram request piling/starvation
     try:
-        await asyncio.wait_for(lock.acquire(), timeout=TIMEOUT_CODA)
+        await asyncio.wait_for(lock.acquire(), timeout=timeout_coda)
         lock_acquired = True
     except TimeoutError:
         # Notify user that the character is currently busy (lock timeout)

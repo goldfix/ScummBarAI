@@ -51,8 +51,9 @@ async def purge_old_sessions(hours: int = 24) -> int:
 
     def _execute_purge() -> int:
         try:
-            with sqlite3.connect(db_path) as conn:
+            with sqlite3.connect(db_path, timeout=10.0) as conn:
                 cursor = conn.cursor()
+                cursor.execute("PRAGMA busy_timeout=10000;")
                 # Targets the standard ADK 'events' table to clear bulky raw dialogue rows
                 cursor.execute("DELETE FROM events WHERE timestamp < ?", (cutoff_str,))
                 conn.commit()
