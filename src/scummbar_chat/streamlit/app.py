@@ -9,6 +9,7 @@ and formats narration vs speech distinctly.
 import asyncio
 import hashlib
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -40,6 +41,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+
+# Regex to strip routing/tag prefixes at the start of a stored user message
+# (e.g. "[avventore: X] [avventore_id: Y] [BARNABY] " -> user text only).
+_AUGMENT_PREFIX_PATTERN = re.compile(r"^(?:\[[^\]]+\]\s*)+")
+# Regex to remove the injected Narratore system note appended to the user prompt
+# (e.g. "\n\n[NOTA DI SISTEMA: È il momento del Narratore...]").
+_NARRATOR_NOTE_PATTERN = re.compile(r"\n*\[NOTA DI SISTEMA:[^\]]*\]")
 
 
 def _get_user_id(patron_name: str) -> str:
@@ -82,14 +91,9 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                             text = p["text"]
                             # Clean up internal prompt tags if user message
                             if role == "user" and "[avventore:" in text:
-                                idx = text.rfind("] ")
-                                if idx != -1:
-                                    text = text[idx + 2 :]
-                                # Strip bot routing tag prefix if present
-                                for tag in ["[BARNABY] ", "[ISOLDE] ", "[BALTHAZAR] ", "[BARNACLE] "]:
-                                    if text.startswith(tag):
-                                        text = text[len(tag) :]
-                                        break
+                                text = _AUGMENT_PREFIX_PATTERN.sub("", text).strip()
+                                # Remove the Narratore system note if it was injected on this turn
+                                text = _NARRATOR_NOTE_PATTERN.sub("", text).strip()
                             text_parts.append(text)
 
                     if text_parts:
@@ -116,7 +120,24 @@ def main() -> None:
     """Main Streamlit application loop."""
     # 1. Render Sidebar & retrieve user preferences
     controls = render_sidebar()
-    patron_name = controls["patron_name"]
+    patron_name = controls["patron_name"].strip()
+
+    # 2. Header & Live Atmosphere Banner
+    st.title("🍺 Scummbar AI — Taverna dei Pirati")
+    current_time_desc = get_time_description()
+    st.info(f"🌆 **Atmosfera in Taverna**: {current_time_desc}")
+
+    # 3. Mandatory Patron Name Guard
+    if not patron_name:
+        st.warning(
+            "🏴‍☠️ **Alt, Pirata!** Per varcare la soglia dello Scummbar e farti riconoscere dal barista, "
+            "inserisci prima il tuo **Nome Avventore** nel menu a sinistra!"
+        )
+        st.chat_input(
+            "⚠️ Inserisci prima il tuo Nome Avventore nel menu a sinistra per iniziare a parlare...",
+            disabled=True,
+        )
+        return
 
     # Derive numerical user_id and deterministic session_id from patron_name
     user_id = _get_user_id(patron_name)
@@ -132,9 +153,9 @@ def main() -> None:
             st.session_state["messages"] = past_messages
         else:
             welcome_intro = (
-                f"_*Un'insegna di legno scricchiola al vento caraibico. Entri nello Scummbar, "
+                f"_Un'insegna di legno scricchiola al vento caraibico. Entri nello Scummbar, "
                 f"l'aria profuma di rum speziato e salsedine. Dietro il bancone, Barnaby ti osserva "
-                f"in silenzio pulendo un boccale._*\n\n"
+                f"in silenzio pulendo un boccale._\n\n"
                 f"**Barnaby**: Benvenuto allo Scummbar, **{patron_name}**. Cosa ti porta qui oggi?"
             )
             st.session_state["messages"] = [
@@ -145,11 +166,6 @@ def main() -> None:
                     "artifacts": [],
                 }
             ]
-
-    # 2. Header & Live Atmosphere Banner
-    st.title("🍺 Scummbar AI — Taverna dei Pirati")
-    current_time_desc = get_time_description()
-    st.info(f"🌆 **Atmosfera in Taverna**: {current_time_desc}")
 
     # 3. Render Historical Chat Messages
     for msg in st.session_state.get("messages", []):
