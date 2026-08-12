@@ -14,6 +14,9 @@ Instead of a dry reference manual, this documentation is structured **didactical
 1. [📖 The Story & The Characters](#-the-story--the-characters)
 2. [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
 3. [🏗️ Architectural Blueprint & Technical Choices (ADK + Telegram)](#️-architectural-blueprint--technical-choices-adk--telegram)
+   - [3.1 Component & File Dependency Map (Telegram + Core ADK)](#31-component--file-dependency-map-telegram--core-adk)
+   - [3.2 Collaborative Multi-Agent Coordination](#32-collaborative-multi-agent-coordination)
+   - [3.3 Core Architectural Choices](#33-core-architectural-choices)
 4. [🤖 AI-Assisted Development: The Pi-Agent Autopilot](#-ai-assisted-development-the-pi-agent-autopilot)
 
 ---
@@ -151,7 +154,96 @@ python telegram_bot.py --debug
 
 The Scummbar ADK application (`src/scummbar_chat/`) is designed around clean software engineering and multi-agent patterns. Here is how the system is organized:
 
-### 1. Collaborative Multi-Agent Coordination
+### 3.1 Component & File Dependency Map (Telegram + Core ADK)
+
+The following diagram illustrates the import hierarchy and data flow between the Telegram delivery layer, the Google ADK runtime, and the core agent logic:
+
+```
+                          ┌────────────────────────────────┐
+                          │       telegram_bot.py          │ (CLI Process Supervisor)
+                          └───────────────┬────────────────┘
+                                          │ imports
+                                          ▼
+                          ┌────────────────────────────────┐
+                          │   telegram/adapter.py          │ (Polling, Semantic Router,
+                          └───────┬──────────────┬─────────┘  Locks, System Prompt Injections)
+                     imports      │              │ imports
+         ┌────────────────────────┘              └────────────────────────┐
+         ▼                                                                ▼
+┌──────────────────┐                                            ┌──────────────────┐
+│telegram/formatter│                                            │telegram/runner.py│ (ADK App & Session Runner,
+└──────────────────┘                                            └────────┬─────────┘  Compaction, Context Cache)
+                                                                         │ imports
+                                                                         ▼
+                                                                ┌──────────────────┐
+                                                                │     agent.py     │ (Root Coordinator &
+                                                                └──┬─────────────┬─┘  InstructionProvider)
+                                                imports sub-agents │             │ imports
+                                 ┌─────────────────────────────────┘             └──────────────────┐
+                                 ▼                                                                  ▼
+              ┌──────────────────────────────────────┐                                   ┌────────────────────┐
+              │              bots/                   │                                   │  time_context.py   │ (Real-Time Atmosphere)
+              │ (barnaby, barnacle, isolde, balthazar)│                                   └────────────────────┘
+              └──────────────────┬───────────────────┘
+                                 │ imports tools & utils
+                                 ▼
+              ┌──────────────────────────────────────┐               ┌────────────────────────────────────────┐
+              │               tools.py               ├──────────────►│               utils.py                 │ (Model Factory, Dual Auth,
+              │ (Memory, Scrolls, Tarot, RSS Feed)   │  imports      │ (Config, Dual Auth, Skills Loader, MD) │  Skills & MD Loader)
+              └──────────────────────────────────────┘               └──────────────────┬─────────────────────┘
+                                                                                        │ loads
+                                                                                        ▼
+                                                                     ┌────────────────────────────────────────┐
+                                                                     │    world/scummbar.md & skills/         │ (World Prompt & Skills)
+                                                                     └────────────────────────────────────────┘
+```
+
+#### A. Telegram Delivery Layer (`telegram_bot.py` & `src/scummbar_chat/telegram/`)
+
+*   **`telegram_bot.py` (CLI Supervisor)**:
+    *   *Role*: Top-level executable script for running Scummbar in Telegram mode.
+    *   *How it works*: Performs pre-flight environment checks (`_check_env()`), validates Google Service Account JSON keys or API keys at boot, configures rotating log files (`data/scummbar_chat/logs/bot.log` and `errors.log`), traps lifecycle signals (`SIGINT`, `SIGTERM`), logs uncaught traceback dumps, and hands execution over to `adapter.main()`.
+*   **`src/scummbar_chat/telegram/adapter.py` (API Adapter & Event Loop)**:
+    *   *Role*: Asynchronous long-polling engine communicating directly with the Telegram Bot API via `aiohttp`.
+    *   *How it works*: Receives raw updates, redirects private DM messages in-character to the public group link, resolves intent via `@mention` priority or keyword matching (`_INTENT_MAP`), manages per-bot concurrency locks (`asyncio.Lock` with a 15s busy timeout), injects Narratore environment prompts every 3 messages, executes ADK turns via `runner.run_agent()`, captures `artifact_delta` streams to upload downloadable `.txt` documents or tarot photos, handles ephemeral whispers for Barnacle, and schedules the hourly background session-pruning cron job.
+*   **`src/scummbar_chat/telegram/formatter.py` (HTML Output Formatter)**:
+    *   *Role*: Text transformation and HTML escaper for Telegram API delivery.
+    *   *How it works*: Takes raw markdown or plain text responses from ADK agents and converts them into Telegram-safe HTML (`format_response()`). Implements a 3-tier parsing scheme: standard dialogue text, character physical action asterisks (`*action*` → `<i>action</i>`), and ambient narration underscores (`_line_` → `<blockquote><i>line</i></blockquote>`), escaping reserved HTML entities (`<`, `>`, `&`).
+*   **`src/scummbar_chat/telegram/runner.py` (ADK Session Runtime & Compaction)**:
+    *   *Role*: Google ADK `App` and `Runner` initialization and state orchestrator.
+    *   *How it works*: Wraps `root_agent` into an ADK `App`. Configures persistent SQLite session storage (`DatabaseSessionService` pointing to `data/scummbar_chat/sessions.db`), configures automated LLM-based event compaction (`EventsCompactionConfig` + `LlmEventSummarizer`), attaches explicit Gemini context caching (`ContextCacheConfig`), and initializes `InMemoryArtifactService` for secret scrolls and portolans. Exposes `run_agent()` and `purge_old_sessions()` (24-hour event retention cleanup).
+
+#### B. Core ADK Agent & Business Logic Layer (`src/scummbar_chat/`)
+
+*   **`src/scummbar_chat/agent.py` (Root Coordinator & Dynamic Instruction)**:
+    *   *Role*: ADK Root Agent (`root_agent`) definition and global instruction provider.
+    *   *How it works*: Instantiates the central `root_agent` (`LlmAgent`). Binds `_world_instruction_provider()`, an ADK `InstructionProvider` function that re-reads `world/scummbar.md` and evaluates real-time Caribbean tavern atmosphere from `time_context.py` at every single model turn. Registers sub-agents (`barnaby`, `barnacle`, `isolde`, `balthazar`) and attaches `DEFAULT_RETRY_CONFIG` for API call resilience.
+*   **`src/scummbar_chat/utils.py` (Central Factory, Dual Auth & Toolset Discovery)**:
+    *   *Role*: Application configuration, LLM model factory, credential isolation, and skill loader.
+    *   *How it works*: Loads `.env` environment variables. Implements `get_gemini_client_kwargs()` to parameterize authentication between Google AI Studio API Keys and Vertex AI Service Accounts without environment pollution, isolating image generation auth (`IMAGE_*`) independently. Implements `_build_model_instance()` to construct `Gemini` or `LiteLlm` (DeepSeek with thinking mode & reasoning effort) instances. Exposes `load_md()` for prompt files and `load_all_skills()` for scanning and instantiating ADK `SkillToolset` packages.
+*   **`src/scummbar_chat/tools.py` (ADK Function Tools)**:
+    *   *Role*: Callable function tools for agents (Memory, Media Generation, RSS Feeds).
+    *   *How it works*:
+        1.  `recall_patron_memory` / `memorize_patron_chat`: Reads/writes patron profile memories in SQLite `patron_memories`, retrieving real Telegram IDs safely via `ToolContext.user_id`.
+        2.  `write_secret_scroll`: Generates recipe, tarot reading, or nautical portolan text files into ADK `InMemoryArtifactService`.
+        3.  `draw_tarot_card`: Multimodal image generation tool invoking `gemini-3.1-flash-lite-image` with isolated auth (`IMAGE_*`) or PIL fallback.
+        4.  `fetch_news_feed`: Live RSS reader (ANSA, HDBlog) for Balthazar's news translation.
+*   **`src/scummbar_chat/time_context.py` (Real-Time Atmosphere Engine)**:
+    *   *Role*: Real-world clock mapping to tavern atmosphere.
+    *   *How it works*: Maps system UTC/local time into 6 Caribbean time periods (Dawn, Morning, Noon, Afternoon, Sunset, Night), returning evocative ambient descriptions for `_world_instruction_provider()`.
+*   **`src/scummbar_chat/world/scummbar.md` (Master World Prompt)**:
+    *   *Role*: Markdown prompt source for the tavern environment.
+    *   *How it works*: Defines tavern geography, ambient rules, NPC relationships, and strict Narratore injection guidelines.
+*   **`src/scummbar_chat/bots/` (Individual Agent Personas)**:
+    *   *Role*: Individual agent persona prompts and module wrappers.
+    *   *How it works*: Contains `agent.py` + `persona.md` for each bot (`barnaby`, `barnacle`, `isolde`, `balthazar`). Defines persona-specific instructions and mounts required tools/skills.
+*   **`src/scummbar_chat/skills/` (Auto-Discovered ADK Skills)**:
+    *   *Role*: Modular, folder-based capabilities (`grog/`, `menu/`).
+    *   *How it works*: Standard ADK skill folders containing `SKILL.md` frontmatter and instructions. Auto-discovered at startup by `utils.load_all_skills()` and mounted to Barnaby.
+
+---
+
+### 3.2 Collaborative Multi-Agent Coordination
 Instead of a single monolith prompt, the Scummbar uses a **Hierarchical Router-Delegate** pattern using Google ADK's `root_agent` and `sub_agents`.
 
 ```
@@ -175,7 +267,7 @@ Instead of a single monolith prompt, the Scummbar uses a **Hierarchical Router-D
     2.  **Semantic Keyword Matching**: The message is scanned against `_INTENT_MAP` (e.g., `grog` routes to Barnaby, `tarocchi` or `carte` to Isolde, `politica` or `mappe` to Balthazar).
 *   **Routing Prefix**: Once resolved, the router prepends `[Risponde NAME]` to the text, which instructs the coordinator (`root_agent`) to route the call to the corresponding sub-agent.
 
-### 2. Core Architectural Choices
+### 3.3 Core Architectural Choices
 
 #### A. Centralized Temporal World Context (InstructionProvider)
 To create an immersive atmosphere, the bar never closes but changes its mood in real-time. In `src/scummbar_chat/time_context.py`, the day is split into 6 periods (Dawn, Noon, Sunset, Night, etc.).
