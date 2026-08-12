@@ -919,10 +919,15 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - Spostate le librerie per le skill Pi-Agent (`html2text`, `beautifulsoup4`, `sqlite-vec`, `ruff`) ed aggiunta `jupyter` (`>=1.1.1`) nel gruppo `[dependency-groups.dev]` in `pyproject.toml`.
   - Aggiornato `py_env.sh` per eseguire esplicitamente `uv sync --group dev` in fase di inizializzazione locale dell'ambiente virtuale (`init` / `init_py`).
   - Sincronizzato l'ambiente virtuale tramite `uv lock` e `uv sync --active --group dev`.
-- **Aggiornamento ed Arricchimento `README.md`**:
-  - Aggiunta la sottosezione **3.1 Component & File Dependency Map (Telegram + Core ADK)** con diagramma di flusso ASCII dell'albero di importazione e dettagli analitici per ogni singolo file del layer Telegram (`telegram_bot.py`, `adapter.py`, `formatter.py`, `runner.py`) e del core ADK (`agent.py`, `utils.py`, `tools.py`, `time_context.py`, `world/scummbar.md`, `bots/`, `skills/`).
-  - Sincronizzati la Table of Contents e la numerazione gerarchica della sezione 3 (`3.1`, `3.2`, `3.3`).
+- **Snellimento e Pulizia Dipendenze (`pyproject.toml`)**:
+  - Rimosse le dipendenze ridondanti `greenlet` e `orjson` da `[project.dependencies]`, in quanto già soddisfatte transitivamente da `google-adk[db]` / `sqlalchemy` e `litellm`.
+  - Verificato tramite `uv lock && uv sync` la corretta risoluzione dei pacchetti e confermata l'inizializzazione priva di errori sia dei modelli Gemini che dei modelli DeepSeek via `LiteLlm`.
   - Aggiunte variabili `.env` `CONTEXT_CACHE_ENABLED`, `CONTEXT_CACHE_MIN_TOKENS`, `CONTEXT_CACHE_TTL_SECONDS`, `CONTEXT_CACHE_INTERVALS` (Sezione 3b).
+- **Realizzazione Frontend Web Single-Player Streamlit (`src/scummbar_chat/streamlit/`)**:
+  - Aggiunta dipendenza `streamlit>=1.40.0` in `pyproject.toml` e sincronizzato l'ambiente con `uv sync`.
+  - Creata cartella ad-hoc `src/scummbar_chat/streamlit/` con `app.py` (entry point UI) e `components.py` (componenti di rendering e sidebar).
+  - Implementata l'esperienza di gioco RPG single-player: identità pirata con ID numerico per `patron_memories`, header atmosfera dinamica (`time_context.py`), selettore interlocutore (`barnaby`, `barnacle`, `isolde`, `balthazar`, `auto`), chat interattiva (`st.chat_message`) e renderizzatore di artefatti (pergamene scaricabili ed immagini tarocchi).
+  - Creato script di avvio `./start_streamlit.sh`.
 
 
 **Obiettivo**: Eseguire un controllo approfondito di `README.md` ed aggiornare schemi, riferimenti ed errori di battitura.

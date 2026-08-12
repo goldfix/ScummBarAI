@@ -327,7 +327,7 @@ This implements **Progressive Disclosure**: it keeps the AI's initial context wi
 
 #### A. Documentation Analyzer & RAG Engine (`/skill:scummbar-docs-analyzer`)
 -   **Why**: The `docs/` folder contains dozens of framework guides. Storing their indexes in the main developer instructions (`AGENTS.md` or `MEMORY.md`) wasted thousands of tokens. Plain `rg`/`grep` searches can't capture semantic intent.
--   **What it does**: This skill provides a **local Hybrid RAG Search Engine** (`rag/`) that chunks all 443 Markdown documents (11,748 chunks), generates embeddings via Google `gemini-embedding-2`, stores vectors in SQLite (`sqlite-vec`), and performs hybrid search using **Reciprocal Rank Fusion (RRF)** between FTS5 keyword matching (BM25) and Vector Cosine Similarity — no manual index needed.
+-   **What it does**: This skill provides a **local Hybrid RAG Search Engine** (`rag/`) that chunks all 860 Markdown documents (14,728 chunks), generates embeddings via Google `gemini-embedding-2`, stores vectors in SQLite (`sqlite-vec`), and performs hybrid search using **Reciprocal Rank Fusion (RRF)** between FTS5 keyword matching (BM25) and Vector Cosine Similarity — no manual index needed.
 -   **How to use**:
     ```bash
     # Semantic + keyword search (returns ranked chunk results)
