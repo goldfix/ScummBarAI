@@ -1,6 +1,6 @@
 # 🍺 ScummBar AI — A Collaborative Multi-Agent Study Project
 
-![scummbar](scummbar_3.jpg)
+![scummbar](scummbar_4.jpg)
 
 > *"Where sabers rest, stories float, and agents run the bar."*
 
