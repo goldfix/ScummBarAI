@@ -919,12 +919,9 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - Spostate le librerie per le skill Pi-Agent (`html2text`, `beautifulsoup4`, `sqlite-vec`, `ruff`) ed aggiunta `jupyter` (`>=1.1.1`) nel gruppo `[dependency-groups.dev]` in `pyproject.toml`.
   - Aggiornato `py_env.sh` per eseguire esplicitamente `uv sync --group dev` in fase di inizializzazione locale dell'ambiente virtuale (`init` / `init_py`).
   - Sincronizzato l'ambiente virtuale tramite `uv lock` e `uv sync --active --group dev`.
-- **Revisione e Ottimizzazione `ruff.toml`**:
-  - Aggiornata la configurazione di `ruff.toml` integrando le direttive della documentazione ufficiale (`docs/ruff/`):
-    - `known-first-party = ["scummbar_chat", "rag"]`
-    - Attivati i plugin `ASYNC`, `RUF`, `C4`, `SIM`, `S`, `A`, `PTH` in `select`
-    - Abilitato `docstring-code-format = true` per la formattazione del codice nelle docstring
-    - Eseguito `ruff check --fix` e `ruff format` con 124 correzioni automatiche applicate.
+- **Aggiornamento ed Arricchimento `README.md`**:
+  - Aggiunta la sottosezione **3.1 Component & File Dependency Map (Telegram + Core ADK)** con diagramma di flusso ASCII dell'albero di importazione e dettagli analitici per ogni singolo file del layer Telegram (`telegram_bot.py`, `adapter.py`, `formatter.py`, `runner.py`) e del core ADK (`agent.py`, `utils.py`, `tools.py`, `time_context.py`, `world/scummbar.md`, `bots/`, `skills/`).
+  - Sincronizzati la Table of Contents e la numerazione gerarchica della sezione 3 (`3.1`, `3.2`, `3.3`).
   - Aggiunte variabili `.env` `CONTEXT_CACHE_ENABLED`, `CONTEXT_CACHE_MIN_TOKENS`, `CONTEXT_CACHE_TTL_SECONDS`, `CONTEXT_CACHE_INTERVALS` (Sezione 3b).
 
 
