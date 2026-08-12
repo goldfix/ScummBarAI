@@ -6,13 +6,14 @@
 
 ---
 
-## 🍺 STATO DEL PROGETTO (aggiornato: 2026-08-05)
+## 🍺 STATO DEL PROGETTO (aggiornato: 2026-08-12)
 
 ### Cos'è Scummbar
 Chat interattiva multi-bot ambientata in una taverna piratesca caraibica.
 I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto, Isolde la veggente, Balthazar il navigatore).
-- **Applicazione Principale (Google ADK 2.6.0 + Telegram)**: **attiva e completata** ✅.
-- **Cheshire Cat AI**: La cartella dell'esperimento `src/scummbar_cat/` è stata completamente rimossa per mantenere il progetto focalizzato al 100% su Google ADK + Telegram.
+- **Applicazione Principale (Google ADK 2.6.0 + Telegram + Streamlit Web RPG)**: **attiva e completata** ✅.
+- **Frontend Streamlit Single-Player RPG**: **attivo e completato** ✅ (`src/scummbar_chat/streamlit/`, avvio con `./start_streamlit.sh`).
+- **Cheshire Cat AI**: La cartella dell'esperimento `src/scummbar_cat/` è stata completamente rimossa per mantenere il progetto focalizzato al 100% su Google ADK + Telegram/Streamlit.
 
 ---
 
@@ -20,9 +21,9 @@ I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatt
 
 ```
 scummbar/
-├── docs/                              # Documentazione tecnica (ADK, DeepSeek, Telegram, ecc.)
+├── docs/                              # Documentazione tecnica (ADK, DeepSeek, Telegram, Streamlit, ecc.)
 ├── src/
-│   └── scummbar_chat/                 # 🤖 Applicazione Principale (Google ADK + Telegram)
+│   └── scummbar_chat/                 # 🤖 Applicazione Principale (Google ADK)
 │       ├── __init__.py
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory, load_md(), load_all_skills()
@@ -32,10 +33,12 @@ scummbar/
 │       ├── world/                     # scummbar.md (world context + regole narrazione)
 │       ├── bots/                      # barnaby, barnacle, isolde, balthazar (agent.py + persona.md)
 │       ├── skills/                    # Skills ADK (grog, menu)
-│       └── telegram/                  # Adapter Telegram (adapter, formatter, runner)
+│       ├── telegram/                  # Adapter Telegram (adapter, formatter, runner)
+│       └── streamlit/                 # 🎮 Frontend Web Streamlit (app.py, components.py)
 ├── data/                              # Dati e log persistenti
-│   └── scummbar_chat/                 # Dati ADK / Telegram (sessions.db + logs/)
+│   └── scummbar_chat/                 # Dati ADK / Telegram / Streamlit (sessions.db + logs/)
 ├── start.sh                           # avvio ADK web con persistenza SQLite
+├── start_streamlit.sh                 # avvio frontend Streamlit Web RPG Single-Player
 ├── py_env.sh                          # setup ambiente Python (venv + uv)
 ├── telegram_bot.py                    # avvio bot Telegram (--debug flag, log su file)
 ├── pyproject.toml                     # dipendenze progetto
@@ -919,10 +922,40 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
   - Spostate le librerie per le skill Pi-Agent (`html2text`, `beautifulsoup4`, `sqlite-vec`, `ruff`) ed aggiunta `jupyter` (`>=1.1.1`) nel gruppo `[dependency-groups.dev]` in `pyproject.toml`.
   - Aggiornato `py_env.sh` per eseguire esplicitamente `uv sync --group dev` in fase di inizializzazione locale dell'ambiente virtuale (`init` / `init_py`).
   - Sincronizzato l'ambiente virtuale tramite `uv lock` e `uv sync --active --group dev`.
-- **Aggiornamento ed Arricchimento `README.md`**:
-  - Aggiunta la sottosezione **3.1 Component & File Dependency Map (Telegram + Core ADK)** con diagramma di flusso ASCII dell'albero di importazione e dettagli analitici per ogni singolo file del layer Telegram (`telegram_bot.py`, `adapter.py`, `formatter.py`, `runner.py`) e del core ADK (`agent.py`, `utils.py`, `tools.py`, `time_context.py`, `world/scummbar.md`, `bots/`, `skills/`).
-  - Sincronizzati la Table of Contents e la numerazione gerarchica della sezione 3 (`3.1`, `3.2`, `3.3`).
+- **Snellimento e Pulizia Dipendenze (`pyproject.toml`)**:
+  - Rimosse le dipendenze ridondanti `greenlet` e `orjson` da `[project.dependencies]`, in quanto già soddisfatte transitivamente da `google-adk[db]` / `sqlalchemy` e `litellm`.
+  - Verificato tramite `uv lock && uv sync` la corretta risoluzione dei pacchetti e confermata l'inizializzazione priva di errori sia dei modelli Gemini che dei modelli DeepSeek via `LiteLlm`.
   - Aggiunte variabili `.env` `CONTEXT_CACHE_ENABLED`, `CONTEXT_CACHE_MIN_TOKENS`, `CONTEXT_CACHE_TTL_SECONDS`, `CONTEXT_CACHE_INTERVALS` (Sezione 3b).
+- **Realizzazione Frontend Web Single-Player Streamlit (`src/scummbar_chat/streamlit/`)**:
+  - Aggiunte dipendenze `streamlit>=1.40.0` e `greenlet>=3.1.0` (richiesta da SQLAlchemy/aiosqlite async engine in Python 3.12 per l'ispezione DB di ADK) in `pyproject.toml` e sincronizzato l'ambiente con `uv sync`.
+  - Creata cartella ad-hoc `src/scummbar_chat/streamlit/` con `app.py` (entry point UI) e `components.py` (componenti di rendering e sidebar).
+  - Implementata l'esperienza di gioco RPG single-player: identità pirata con ID numerico per `patron_memories`, header atmosfera dinamica (`time_context.py`), chat interattiva (`st.chat_message`) e renderizzatore di artefatti (pergamene scaricabili ed immagini tarocchi).
+  - Rimosso il selettore manuale dal menu laterale ed integrato l'instradamento semantico automatico `_resolve_intent()` per nomi o appellativi (*maga, veggente, navigatore, cartografo, gatto, micio, barista, oste*).
+  - Perfezionata la funzione `format_streamlit_narrative()`: sia la narrazione ambientale (`_testo_`) che le azioni dei personaggi (`*azione*`) forzano il font monospaziato di colore **nero puro (`color: #000000 !important;`)** su uno sfondo neutro chiaro leggibile, mentre il testo parlato del bot rimane nel font normale sans-serif per la massima leggibilità.
+  - **Recupero Automatico Storico Chat & Iniezione Narratore**: Implementato `session_id` deterministico legato al nome del pirata (`st_session_{user_id}`) e la funzione `load_session_chat_history()`. Allineato il contatore `narrator_counter` per iniettare la `[NOTA DI SISTEMA: È il momento del Narratore...]` ogni 3 messaggi anche su Streamlit, attivando le descrizioni d'ambiente renderizzate nel box dorato.
+  - Creato script di avvio `./start_streamlit.sh`.
+
+---
+
+### 2026-08-12 — Implementazione Frontend Web Streamlit (Single-Player RPG)
+
+**Obiettivo**: Arricchire l'applicazione con un secondo frontend web nativo in Streamlit per trasformare lo Scummbar in un gioco avventura/RPG single-player interattivo, mantenendo la condivisione totale del database e della logica ADK con la versione Telegram.
+
+**Attività svolte**:
+- **Importazione Documentazione Streamlit (`docs/Streamlit/`) ed Indicizzazione RAG**:
+  - Convertiti ed indicizzati **402 nuovi documenti Markdown** ufficiali da Streamlit in `docs/Streamlit/`.
+  - Eseguito `rag/indexer.py`: database RAG incrementale aggiornato a **860 documenti (14.728 chunk)**.
+- **Implementazione Package Streamlit (`src/scummbar_chat/streamlit/`)**:
+  - Creata la cartella ad-hoc `src/scummbar_chat/streamlit/` con `app.py` (entry point UI) e `components.py` (componenti di rendering).
+  - Implementato l'instradamento semantico automatico via `_resolve_intent()` per nomi o appellativi (*maga, veggente, navigatore, cartografo, gatto, micio, barista, oste*).
+  - Creata la funzione `format_streamlit_narrative()` con resa visiva distinta: narrazione d'ambiente (`_testo_`) in box scuro monospaziato con bordo dorato (`📜`), azioni fisiche del personaggio (`*azione*`) in font monospaziato nero su badge chiaro (`color: #000000 !important; font-weight: 600`), e dialogo parlato in font normale sans-serif.
+  - Implementata la funzione `load_session_chat_history()` e `session_id` deterministico (`st_session_{user_id}`): inserendo o cambiando il "Nome Avventore" nella sidebar, Streamlit ripristina all'istante l'intera cronologia della conversazione passata da SQLite.
+  - Sincronizzato il contatore `narrator_counter` per iniettare la nota di sistema `[NOTA DI SISTEMA: È il momento del Narratore...]` ogni 3 turni.
+- **Sicurezza e Concorrenza Database Multi-Processo**:
+  - Forzata la modalità WAL (`PRAGMA journal_mode=WAL;`) e `PRAGMA busy_timeout=10000;` con `timeout=10.0` su `data/scummbar_chat/sessions.db`, garantendo la perfetta coesistenza e scrittura simultanea senza blocchi tra Telegram e Streamlit.
+- **Documentazione Pubblica (`README.md`)**:
+  - Creata la nuova Sezione 4 **🎮 Streamlit Single-Player RPG Frontend** in `README.md` con dettagli su architettura, routing automatico, recupero storico, concorrenza e formattazione narrativa.
+  - Aggiornati la Table of Contents ed il Quick Start con lo script `./start_streamlit.sh`.
 
 
 **Obiettivo**: Eseguire un controllo approfondito di `README.md` ed aggiornare schemi, riferimenti ed errori di battitura.

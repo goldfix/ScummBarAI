@@ -17,7 +17,11 @@ Instead of a dry reference manual, this documentation is structured **didactical
    - [3.1 Component & File Dependency Map (Telegram + Core ADK)](#31-component--file-dependency-map-telegram--core-adk)
    - [3.2 Collaborative Multi-Agent Coordination](#32-collaborative-multi-agent-coordination)
    - [3.3 Core Architectural Choices](#33-core-architectural-choices)
-4. [🤖 AI-Assisted Development: The Pi-Agent Autopilot](#-ai-assisted-development-the-pi-agent-autopilot)
+4. [🎮 Streamlit Single-Player RPG Frontend](#-streamlit-single-player-rpg-frontend)
+   - [4.1 Architecture & Concept](#41-architecture--concept)
+   - [4.2 Key Features & Capabilities](#42-key-features--capabilities)
+   - [4.3 Distinct Narrative & Action Styling](#43-distinct-narrative--action-styling)
+5. [🤖 AI-Assisted Development: The Pi-Agent Autopilot](#-ai-assisted-development-the-pi-agent-autopilot)
 
 ---
 
@@ -147,6 +151,12 @@ Open `http://localhost:8000` to chat with the ADK coordinator.
 ```bash
 python telegram_bot.py --debug
 ```
+
+#### Option C: Streamlit Single-Player Web App
+```bash
+./start_streamlit.sh
+```
+Open `http://localhost:8501` to play the single-player Scummbar RPG adventure in your browser.
 
 ---
 
@@ -300,6 +310,69 @@ The Scummbar is designed to be model-agnostic. You can switch the brain of the t
 
 ---
 
+## 🎮 Streamlit Single-Player RPG Frontend
+
+While Telegram provides a real-time, multi-player group chat experience, the **Streamlit Web Application** (`src/scummbar_chat/streamlit/`) transforms the Scummbar into an **interactive, single-player narrative RPG adventure game**.
+
+```
+                         ┌───────────────────────────┐
+                         │   Google ADK Core Agent   │
+                         │ (agent.py / runner.py)    │
+                         └─────────────┬─────────────┘
+                                       │
+                ┌──────────────────────┴──────────────────────┐
+                ▼                                             ▼
+   ┌──────────────────────────┐                  ┌──────────────────────────┐
+   │  Telegram Adapter        │                  │  Streamlit App Frontend  │
+   │  (telegram/adapter.py)   │                  │  (streamlit/app.py)      │
+   └────────────┬─────────────┘                  └────────────┬─────────────┘
+                ▼                                             ▼
+        [ Telegram Group ]                            [ Browser Web UI ]
+```
+
+### 4.1 Architecture & Concept
+
+The Streamlit frontend is implemented as a standalone, modular package under `src/scummbar_chat/streamlit/`. It operates alongside Telegram with **zero business logic duplication**:
+
+- **`src/scummbar_chat/streamlit/app.py`**: Main Streamlit application entry point. Manages session state, handles automatic intent routing, enforces Narratore trigger intervals, and loads historical dialogue.
+- **`src/scummbar_chat/streamlit/components.py`**: Rendering helper functions for avatars, custom narrative formatting, artifact downloads, and sidebar controls.
+- **`start_streamlit.sh`**: Launch script executing `streamlit run src/scummbar_chat/streamlit/app.py`.
+
+### 4.2 Key Features & Capabilities
+
+#### A. Automatic Semantic Intent Routing
+Instead of requiring manual bot selection widgets, Streamlit leverages the same semantic routing engine used by Telegram (`_resolve_intent()`). Users can address characters naturally by name or title:
+- **`maga` / `veggente` / `tarocchi`** ➔ Routes to **Isolde** 🔮
+- **`navigatore` / `cartografo` / `mappe` / `notizie`** ➔ Routes to **Balthazar** 🧭
+- **`gatto` / `micio` / `fusa`** ➔ Routes to **Barnacle** 🐱
+- **`barista` / `grog` / `menu` / `oste`** ➔ Routes to **Barnaby** 🍺
+
+#### B. Automatic History Restoration by Patron Name
+When a player enters or updates their **"Nome Avventore"** in the sidebar (e.g. *"Guybrush"* or *"Capitan Morgan"*):
+1. A stable numerical `user_id` is computed (`hashlib.sha256(patron_name)`).
+2. A deterministic session ID is bound to the character (`st_session_{user_id}`).
+3. The function `load_session_chat_history()` queries SQLite's `events` table and **instantly restores all past dialogue turns** for that pirate, allowing players to resume previous game sessions seamlessly.
+
+#### C. Narratore Trigger Synchronization
+To maintain parity with Telegram, Streamlit tracks dialogue turns using a session counter (`narrator_counter`). Every **3 turns**, it appends `[NOTA DI SISTEMA: È il momento del Narratore...]` to the prompt, instructing the agent to append an environmental atmosphere description.
+
+#### D. Multi-Process Concurrency & WAL Database Safety
+Both Telegram and Streamlit share the exact same SQLite database (`data/scummbar_chat/sessions.db`). To prevent file locking conflicts (`database is locked`) when both applications write simultaneously:
+- Database connections enforce **WAL Mode** (`PRAGMA journal_mode=WAL;`).
+- Busy timeouts are configured to 10 seconds (`PRAGMA busy_timeout=10000;` and `sqlite3.connect(timeout=10.0)`).
+
+### 4.3 Distinct Narrative & Action Styling
+
+To ensure players can immediately distinguish between **spoken dialogue**, **character actions**, and **environmental narration**, the rendering pipeline (`format_streamlit_narrative()`) applies a 3-tier visual hierarchy:
+
+| Message Element | Source Pattern | Visual Resa in Streamlit |
+|-----------------|----------------|--------------------------|
+| **Environmental Narration** | Full lines in `_text_` | Dark callout box with gold left border (`📜`) and monospace font |
+| **Character Physical Actions** | Inline text in `*action*` | Crisp **black monospace text** (`color: #000000 !important; font-weight: 600`) inside a soft grey badge (`✦ action ✦`) |
+| **Spoken Character Dialogue** | Standard text | Clean, unstyled sans-serif text standing out prominently |
+
+---
+
 ## 🤖 AI-Assisted Development: The Pi-Agent Autopilot
 
 This repository was designed to be developed, refactored, and maintained **collaboratively with an AI coding assistant (Pi-Agent)**.
@@ -327,7 +400,7 @@ This implements **Progressive Disclosure**: it keeps the AI's initial context wi
 
 #### A. Documentation Analyzer & RAG Engine (`/skill:scummbar-docs-analyzer`)
 -   **Why**: The `docs/` folder contains dozens of framework guides. Storing their indexes in the main developer instructions (`AGENTS.md` or `MEMORY.md`) wasted thousands of tokens. Plain `rg`/`grep` searches can't capture semantic intent.
--   **What it does**: This skill provides a **local Hybrid RAG Search Engine** (`rag/`) that chunks all 443 Markdown documents (11,748 chunks), generates embeddings via Google `gemini-embedding-2`, stores vectors in SQLite (`sqlite-vec`), and performs hybrid search using **Reciprocal Rank Fusion (RRF)** between FTS5 keyword matching (BM25) and Vector Cosine Similarity — no manual index needed.
+-   **What it does**: This skill provides a **local Hybrid RAG Search Engine** (`rag/`) that chunks all 860 Markdown documents (14,728 chunks), generates embeddings via Google `gemini-embedding-2`, stores vectors in SQLite (`sqlite-vec`), and performs hybrid search using **Reciprocal Rank Fusion (RRF)** between FTS5 keyword matching (BM25) and Vector Cosine Similarity — no manual index needed.
 -   **How to use**:
     ```bash
     # Semantic + keyword search (returns ranked chunk results)
