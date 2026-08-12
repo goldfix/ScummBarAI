@@ -59,27 +59,27 @@ def format_streamlit_narrative(text: str) -> str:
             formatted_lines.append("")
             continue
 
-        # 1. Full-line Environmental Narration (_text_) -> Monospace Box
+        # 1. Full-line Environmental Narration (_text_) -> Monospace Box with Black Text
         m_full = _FULL_LINE_ENV_PATTERN.match(stripped)
         if m_full:
             inner_text = m_full.group(1).strip()
             formatted_lines.append(
                 f'<div style="font-family: monospace !important; font-size: 0.9em; '
-                f"background-color: #1a202c; border: 1px solid #2d3748; "
-                f"border-left: 4px solid #d4af37; padding: 10px 14px; margin: 8px 0; "
-                f'border-radius: 6px; color: #cbd5e0; line-height: 1.5;">'
+                f"color: #000000 !important; background-color: #f8fafc; "
+                f"border: 1px solid #cbd5e1; border-left: 4px solid #d4af37; "
+                f'padding: 10px 14px; margin: 8px 0; border-radius: 6px; line-height: 1.5;">'
                 f"📜 <i>{inner_text}</i></div>"
             )
             continue
 
-        # 2. Inline Character Physical Actions (*action*) -> Monospace Code Badge
+        # 2. Inline Character Physical Actions (*action*) -> Monospace Black Text Badge
         def _replace_action(match: re.Match) -> str:
             action_text = match.group(1).strip()
             return (
                 f'<code style="font-family: monospace !important; font-size: 0.88em; '
-                f"color: #f6ad55; background-color: rgba(246, 173, 85, 0.12); "
-                f"padding: 2px 6px; border-radius: 4px; "
-                f'border: 1px solid rgba(246, 173, 85, 0.25);">✦ {action_text} ✦</code>'
+                f"color: #000000 !important; background-color: #e2e8f0; "
+                f"padding: 2px 6px; border-radius: 4px; font-weight: 600; "
+                f'border: 1px solid #cbd5e1;">✦ {action_text} ✦</code>'
             )
 
         formatted_line = _INLINE_ACTION_PATTERN.sub(_replace_action, line)
