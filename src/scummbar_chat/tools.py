@@ -6,10 +6,12 @@ Operations:
 - Translates ledger retrieval results into structured dictionaries for the LLM runner.
 """
 
+import json
 import logging
 import os
 import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
 
 import google.genai.types as types
 from google.adk.tools import FunctionTool
@@ -23,7 +25,7 @@ log = logging.getLogger(__name__)
 def _ensure_patron_memories_table() -> None:
     """Create the patron_memories table if it does not exist yet and enable WAL mode for concurrent processes."""
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(db_path, timeout=10.0) as conn:
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA busy_timeout=10000;")
@@ -100,7 +102,7 @@ async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_
                 # Accumulate traits split by a standard structural pipe character
                 updated_traits = current_traits
                 if new_traits_learned:
-                    updated_traits = f"{current_traits} | {new_traits_learned}".strip(" | ")
+                    updated_traits = f"{current_traits} | {new_traits_learned}".strip().strip("|").strip()
 
                 cursor.execute(
                     """
@@ -123,6 +125,73 @@ async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_
     except sqlite3.Error as e:
         log.error("Database error in memorize_patron_chat: %s", e)
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
+
+
+async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str = "") -> str:
+    """
+    Usa questo strumento per aggiornare o compilare il Diario di Bordo dell'avventore attuale.
+    - patron_name: Il nome del pirata di cui stai aggiornando il diario.
+    """
+    from src.scummbar_chat.diary import update_tavern_diary_async
+
+    # Retrieve patron name from DB if not passed
+    user_id = tool_context.user_id
+    if not patron_name:
+        _ensure_patron_memories_table()
+        db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
+        try:
+            with sqlite3.connect(db_path, timeout=10.0) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT patron_name FROM patron_memories WHERE user_id = ?", (user_id,))
+                row = cursor.fetchone()
+                if row and row[0]:
+                    patron_name = row[0]
+        except sqlite3.Error:
+            pass
+
+    if not patron_name:
+        patron_name = f"Avventore_{user_id}"
+
+    # Load the current session events from DB using the real session_id (works in both
+    # Streamlit and Telegram contexts) and filtered by user_id to avoid mixing other patrons.
+    session_id = tool_context.session.id
+    db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
+    messages: list[dict] = []
+    try:
+        with sqlite3.connect(db_path, timeout=10.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT event_data FROM events WHERE user_id = ? AND session_id = ? ORDER BY id ASC",
+                (user_id, session_id),
+            )
+            for row in cursor.fetchall():
+                try:
+                    ev = json.loads(row[0])
+                    content = ev.get("content", {})
+                    role = content.get("role", "")
+                    parts = content.get("parts", [])
+                    # Only keep plain text parts, skipping internal thought/reasoning parts
+                    text_parts = [p.get("text", "") for p in parts if "text" in p and not p.get("thought", False)]
+                    full_text = "\n".join(text_parts).strip()
+                    if full_text and role in ["user", "model", "assistant"]:
+                        norm_role = "user" if role == "user" else "assistant"
+                        messages.append(
+                            {
+                                "role": norm_role,
+                                "content": full_text,
+                                "bot_name": "barnaby" if norm_role == "assistant" else None,
+                            }
+                        )
+                except (json.JSONDecodeError, KeyError, TypeError):
+                    continue
+    except sqlite3.Error as e:
+        log.warning("Impossibile recuperare gli eventi per il diario via tool: %s", e)
+
+    success, status_msg, _ = await update_tavern_diary_async(patron_name, messages)
+    if success:
+        return f"📜 Diario di bordo aggiornato con successo per {patron_name}! ({status_msg})"
+    else:
+        return f"📜 Il diario di bordo di {patron_name} è già aggiornato. ({status_msg})"
 
 
 async def write_secret_scroll(tool_context: ToolContext, title: str, content: str) -> str:
@@ -219,7 +288,6 @@ async def draw_tarot_card(
     - card_name: Il titolo o nome dell'arcano (es. 'Il Leviatano', 'La Taverna', 'Il Naufragio').
     - scene_description: Dettagliata descrizione visiva e marinaresca di ciò che appare nell'illustrazione della carta.
     """
-    import os
 
     from google import genai
 
@@ -379,6 +447,7 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
 # Esportazione degli strumenti ADK
 recall_patron_tool = FunctionTool(recall_patron_memory)
 memorize_patron_tool = FunctionTool(memorize_patron_chat)
+update_tavern_diary_tool = FunctionTool(update_tavern_diary_tool)
 write_secret_scroll_tool = FunctionTool(write_secret_scroll)
 draw_tarot_card_tool = FunctionTool(draw_tarot_card)
 fetch_news_feed_tool = FunctionTool(fetch_news_feed)

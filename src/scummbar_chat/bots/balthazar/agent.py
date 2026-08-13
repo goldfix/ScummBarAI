@@ -9,6 +9,7 @@ from ...tools import (
     fetch_news_feed_tool,
     memorize_patron_tool,
     recall_patron_tool,
+    update_tavern_diary_tool,
     write_secret_scroll_tool,
 )
 from ...utils import DEFAULT_RETRY_CONFIG, MODEL, THINKING_CONFIG, load_all_skills, load_md
@@ -34,6 +35,7 @@ balthazar_agent = Agent(
         _balthazar_toolset,
         recall_patron_tool,
         memorize_patron_tool,
+        update_tavern_diary_tool,
         write_secret_scroll_tool,
         fetch_news_feed_tool,
     ],

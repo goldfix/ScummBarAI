@@ -33,7 +33,7 @@ scummbar/
 ├── src/scummbar_chat/                 # 🤖 Applicazione Google ADK + Telegram
 │   ├── agent.py                       # root agent + InstructionProvider temporale
 │   ├── utils.py                       # factory modello, config, load_md, load_all_skills
-│   ├── time_context.py                # orario reale → atmosfera taverna
+│   ├── time_context.py                # real time → tavern atmosphere
 │   ├── tools.py                       # FunctionTool ADK: recall, memorize, write_secret_scroll, fetch_news_feed
 │   ├── .env                           # ⚠️ NON committare — contiene token e API key
 │   ├── world/scummbar.md              # world context + regole Narratore (prompt)

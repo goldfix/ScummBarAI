@@ -6,7 +6,12 @@ from google.adk.agents import Agent
 from google.adk.tools import skill_toolset
 
 # Import the memory and artifact tools we created earlier
-from ...tools import memorize_patron_tool, recall_patron_tool, write_secret_scroll_tool
+from ...tools import (
+    memorize_patron_tool,
+    recall_patron_tool,
+    update_tavern_diary_tool,
+    write_secret_scroll_tool,
+)
 from ...utils import DEFAULT_RETRY_CONFIG, MODEL, THINKING_CONFIG, load_all_skills, load_md
 
 _PERSONA = load_md(pathlib.Path(__file__).parent / "persona.md")
@@ -29,5 +34,11 @@ barnaby_agent = Agent(
     generate_content_config=THINKING_CONFIG,
     retry_config=DEFAULT_RETRY_CONFIG,
     # Inject both the dynamic skills and the database memory/artifact tools
-    tools=[_barnaby_toolset, recall_patron_tool, memorize_patron_tool, write_secret_scroll_tool],
+    tools=[
+        _barnaby_toolset,
+        recall_patron_tool,
+        memorize_patron_tool,
+        update_tavern_diary_tool,
+        write_secret_scroll_tool,
+    ],
 )
