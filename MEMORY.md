@@ -436,9 +436,9 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Memoria avventori | ✅ | `patron_memories` SQLite + `recall_patron_memory` + `memorize_patron_chat` |
 | Artefatti e Pergamene | ✅ | `InMemoryArtifactService` + `write_secret_scroll` + `sendDocument` |
 | Logging verboso + error export | ✅ | `--debug`, `bot.log`, `errors.log`, `_dump_exception()` |
-| Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
+| Generatore Diagrammi Kroki (`scummbar-kroki-diagrams`) | ✅ | Skill Pi-Agent in `.agents/skills/scummbar-kroki-diagrams/` con script `kroki_generator.py` (Excalidraw default, zlib+Base64 URL-safe) per la generazione di diagrammi per documentazione e README |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
-| Importazione Documentazione (Pydantic, FastAPI, HTTPX, DeepSeek, ADK, Streamlit, UV, Ruff) | ✅ | docs/ indicizzati nel RAG (860 documenti, 14.728 chunk) |
+| Importazione Documentazione (Pydantic, FastAPI, HTTPX, DeepSeek, ADK, Streamlit, Kroki, UV, Ruff) | ✅ | docs/ indicizzati nel RAG (897 documenti, 14.881 chunk in `.md`, `.adoc`, `.yaml`, ecc.) |
 | Supporto duale autenticazione (Service Account ↔ API Key) | ✅ | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |
 | Autenticazione Gemini via Service Account | ✅ | `.env` + `GOOGLE_APPLICATION_CREDENTIALS`; pre-flight check in `telegram_bot.py` |
 | Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
@@ -844,6 +844,19 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 ---
 
 ## 📋 Log delle Sessioni di Lavoro
+
+### 2026-08-13 — Skill Kroki per Pi-Agent (`scummbar-kroki-diagrams`)
+
+**Obiettivo**: Creare una nuova skill Pi-Agent `.agents/skills/scummbar-kroki-diagrams/` per generare diagrammi ed infografiche vettoriali a supporto della documentazione e del README tramite Kroki.io (Excalidraw di default, zlib deflate + Base64 URL-safe).
+
+**Attività svolte**:
+- **Estensione RAG per file `.adoc` e codice**: Aggiornato `rag/chunker.py` per riconoscere intestazioni AsciiDoc (`= Title`) e `rag/indexer.py` per indicizzare 37 file in `docs/kroki/` (totale RAG: 897 documenti, 14.881 chunk).
+- **Nuova Skill Pi-Agent (`.agents/skills/scummbar-kroki-diagrams/`)**:
+  - `SKILL.md`: Documentazione della skill per Pi-Agent, tipi di diagramma supportati, e regole di default (Excalidraw).
+  - `scripts/kroki_generator.py`: Script CLI Python con codifica `zlib.compress(text, 9)` + `base64.urlsafe_b64encode`. Supporta flag `--type`, `--format`, `--output`, `--markdown`, `--html`.
+- **Verifica**: Testati con successo lo script CLI (`kroki_generator.py`) e la generazione di tag Markdown/HTML.
+
+---
 
 ### 2026-08-13 — Diario di Bordo, Fix Chat Input e Ristrutturazione README
 

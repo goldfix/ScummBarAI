@@ -48,6 +48,7 @@ scummbar/
 │   └── streamlit/                     # 🎮 frontend Web RPG (app.py, components.py)
 ├── .agents/skills/                    # 🤖 Pi-Agent Skills di sistema
 │   ├── scummbar-docs-analyzer/        # RAG ibrido (FTS5 + sqlite-vec + gemini-embedding-2)
+│   ├── scummbar-kroki-diagrams/       # Generatore di diagrammi e mappe tramite Kroki (Excalidraw, Mermaid, ecc.)
 │   ├── scummbar-memory-updater/       # regole aggiornamento MEMORY/README/AGENTS
 │   └── scummbar-web-to-markdown/      # convertitore web → Markdown
 ├── data/                              # Dati e log persistenti dell'applicazione
@@ -80,7 +81,8 @@ scummbar/
 
 ## 🤖 Pi-Agent Skills
 Il progetto fornisce delle skill di sistema sotto `.agents/skills/` che devi invocare o consultare:
-- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra gli **860 documenti** (14.728 chunk) nella cartella `docs/`.
+- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra gli **897 documenti** (14.881 chunk in formato `.md`, `.adoc`, `.yaml`, ecc.) nella cartella `docs/`.
+- `/skill:scummbar-kroki-diagrams`: Genera diagrammi, schemi e mappe vettoriali (Excalidraw di default, Mermaid, Graphviz, PlantUML, D2, ecc.) tramite codifica URL zlib+Base64 per Kroki.io.
 - `/skill:scummbar-memory-updater`: Per aggiornare `MEMORY.md`, `README.md` e `AGENTS.md` alla fine di una sessione di sviluppo o per modifiche rilevanti.
 - `/skill:scummbar-web-to-markdown`: Per convertire una pagina web in un file Markdown salvato nella cartella specificata dall'utente e auto-indicizzarlo nel RAG.
 
@@ -157,7 +159,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro   # DeepSeek Pro
 
 ## 📚 Dove Trovare la Documentazione
 
-Tutta la documentazione è nella cartella `docs/` (**860 file Markdown, 14.728 chunk vettorializzati**).
+Tutta la documentazione è nella cartella `docs/` (**897 file di testo, 14.881 chunk vettorializzati**).
 Usa la skill **`scummbar-docs-analyzer`** (`/skill:scummbar-docs-analyzer`) per effettuare ricerche ibride (semantiche + keyword) sul database RAG locale.
 
 ---

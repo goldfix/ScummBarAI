@@ -21,9 +21,16 @@ except ImportError:
     from rag.embedder import Embedder
 
 
+SUPPORTED_EXTENSIONS = {
+    ".md", ".adoc", ".txt", ".rst",
+    ".yaml", ".yml", ".json",
+    ".py", ".go", ".php", ".cs", ".kt", ".java", ".ex"
+}
+
+
 class RAGIndexer:
     """
-    Coordinates incremental indexing of Markdown documentation into SQLite.
+    Coordinates incremental indexing of Markdown, AsciiDoc, and text documentation into SQLite.
     """
 
     def __init__(self, docs_dir: Path = DOCS_DIR):
@@ -51,8 +58,17 @@ class RAGIndexer:
             print(f"❌ Docs directory does not exist: {self.docs_dir}")
             return {"indexed": 0, "skipped": 0, "deleted": 0, "total_chunks": 0}
 
-        md_files = sorted(list(self.docs_dir.rglob("*.md")))
-        disk_rel_paths = {str(f.relative_to(self.docs_dir.parent)) for f in md_files}
+        doc_files = []
+        for p in self.docs_dir.rglob("*"):
+            if p.is_file() and p.suffix.lower() in SUPPORTED_EXTENSIONS:
+                # Exclude hidden directories like .git
+                rel = p.relative_to(self.docs_dir)
+                if any(part.startswith(".") for part in rel.parts[:-1]):
+                    continue
+                doc_files.append(p)
+
+        doc_files = sorted(doc_files)
+        disk_rel_paths = {str(f.relative_to(self.docs_dir.parent)) for f in doc_files}
         stored_paths = set(self.db.get_all_doc_paths())
 
         # Purge deleted files
@@ -64,18 +80,18 @@ class RAGIndexer:
                 self.db.delete_doc(del_path)
 
         stats = {
-            "total_files": len(md_files),
+            "total_files": len(doc_files),
             "indexed": 0,
             "skipped": 0,
             "deleted": deleted_count,
             "total_chunks": 0,
         }
 
-        print(f"🔍 Found {len(md_files)} Markdown files in {self.docs_dir}. Starting indexing...")
+        print(f"🔍 Found {len(doc_files)} documentation files in {self.docs_dir}. Starting indexing...")
 
-        for md_file in md_files:
-            rel_path = str(md_file.relative_to(self.docs_dir.parent))
-            current_md5 = self._compute_md5(md_file)
+        for doc_file in doc_files:
+            rel_path = str(doc_file.relative_to(self.docs_dir.parent))
+            current_md5 = self._compute_md5(doc_file)
 
             # Incremental check
             stored_md5 = self.db.get_doc_hash(rel_path)
@@ -86,7 +102,7 @@ class RAGIndexer:
             print(f"⚡ Indexing: {rel_path}...")
 
             # 1. Chunk document
-            chunks = self.chunker.chunk_file(md_file, rel_path)
+            chunks = self.chunker.chunk_file(doc_file, rel_path)
             if not chunks:
                 stats["skipped"] += 1
                 continue
