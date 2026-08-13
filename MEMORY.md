@@ -440,6 +440,12 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
 | Sistema Pi-Agent Skills (`scummbar-*`) | ✅ | Introduzione di skill per progressive disclosure documentale |
 | Unificazione API Immagini | ✅ | Deprecato branch Imagen, architettura unificata su `generate_content` Gemini Nano |
+| Frontend Web Streamlit (Single-Player RPG) | ✅ | `src/scummbar_chat/streamlit/` (`app.py`, `components.py`), routing automatico, recupero storico da DB, WAL mode |
+| Fase 2a Streamlit: Sacca del Pirata (Inventario) | 🔲 | Registro persistente nella sidebar per collezionare e riscaricare pergamene, mappe, ricette e carte tarocchi |
+| Fase 2b Streamlit: Ispezione Memoria Avventore | 🔲 | Visualizzatore nella sidebar dei tratti e ricordi registrati su di te da Barnaby (`recall_patron_memory`) |
+| Fase 2c Streamlit: Selettore Modello in UI | 🔲 | Dropdown nella sidebar per switchare il modello attivo (Gemini 3.6 ↔ DeepSeek v4) al volo dall'interfaccia web |
+| Fase 3 Streamlit: Mappa della Taverna & Selezione Luogo | 🔲 | Spostamento visivo tra i tavoli della taverna (*Bancone, Cassa del Gatto, Angolo d'Ombra, Cartografo*) e controllo dell'ora |
+| Dialoghi Bot-to-Bot controllati | 🔲 | Interazioni guidate cross-agente senza loop infiniti (es. Barnaby ↔ Balthazar) |
 
 ---
 
