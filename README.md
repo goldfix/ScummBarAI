@@ -1,6 +1,6 @@
 # 🍺 ScummBar AI — A Collaborative Multi-Agent Study Project
 
-![scummbar](scummbar_4.jpg)
+![scummbar](assets/scummbar_4.jpg)
 
 > *"Where sabers rest, stories float, and agents run the bar."*
 
@@ -53,7 +53,8 @@ The repository is intentionally structured **didactically**: every architectural
     - [7.2 scummbar-docs-analyzer (Hybrid RAG)](#72-scummbar-docs-analyzer-hybrid-rag)
     - [7.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)](#73-scummbar-memory-updater-memoryreadmeagents-management)
     - [7.4 scummbar-web-to-markdown (Docs Import)](#74-scummbar-web-to-markdown-docs-import)
-    - [7.5 How to Use the Autopilot](#75-how-to-use-the-autopilot)
+    - [7.5 scummbar-kroki-diagrams (Kroki Diagram Generator)](#75-scummbar-kroki-diagrams-kroki-diagram-generator)
+    - [7.6 How to Use the Autopilot](#76-how-to-use-the-autopilot)
   - [🧭 Project Structure](#-project-structure)
   - [⚙️ Environment Configuration (.env)](#️-environment-configuration-env)
 
@@ -132,79 +133,11 @@ The heart of the application lives in `src/scummbar_chat/`. Everything else (Tel
 
 ### 4.1 Core Overview Diagram
 
-```
-                          ┌──────────────────────────────────────────────────┐
-                          │                   utils.py                      │
-                          │  (Config .env · Model Factory · Dual Auth ·     │
-                          │   load_md() · load_all_skills() · Context Cache)│
-                          └───────────────┬──────────────────┬──────────────┘
-                                          │                  │ builds MODEL / COMPACTION_LLM
-                                          ▼                  ▼
-                          ┌──────────────────────────────────────────────────┐
-                          │              time_context.py                     │
-                          │   (real clock → 6 atmospheric moments)           │
-                          └───────────────────┬──────────────────────────────┘
-                                              │ InstructionProvider (global_instruction)
-                                              ▼
-                          ┌──────────────────────────────────────────────────┐
-                          │                  agent.py                        │
-                          │      root_agent = Coordinator (Router)           │
-                          │   static_instruction = world/scummbar.md         │
-                          │   instruction = delegation to sub-agents         │
-                          └───────────────┬──────────────────┬──────────────┘
-                                          │ sub_agents       │
-              ┌───────────────────────────┼──────────────────┼───────────────────────────┐
-              ▼                           ▼                  ▼                           ▼
-     ┌────────────────┐         ┌────────────────┐  ┌────────────────┐        ┌────────────────┐
-     │   barnaby      │         │   barnacle     │  │    isolde      │        │   balthazar    │
-     │ (the bartender)│         │  (the cat)     │  │(the seer)      │        │(the navigator) │
-     └───────┬────────┘         └───────┬────────┘  └───────┬────────┘        └───────┬────────┘
-             │ tools + skills           │ tools            │ tools                   │ tools
-             ▼                          ▼                  ▼                         ▼
-     ┌──────────────────────────────────────────────────────────────────────────────────────┐
-     │                                  tools.py (FunctionTool)                              │
-     │  recall_patron_memory · memorize_patron_chat · write_secret_scroll ·                 │
-     │  draw_tarot_card · fetch_news_feed · update_tavern_diary_tool                        │
-     └──────────────────────────────────────────────────────────────────────────────────────┘
-             │                          │                  │
-             ▼                          ▼                  ▼
-     ┌─────────────────┐      ┌──────────────────┐  ┌──────────────────┐      ┌──────────────────┐
-     │  skills/        │      │  patron_memories │  │ InMemoryArtifact │      │  diary.py        │
-     │ (grog, menu)    │      │  (SQLite)        │  │ Service (ADK)    │      │  (Captain's Log) │
-     │  SKILL.md       │      │  sessions.db     │  │                  │      │  data/diaries/   │
-     └─────────────────┘      └──────────────────┘  └──────────────────┘      └──────────────────┘
-```
+![Core Overview Diagram (C4-PlantUML)](assets/core_overview_diagram.svg)
 
 **Logical flow of a single turn:**
 
-```
-Input (Telegram / Streamlit / ADK Web)
-        │
-        ▼
-┌────────────────────────────────────────────────────────────┐
-│ adapter / app: _resolve_intent()  →  [Risponde NOME]        │
-│   + prefix [avventore: X] [avventore_id: Y]                │
-│   + (every 3 turns) [NOTA DI SISTEMA: Narratore...]         │
-└────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────────────────────────────────────┐
-│ runner.run_agent(user_id, session_id, text)                │
-│   → App(root_agent) + DatabaseSessionService (SQLite)      │
-│   → ContextCacheConfig (Gemini) / KV cache (DeepSeek)      │
-│   → EventsCompactionConfig (every 30 events, overlap 2)    │
-└────────────────────────────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────────────────────────────────────┐
-│ root_agent: global_instruction (time_context) + world       │
-│   → delegates to barnaby / barnacle / isolde / balthazar    │
-│   → the sub-agent uses its tools (memory, artifacts, ...)   │
-└────────────────────────────────────────────────────────────┘
-        │
-        ▼
-Response text + artifact_delta → HTML formatter → delivery
-```
+![Turn Execution Sequence (C4-PlantUML)](assets/turn_execution_sequence.svg)
 
 ### 4.2 Multi-Agent Coordination (Router-Delegate)
 
@@ -341,18 +274,7 @@ Telegram provides the **multi-player** experience: a shared group where the 4 bo
 
 ### 5.1 Telegram Delivery Architecture
 
-```
-telegram_bot.py (CLI Supervisor: env check, logging, signals)
-        │
-        ▼
-telegram/adapter.py (aiohttp long-polling, routing, locks, narrator injection)
-        │                          │
-        ▼                          ▼
-telegram/formatter.py         telegram/runner.py (ADK App + sessions + compaction)
-        │
-        ▼
-Telegram Bot API (HTML messages, documents, photos, ephemeral)
-```
+![Telegram Delivery Architecture (C4-PlantUML)](assets/telegram_delivery_architecture.svg)
 
 | File | Role |
 |------|------|
@@ -392,21 +314,7 @@ While Telegram is a real-time group chat, the **Streamlit Web App** (`src/scummb
 
 ### 6.1 Architecture & Concept
 
-```
-                    ┌─────────────────────────────┐
-                    │   Google ADK Core Agent     │
-                    │ (agent.py / runner.py)      │
-                    └──────────────┬──────────────┘
-                                   │
-              ┌────────────────────┴────────────────────┐
-              ▼                                         ▼
-  ┌──────────────────────────┐              ┌──────────────────────────┐
-  │  Telegram Adapter        │              │  Streamlit App Frontend  │
-  │  (telegram/adapter.py)   │              │  (streamlit/app.py)      │
-  └────────────┬─────────────┘              └────────────┬─────────────┘
-               ▼                                        ▼
-       [ Telegram Group ]                       [ Browser Web UI ]
-```
+![Multi-Frontend Architecture (C4-PlantUML)](assets/multi_frontend_architecture.svg)
 
 **Zero business-logic duplication**: `app.py` uses the same `run_agent()` as Telegram and the same routing functions (`_resolve_intent()`).
 
@@ -460,17 +368,7 @@ Telegram and Streamlit share the same `sessions.db`. To avoid `database is locke
 
 This repository is designed to be developed, refactored, and maintained **in collaboration with an AI assistant (Pi-Agent)**. To this end, an autonomous **Agent Skills** system is configured directly in the codebase.
 
-```
-                            [.agents/skills/]
-                                    │
-          ┌─────────────────────────┼──────────────────────────┐
-          ▼                         ▼                          ▼
-[scummbar-docs-analyzer]  [scummbar-memory-updater]  [scummbar-web-to-markdown]
-  - Hybrid RAG engine        - Logging rules               - HTML→MD converter
-  - FTS5 BM25 + Vector       - Roadmap compiler            - bs4 + html2text
-  - gemini-embedding-2       - Fence marker validator      - Auto RAG indexing
-  - Reciprocal Rank Fusion
-```
+![Pi-Agent Skills Architecture (C4-PlantUML)](assets/pi_agent_skills_architecture.svg)
 
 ### 7.1 What is a Pi-Agent Skill (Progressive Disclosure)
 
@@ -517,7 +415,18 @@ PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
 | **Extras** | Automatic updates, relative→absolute link resolution, UTF-8 emoji preservation, overwrite protection |
 | **Post-conversion** | Automatic trigger of the RAG indexer to update the vector database |
 
-### 7.5 How to Use the Autopilot
+### 7.5 scummbar-kroki-diagrams (Kroki Diagram Generator)
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Generate vector diagrams and infographics via Kroki.io |
+| **Encoder** | zlib deflate (level 9) + Base64 URL-safe encoding |
+| **Default Style** | **Excalidraw** (`excalidraw`) for hand-drawn architectural sketches |
+| **Supported Types** | Mermaid, PlantUML, Graphviz/DOT, D2, BPMN, C4PlantUML, BlockDiag, etc. |
+| **CLI Script** | `.agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py` |
+| **Target** | Used by Pi-Agent for documentation & README diagrams (not in runtime ADK app) |
+
+### 7.6 How to Use the Autopilot
 
 ```bash
 # 1. Search the documentation (hybrid RAG FTS5 + Cosine)
@@ -542,6 +451,7 @@ PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
 scummbar/
 ├── .agents/skills/                 # 🤖 Pi-Agent system skills
 │   ├── scummbar-docs-analyzer/     #    Hybrid RAG (FTS5 + sqlite-vec + gemini-embedding-2)
+│   ├── scummbar-kroki-diagrams/    #    Kroki diagram generator (Excalidraw, Mermaid...)
 │   ├── scummbar-memory-updater/    #    MEMORY/README/AGENTS update rules
 │   └── scummbar-web-to-markdown/   #    Web → Markdown converter
 ├── docs/                           # 📚 Technical docs (ADK, DeepSeek, Telegram, Streamlit...)

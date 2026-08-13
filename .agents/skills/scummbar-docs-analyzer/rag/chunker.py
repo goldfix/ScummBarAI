@@ -56,12 +56,16 @@ class MarkdownChunker:
         for line_num, line in enumerate(lines, start=1):
             stripped = line.strip()
 
-            # Track code block toggle
-            if stripped.startswith("```"):
+            # Track code block toggle for Markdown (```), AsciiDoc (----, ....)
+            if stripped.startswith("```") or stripped.startswith("----") or stripped.startswith("...."):
                 in_code_block = not in_code_block
 
-            # Header detection (only outside code blocks)
-            header_match = re.match(r"^(#{1,6})\s+(.+)$", stripped) if not in_code_block else None
+            # Header detection for Markdown (#) and AsciiDoc (=) (only outside code blocks)
+            header_match = (
+                re.match(r"^(#{1,6}|={1,6})\s+(.+)$", stripped)
+                if not in_code_block
+                else None
+            )
 
             if header_match:
                 level = len(header_match.group(1))
