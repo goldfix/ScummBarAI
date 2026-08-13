@@ -6,15 +6,17 @@ Incremental updates track the exact integer message index (`last_saved_index`) t
 that only new conversation messages are summarized into new chapters.
 """
 
+import asyncio
 import json
 import logging
 import re
 from datetime import datetime
 from pathlib import Path
 
-from google import genai
+from google.adk.models import LlmRequest
+from google.genai import types
 
-from src.scummbar_chat.utils import COMPACTION_MODEL, get_gemini_client_kwargs
+from src.scummbar_chat.utils import COMPACTION_MODEL, _build_model_instance
 
 log = logging.getLogger("scummbar.diary")
 
@@ -64,8 +66,8 @@ def read_diary_content(patron_name: str) -> str:
     return ""
 
 
-def _generate_chapter_narrative(patron_name: str, new_messages: list[dict], start_idx: int, end_idx: int) -> str:
-    """Invokes LLM to generate a first-person narrative story chapter from raw transcript messages."""
+def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int) -> str:
+    """Builds the plain-text transcript of new messages for the LLM prompt."""
     transcript_lines = []
     for idx, msg in enumerate(new_messages, start=start_idx + 1):
         role = msg.get("role", "user")
@@ -81,7 +83,12 @@ def _generate_chapter_narrative(patron_name: str, new_messages: list[dict], star
 
         transcript_lines.append(f"- [Msg #{idx} - {speaker}]: {content}")
 
-    transcript_text = "\n".join(transcript_lines)
+    return "\n".join(transcript_lines)
+
+
+async def generate_chapter_async(patron_name: str, new_messages: list[dict], start_idx: int, end_idx: int) -> str:
+    """Invokes the LLM (Gemini or DeepSeek) to generate a first-person narrative chapter."""
+    transcript_text = _build_transcript(patron_name, new_messages, start_idx)
 
     prompt = (
         f"Sei l'avventore '{patron_name}'.\n"
@@ -94,7 +101,7 @@ def _generate_chapter_narrative(patron_name: str, new_messages: list[dict], star
         f"Scrivi una pagina o capitolo per il TUO diario di bordo personale in PRIMA PERSONA ('Io').\n"
         f"Racconta la tua esperienza nello Scummbar, cosa hai chiesto, come ti hanno risposto i vari pirati della taverna "
         f"(Barnaby, Barnacle, Isolde, Balthazar) e le tue sensazioni o pensieri da pirata.\n\n"
-        f"REGOLE DI STILE E FORMATTO:\n"
+        f"REGOLE DI STILE E FORMATO:\n"
         f"1. Scrivi SEMPRE ed ESCLUSIVAMENTE in PRIMA PERSONA ('Oggi sono entrato nello Scummbar...', 'Ho chiesto a Barnaby...').\n"
         f"2. Mantieni uno stile d'avventura caraibica, discorsivo, vivace, ricco di dettagli d'atmosfera e piacevole da leggere.\n"
         f"3. NON fare un riassunto burocratico né un elenco di punti. Scrivi un vero e proprio capitolo di diario personale.\n"
@@ -103,15 +110,19 @@ def _generate_chapter_narrative(patron_name: str, new_messages: list[dict], star
     )
 
     try:
-        client = genai.Client(**get_gemini_client_kwargs())
-        response = client.models.generate_content(
+        # Build the model via the shared factory so both Gemini (Vertex/API Key) and DeepSeek work
+        llm = _build_model_instance(COMPACTION_MODEL)
+        request = LlmRequest(
             model=COMPACTION_MODEL,
-            contents=prompt,
+            contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
         )
-        if response and response.text:
-            return response.text.strip()
+        async for response in llm.generate_content_async(request):
+            if response.content and response.content.parts:
+                text_parts = [p.text for p in response.content.parts if getattr(p, "text", None)]
+                if text_parts:
+                    return "\n".join(text_parts).strip()
     except Exception as e:
-        log.error("Errore generazione capitolo diario con Gemini: %s", e)
+        log.error("Errore generazione capitolo diario: %s", e)
 
     # Fallback if LLM call fails
     return (
@@ -120,9 +131,47 @@ def _generate_chapter_narrative(patron_name: str, new_messages: list[dict], star
     )
 
 
-def update_tavern_diary(patron_name: str, messages: list[dict]) -> tuple[bool, str, str]:
+def _write_chapter_to_file(
+    patron_name: str,
+    total_messages: int,
+    chapter_text: str,
+    last_saved_index: int,
+) -> tuple[bool, str, str]:
+    """Appends a new chapter to the diary file (creating it if needed) and returns the full content."""
+    file_path = get_diary_file_path(patron_name)
+    now_str = datetime.now().strftime("%d %B %Y - %H:%M")
+    updated_metadata = json.dumps({"last_saved_index": total_messages, "patron_name": patron_name})
+
+    if file_path.exists():
+        content = file_path.read_text(encoding="utf-8")
+        new_metadata_comment = f"<!-- DIARY_METADATA: {updated_metadata} -->"
+
+        if "<!-- DIARY_METADATA:" in content:
+            content = re.sub(r"<!--\s*DIARY_METADATA:.*-->", new_metadata_comment, content, count=1)
+        else:
+            content = f"{new_metadata_comment}\n\n" + content
+
+        new_chapter_block = f"\n\n---\n\n## ⚓ Capitolo (Messaggi #{last_saved_index + 1} - #{total_messages})\n*_Registrato il {now_str}_*\n\n{chapter_text}"
+        content += new_chapter_block
+    else:
+        metadata_comment = f"<!-- DIARY_METADATA: {updated_metadata} -->"
+        header_block = f"{metadata_comment}\n\n# 📜 Il Diario di Bordo di {patron_name}\n*_Memorie personali, avventure e sbornie nello Scummbar_*\n\n---"
+        first_chapter_block = f"\n\n## ⚓ Capitolo 1 (Messaggi #1 - #{total_messages})\n*_Registrato il {now_str}_*\n\n{chapter_text}"
+        content = header_block + first_chapter_block
+
+    file_path.write_text(content, encoding="utf-8")
+    log.info("Diario aggiornato per %s: %s messaggi registrati.", patron_name, total_messages)
+
+    return (
+        True,
+        f"Diario aggiornato con successo! Registrati messaggi da #{last_saved_index + 1} a #{total_messages}.",
+        content,
+    )
+
+
+async def update_tavern_diary_async(patron_name: str, messages: list[dict]) -> tuple[bool, str, str]:
     """
-    Incrementally updates or creates the patron's diary Markdown file.
+    Incrementally updates or creates the patron's diary Markdown file (async).
 
     Returns:
         (success: bool, status_message: str, full_file_content: str)
@@ -140,50 +189,24 @@ def update_tavern_diary(patron_name: str, messages: list[dict]) -> tuple[bool, s
     last_saved_index = metadata.get("last_saved_index", 0)
 
     if total_messages <= last_saved_index:
-        current_content = read_diary_content(patron_name)
         return (
             False,
             f"Nessun nuovo messaggio da registrare. (Ultimo messaggio salvato: #{last_saved_index})",
-            current_content,
+            read_diary_content(patron_name),
         )
 
     # Slice only new messages from last_saved_index to total_messages
     new_messages = messages[last_saved_index:total_messages]
 
     # Generate first-person narrative text for this new chapter
-    chapter_text = _generate_chapter_narrative(patron_name, new_messages, last_saved_index, total_messages)
+    chapter_text = await generate_chapter_async(patron_name, new_messages, last_saved_index, total_messages)
 
-    now_str = datetime.now().strftime("%d %B %Y - %H:%M")
+    return _write_chapter_to_file(patron_name, total_messages, chapter_text, last_saved_index)
 
-    # Read existing file or create new structure
-    if file_path.exists():
-        content = file_path.read_text(encoding="utf-8")
-        # Update metadata comment at top of file
-        updated_metadata = json.dumps({"last_saved_index": total_messages, "patron_name": patron_name})
-        new_metadata_comment = f"<!-- DIARY_METADATA: {updated_metadata} -->"
 
-        if "<!-- DIARY_METADATA:" in content:
-            content = re.sub(r"<!--\s*DIARY_METADATA:.*-->", new_metadata_comment, content, count=1)
-        else:
-            content = f"{new_metadata_comment}\n\n" + content
-
-        # Append new chapter
-        new_chapter_block = f"\n\n---\n\n## ⚓ Capitolo (Messaggi #{last_saved_index + 1} - #{total_messages})\n*_Registrato il {now_str}_*\n\n{chapter_text}"
-        content += new_chapter_block
-    else:
-        updated_metadata = json.dumps({"last_saved_index": total_messages, "patron_name": patron_name})
-        metadata_comment = f"<!-- DIARY_METADATA: {updated_metadata} -->"
-
-        header_block = f"{metadata_comment}\n\n# 📜 Il Diario di Bordo di {patron_name}\n*_Memorie personali, avventure e sbornie nello Scummbar_*\n\n---"
-        first_chapter_block = f"\n\n## ⚓ Capitolo 1 (Messaggi #1 - #{total_messages})\n*_Registrato il {now_str}_*\n\n{chapter_text}"
-        content = header_block + first_chapter_block
-
-    # Write back to Markdown file
-    file_path.write_text(content, encoding="utf-8")
-    log.info("Diario aggiornato per %s: %s messaggi registrati.", patron_name, total_messages)
-
-    return (
-        True,
-        f"Diario aggiornato con successo! Registrati messaggi da #{last_saved_index + 1} a #{total_messages}.",
-        content,
-    )
+def update_tavern_diary(patron_name: str, messages: list[dict]) -> tuple[bool, str, str]:
+    """
+    Synchronous wrapper around `update_tavern_diary_async` for non-async callers
+    (e.g. Streamlit script context). Returns the same tuple.
+    """
+    return asyncio.run(update_tavern_diary_async(patron_name, messages))

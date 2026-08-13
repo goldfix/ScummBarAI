@@ -127,12 +127,12 @@ async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
 
 
-async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str) -> str:
+async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str = "") -> str:
     """
     Usa questo strumento per aggiornare o compilare il Diario di Bordo dell'avventore attuale.
     - patron_name: Il nome del pirata di cui stai aggiornando il diario.
     """
-    from src.scummbar_chat.diary import update_tavern_diary
+    from src.scummbar_chat.diary import update_tavern_diary_async
 
     # Retrieve patron name from DB if not passed
     user_id = tool_context.user_id
@@ -152,17 +152,17 @@ async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str) 
     if not patron_name:
         patron_name = f"Avventore_{user_id}"
 
-    # For tool-driven calls, we load events directly from DB if available
-    # Or call update_tavern_diary with events
+    # Load the current session events from DB using the real session_id (works in both
+    # Streamlit and Telegram contexts) and filtered by user_id to avoid mixing other patrons.
+    session_id = tool_context.session.id
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     messages: list[dict] = []
     try:
         with sqlite3.connect(db_path, timeout=10.0) as conn:
             cursor = conn.cursor()
-            session_id = f"st_session_{user_id}"
             cursor.execute(
-                "SELECT event_data FROM events WHERE session_id = ? ORDER BY id ASC",
-                (session_id,),
+                "SELECT event_data FROM events WHERE user_id = ? AND session_id = ? ORDER BY id ASC",
+                (user_id, session_id),
             )
             for row in cursor.fetchall():
                 try:
@@ -170,7 +170,8 @@ async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str) 
                     content = ev.get("content", {})
                     role = content.get("role", "")
                     parts = content.get("parts", [])
-                    text_parts = [p.get("text", "") for p in parts if "text" in p]
+                    # Only keep plain text parts, skipping internal thought/reasoning parts
+                    text_parts = [p.get("text", "") for p in parts if "text" in p and not p.get("thought", False)]
                     full_text = "\n".join(text_parts).strip()
                     if full_text and role in ["user", "model", "assistant"]:
                         norm_role = "user" if role == "user" else "assistant"
@@ -186,7 +187,7 @@ async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str) 
     except sqlite3.Error as e:
         log.warning("Impossibile recuperare gli eventi per il diario via tool: %s", e)
 
-    success, status_msg, _ = update_tavern_diary(patron_name, messages)
+    success, status_msg, _ = await update_tavern_diary_async(patron_name, messages)
     if success:
         return f"📜 Diario di bordo aggiornato con successo per {patron_name}! ({status_msg})"
     else:
