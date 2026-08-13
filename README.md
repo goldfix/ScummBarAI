@@ -380,12 +380,12 @@ This implements **Progressive Disclosure**: it keeps the AI's context window cle
 
 | Aspect | Detail |
 |--------|--------|
-| **Purpose** | Semantic + keyword search across 860+ Markdown documents in `docs/` |
+| **Purpose** | Semantic + keyword search across **897 text documents** in `docs/` (Markdown, AsciiDoc, YAML, source code) |
 | **Engine** | Local hybrid RAG: **FTS5 BM25** + **Vector Cosine Similarity** with `sqlite-vec` |
 | **Embeddings** | Google `gemini-embedding-2` (768 dimensions) |
 | **Fusion** | **Reciprocal Rank Fusion (RRF)** between the two rankings |
 | **Cleanup** | The indexer compares DB vs disk and **automatically removes orphan documents** |
-| **DB** | `.agents/skills/scummbar-docs-analyzer/data/docs_rag.db` (860 docs, 14,728 chunks) |
+| **DB** | `.agents/skills/scummbar-docs-analyzer/data/docs_rag.db` (897 docs, 14,881 chunks) |
 
 ```bash
 # Hybrid search (semantic + keyword)
@@ -421,9 +421,10 @@ PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
 |--------|--------|
 | **Purpose** | Generate vector diagrams and infographics via Kroki.io |
 | **Encoder** | zlib deflate (level 9) + Base64 URL-safe encoding |
-| **Default Style** | **Excalidraw** (`excalidraw`) for hand-drawn architectural sketches |
-| **Supported Types** | Mermaid, PlantUML, Graphviz/DOT, D2, BPMN, C4PlantUML, BlockDiag, etc. |
+| **Default Style** | **C4-PlantUML** (`c4plantuml`) for architectural C4 diagrams |
+| **Supported Types** | Excalidraw, Mermaid, PlantUML, Graphviz/DOT, D2, BPMN, BlockDiag, etc. |
 | **CLI Script** | `.agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py` |
+| **SVG Localization** | `--localize` downloads remote Kroki SVGs into `assets/` and rewrites Markdown links to local files (offline-ready) |
 | **Target** | Used by Pi-Agent for documentation & README diagrams (not in runtime ADK app) |
 
 ### 7.6 How to Use the Autopilot
@@ -439,7 +440,12 @@ python3 .agents/skills/scummbar-web-to-markdown/scripts/convert.py \
 PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
   .agents/skills/scummbar-docs-analyzer/rag/indexer.py
 
-# 3. Update memory, roadmap, and check fence-marker health
+# 3. Generate a C4-PlantUML diagram (default) and localize it as local SVG in assets/
+python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py \
+  "Scummbar System\nBarnaby Bartender" --markdown
+python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py --localize README.md
+
+# 4. Update memory, roadmap, and check fence-marker health
 /skill:scummbar-memory-updater
 ```
 
