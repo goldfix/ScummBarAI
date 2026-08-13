@@ -436,7 +436,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Memoria avventori | ✅ | `patron_memories` SQLite + `recall_patron_memory` + `memorize_patron_chat` |
 | Artefatti e Pergamene | ✅ | `InMemoryArtifactService` + `write_secret_scroll` + `sendDocument` |
 | Logging verboso + error export | ✅ | `--debug`, `bot.log`, `errors.log`, `_dump_exception()` |
-| Generatore Diagrammi Kroki (`scummbar-kroki-diagrams`) | ✅ | Skill Pi-Agent in `.agents/skills/scummbar-kroki-diagrams/` con script `kroki_generator.py` (Excalidraw default, zlib+Base64 URL-safe) per la generazione di diagrammi per documentazione e README |
+| Generatore Diagrammi Kroki (`scummbar-kroki-diagrams`) | ✅ | Skill Pi-Agent in `.agents/skills/scummbar-kroki-diagrams/` con script `kroki_generator.py` (C4-PlantUML default, zlib+Base64 URL-safe) per la generazione di diagrammi per documentazione e README |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
 | Importazione Documentazione (Pydantic, FastAPI, HTTPX, DeepSeek, ADK, Streamlit, Kroki, UV, Ruff) | ✅ | docs/ indicizzati nel RAG (897 documenti, 14.881 chunk in `.md`, `.adoc`, `.yaml`, ecc.) |
 | Supporto duale autenticazione (Service Account ↔ API Key) | ✅ | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |

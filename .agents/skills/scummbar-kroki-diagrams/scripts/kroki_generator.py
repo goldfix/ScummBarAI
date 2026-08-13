@@ -2,9 +2,9 @@
 """
 Kroki Diagram Generator & URL Encoder for Pi-Agent & Scummbar.
 
-Encodes plain text diagram sources (Excalidraw, Mermaid, PlantUML, Graphviz, D2, etc.)
+Encodes plain text diagram sources (C4-PlantUML, Excalidraw, Mermaid, PlantUML, Graphviz, D2, etc.)
 using deflate (zlib level 9) + URL-safe Base64 into Kroki URLs.
-Default diagram type: excalidraw
+Default diagram type: c4plantuml (C4-PlantUML)
 Default format: svg
 """
 
@@ -30,37 +30,34 @@ def encode_kroki_payload(source_text: str) -> str:
     return base64.urlsafe_b64encode(compressed).decode("ascii")
 
 
-def generate_kroki_url(
-    source_text: str,
-    diagram_type: str = "excalidraw",
-    output_format: str = "svg",
-    base_url: str = "https://kroki.io",
-    params: dict[str, str] | None = None,
-) -> str:
+def build_simple_c4_plantuml(source_text: str) -> str:
     """
-    Generates a Kroki GET request URL for a given diagram source.
-    If diagram_type is omitted or empty, defaults to 'excalidraw'.
+    If source_text is not a full @startuml ... @enduml block,
+    wraps plain text lines into a valid C4-Container diagram structure.
     """
-    if not diagram_type or not str(diagram_type).strip():
-        diagram_type = "excalidraw"
-    diagram_type = str(diagram_type).lower().strip()
+    clean_text = source_text.strip()
+    if clean_text.startswith("@startuml") or clean_text.startswith("C4") or clean_text.startswith("Person"):
+        return source_text
 
-    if not output_format or not str(output_format).strip():
-        output_format = "svg"
-    output_format = str(output_format).lower().strip()
+    lines = [line.strip() for line in clean_text.splitlines() if line.strip()]
+    if not lines:
+        return source_text
 
-    # If excalidraw is given as simple dict/text without full JSON wrapper, try building basic valid JSON
-    if diagram_type == "excalidraw" and not source_text.strip().startswith("{"):
-        source_text = build_simple_excalidraw_json(source_text)
+    system_title = lines[0]
+    components = lines[1:] if len(lines) > 1 else []
 
-    payload = encode_kroki_payload(source_text)
-    url = f"{base_url.rstrip('/')}/{diagram_type}/{output_format}/{payload}"
+    puml = [
+        "@startuml",
+        "!include <C4/C4_Container>",
+        "",
+        f"System(system, '{system_title}', 'Scummbar System')",
+    ]
+    for idx, comp in enumerate(components):
+        puml.append(f"Container(comp_{idx}, '{comp}', 'Component')")
+        puml.append(f"Rel(system, comp_{idx}, 'Uses')")
+    puml.append("@enduml")
 
-    if params:
-        query_str = "&".join(f"{k}={v}" for k, v in params.items())
-        url = f"{url}?{query_str}"
-
-    return url
+    return "\n".join(puml)
 
 
 def build_simple_excalidraw_json(label_text: str) -> str:
@@ -96,6 +93,41 @@ def build_simple_excalidraw_json(label_text: str) -> str:
         "elements": elements
     }
     return json.dumps(excalidraw_doc, ensure_ascii=False)
+
+
+def generate_kroki_url(
+    source_text: str,
+    diagram_type: str = "c4plantuml",
+    output_format: str = "svg",
+    base_url: str = "https://kroki.io",
+    params: dict[str, str] | None = None,
+) -> str:
+    """
+    Generates a Kroki GET request URL for a given diagram source.
+    If diagram_type is omitted or empty, defaults to 'c4plantuml' (C4-PlantUML).
+    """
+    if not diagram_type or not str(diagram_type).strip():
+        diagram_type = "c4plantuml"
+    diagram_type = str(diagram_type).lower().strip()
+
+    if not output_format or not str(output_format).strip():
+        output_format = "svg"
+    output_format = str(output_format).lower().strip()
+
+    # Apply auto-wrappers if plain text is provided
+    if diagram_type == "c4plantuml":
+        source_text = build_simple_c4_plantuml(source_text)
+    elif diagram_type == "excalidraw" and not source_text.strip().startswith("{"):
+        source_text = build_simple_excalidraw_json(source_text)
+
+    payload = encode_kroki_payload(source_text)
+    url = f"{base_url.rstrip('/')}/{diagram_type}/{output_format}/{payload}"
+
+    if params:
+        query_str = "&".join(f"{k}={v}" for k, v in params.items())
+        url = f"{url}?{query_str}"
+
+    return url
 
 
 def download_kroki_diagram(
@@ -137,8 +169,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--type", "-t",
-        default="excalidraw",
-        help="Diagram type (default: excalidraw). Options: excalidraw, mermaid, plantuml, graphviz, d2, bpmn, etc."
+        default="c4plantuml",
+        help="Diagram type (default: c4plantuml). Options: c4plantuml, excalidraw, mermaid, plantuml, graphviz, d2, bpmn, etc."
     )
     parser.add_argument(
         "--format", "-fmt",

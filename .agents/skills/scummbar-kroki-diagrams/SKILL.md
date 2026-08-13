@@ -1,6 +1,6 @@
 ---
 name: scummbar-kroki-diagrams
-description: Genera grafici, mappe mentali e diagrammi vettoriali (Excalidraw, Mermaid, PlantUML, Graphviz, D2, ecc.) tramite Kroki usando la codifica URL zlib+Base64. Stile di default: Excalidraw. Uso esclusivo per documentazione (Pi-Agent), non integrata nell'applicazione.
+description: Genera grafici, mappe mentali e diagrammi vettoriali (C4-PlantUML, Excalidraw, Mermaid, PlantUML, Graphviz, D2, ecc.) tramite Kroki usando la codifica URL zlib+Base64. Stile di default: C4-PlantUML. Uso esclusivo per documentazione (Pi-Agent), non integrata nell'applicazione.
 ---
 
 # Scummbar Kroki Diagram Generator
@@ -15,8 +15,8 @@ L'integrazione si basa sull'interfaccia HTTP `GET` con codifica del contenuto tr
 
 ## 📐 Regole di Default e Comportamento
 
-1. **Stile di Default (Excalidraw)**:
-   Se l'utente o la richiesta **non specifica uno stile**, il tipo di diagramma predefinito è **`excalidraw`** (stile fatto a mano / hand-drawn, ideale per mappe e schemi informali).
+1. **Stile di Default (C4-PlantUML)**:
+   Se l'utente o la richiesta **non specifica uno stile**, il tipo di diagramma predefinito è **`c4plantuml`** (C4-PlantUML, ideale per schemi architetturali e di contesto/container).
 2. **Formato Output**:
    Di default l'output è generato in formato **`svg`** (vettoriale scalabile). Il formato **`png`** è il secondo supportato (entrambi documentati). Altri formati (`jpeg`, `pdf`) possono funzionare ma **non sono garantiti** per tutti i tipi di diagramma.
 3. **Algoritmo di Codifica URL** (allineato alla doc `setup/pages/encode-diagram.adoc`):
@@ -41,7 +41,8 @@ Fonte: `docs/kroki/pages/index.adoc` e `docs/kroki/setup/pages/install.adoc`.
 
 | Tipo (`diagram_type`) | Descrizione |
 | :--- | :--- |
-| **`excalidraw`** *(Default)* | Diagrammi in stile bozza/fatto a mano. Accetta sia JSON Excalidraw completo sia righe di testo per nodi veloci. |
+| **`c4plantuml`** *(Default)* | Diagrammi C4 Model (Context, Container, Component) basati su PlantUML. |
+| **`excalidraw`** | Diagrammi in stile bozza/fatto a mano. Accetta sia JSON Excalidraw completo sia righe di testo per nodi veloci. |
 | **`mermaid`** | Diagrammi di flusso (`flowchart`), sequenze, class diagram, ER e Gantt. |
 | **`graphviz`** / **`dot`** | Grafi orientati e reti tramite la sintassi DOT. |
 | **`plantuml`** / **`c4plantuml`** | Modelli UML complessi e architettura C4. |
@@ -74,7 +75,7 @@ Lo script `.agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py` fo
 ### Esempi di utilizzo:
 
 ```bash
-# 1. Grafico Excalidraw di default (solo testo per nodi rapidi)
+# 1. Grafico C4-PlantUML di default (solo testo per nodi rapidi)
 python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py "Taverna Scummbar
 Tavolo di Barnaby
 Mappa di Balthazar" --markdown
