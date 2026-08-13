@@ -16,6 +16,12 @@ from pathlib import Path
 import streamlit as st
 
 # Import core Scummbar components
+from src.scummbar_chat.diary import (
+    get_diary_file_path,
+    read_diary_content,
+    read_diary_metadata,
+    update_tavern_diary,
+)
 from src.scummbar_chat.streamlit.components import (
     BOT_AVATARS,
     format_streamlit_narrative,
@@ -147,6 +153,8 @@ def main() -> None:
     if st.session_state.get("current_patron_name") != patron_name:
         st.session_state["current_patron_name"] = patron_name
         st.session_state["session_id"] = session_id
+        # Reset automatic diary check baseline for the new patron
+        st.session_state["last_auto_diary_check"] = 0
 
         past_messages = load_session_chat_history(user_id, session_id)
         if past_messages:
@@ -167,79 +175,133 @@ def main() -> None:
                 }
             ]
 
-    # 3. Render Historical Chat Messages
-    for msg in st.session_state.get("messages", []):
-        role = msg["role"]
-        bot_name = msg.get("bot_name")
-        avatar = get_avatar_for_role(role, bot_name)
+    # 4. Main Interface Tabs: Chat vs Diario di Bordo
+    tab_chat, tab_diary = st.tabs(["💬 Chat Taverna", "📜 Diario di Bordo"])
 
-        with st.chat_message(role, avatar=avatar):
-            formatted_text = format_streamlit_narrative(msg["content"])
-            st.markdown(formatted_text, unsafe_allow_html=True)
-            if msg.get("artifacts"):
-                render_artifacts(msg["artifacts"])
+    with tab_chat:
+        # A. Render Historical Chat Messages
+        for msg in st.session_state.get("messages", []):
+            role = msg["role"]
+            bot_name = msg.get("bot_name")
+            avatar = get_avatar_for_role(role, bot_name)
 
-    # 4. User Chat Input (Automatic Semantic Routing)
-    if prompt := st.chat_input("Rivolgiti alla taverna, al barista, alla maga o al navigatore..."):
-        # A. Display user message immediately
-        st.session_state.messages.append(
-            {
-                "role": "user",
-                "content": prompt,
-                "bot_name": None,
-                "artifacts": [],
-            }
-        )
-        with st.chat_message("user", avatar=BOT_AVATARS["user"]):
-            st.markdown(prompt)
+            with st.chat_message(role, avatar=avatar):
+                formatted_text = format_streamlit_narrative(msg["content"])
+                st.markdown(formatted_text, unsafe_allow_html=True)
+                if msg.get("artifacts"):
+                    render_artifacts(msg["artifacts"])
 
-        # B. Automatic intent routing via names or appellations ("maga", "navigatore", etc.)
-        detected_bot = _resolve_intent(prompt)
-        augmented_prompt = prompt
+        # B. User Chat Input (Automatic Semantic Routing)
+        if prompt := st.chat_input("Rivolgiti alla taverna, al barista, alla maga o al navigatore..."):
+            # Display user message immediately
+            st.session_state.messages.append(
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "bot_name": None,
+                    "artifacts": [],
+                }
+            )
+            with st.chat_message("user", avatar=BOT_AVATARS["user"]):
+                st.markdown(prompt)
 
-        if detected_bot:
-            augmented_prompt = f"[{detected_bot.upper()}] {prompt}"
+            # Automatic intent routing via names or appellations ("maga", "navigatore", etc.)
+            detected_bot = _resolve_intent(prompt)
+            augmented_prompt = prompt
 
-        # Inject patron ID context for memory recall
-        augmented_prompt = f"[avventore: {patron_name}] [avventore_id: {user_id}] {augmented_prompt}"
+            if detected_bot:
+                augmented_prompt = f"[{detected_bot.upper()}] {prompt}"
 
-        # Increment session message counter to trigger Narrator prompt every 3 turns
-        st.session_state["narrator_counter"] = st.session_state.get("narrator_counter", 0) + 1
-        if st.session_state["narrator_counter"] % 3 == 0:
-            st.session_state["narrator_counter"] = 0
-            augmented_prompt += NARRATOR_SYSTEM_PROMPT
+            # Inject patron ID context for memory recall
+            augmented_prompt = f"[avventore: {patron_name}] [avventore_id: {user_id}] {augmented_prompt}"
 
-        # C. Execute ADK agent turn asynchronously with a spinner
-        active_avatar = BOT_AVATARS.get(detected_bot, "🍺") if detected_bot else "🍺"
-        with st.chat_message("assistant", avatar=active_avatar):
-            with st.spinner("La taverna sta elaborando la tua richiesta..."):
-                try:
-                    response_text, artifacts = asyncio.run(
-                        run_agent(
-                            user_id=user_id,
-                            session_id=session_id,
-                            text=augmented_prompt,
+            # Increment session message counter to trigger Narrator prompt every 3 turns
+            st.session_state["narrator_counter"] = st.session_state.get("narrator_counter", 0) + 1
+            if st.session_state["narrator_counter"] % 3 == 0:
+                st.session_state["narrator_counter"] = 0
+                augmented_prompt += NARRATOR_SYSTEM_PROMPT
+
+            # Execute ADK agent turn asynchronously with a spinner
+            active_avatar = BOT_AVATARS.get(detected_bot, "🍺") if detected_bot else "🍺"
+            with st.chat_message("assistant", avatar=active_avatar):
+                with st.spinner("La taverna sta elaborando la tua richiesta..."):
+                    try:
+                        response_text, artifacts = asyncio.run(
+                            run_agent(
+                                user_id=user_id,
+                                session_id=session_id,
+                                text=augmented_prompt,
+                            )
                         )
-                    )
-                except Exception as e:
-                    response_text = f"⚠️ *Si è verificato un errore nello Scummbar*: {e}"
-                    artifacts = []
+                    except Exception as e:
+                        response_text = f"⚠️ *Si è verificato un errore nello Scummbar*: {e}"
+                        artifacts = []
 
-            # D. Render formatted assistant response and artifacts
-            formatted_response = format_streamlit_narrative(response_text)
-            st.markdown(formatted_response, unsafe_allow_html=True)
-            if artifacts:
-                render_artifacts(artifacts)
+                # Render formatted assistant response and artifacts
+                formatted_response = format_streamlit_narrative(response_text)
+                st.markdown(formatted_response, unsafe_allow_html=True)
+                if artifacts:
+                    render_artifacts(artifacts)
 
-        # E. Save response to session state
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": response_text,
-                "bot_name": detected_bot or "barnaby",
-                "artifacts": artifacts,
-            }
-        )
+            # Save response to session state
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": response_text,
+                    "bot_name": detected_bot or "barnaby",
+                    "artifacts": artifacts,
+                }
+            )
+
+            # C. Automatic Diary Update Check (Every 10 messages)
+            total_msgs = len(st.session_state.messages)
+            last_auto = st.session_state.get("last_auto_diary_check", 0)
+            if total_msgs >= last_auto + 10:
+                st.session_state["last_auto_diary_check"] = total_msgs
+                success, status_msg, _ = update_tavern_diary(patron_name, st.session_state.messages)
+                if success:
+                    st.toast("📜 Il tuo Diario di Bordo si è arricchito di un nuovo capitolo!", icon="📜")
+
+    with tab_diary:
+        st.subheader(f"📜 Il Diario di Bordo di {patron_name}")
+
+        file_path = get_diary_file_path(patron_name)
+        meta = read_diary_metadata(file_path)
+        last_saved = meta.get("last_saved_index", 0)
+        current_msgs = len(st.session_state.get("messages", []))
+
+        col1, col2 = st.columns([2, 1])
+
+        with col1:
+            st.caption(f"📊 Messaggi registrati nel Diario: **{last_saved}** / **{current_msgs}** presenti in chat.")
+
+        with col2:
+            if st.button("🔄 Compila / Aggiorna Diario ORA", key="btn_manual_diary", use_container_width=True):
+                with st.spinner("Compilazione del Diario di Bordo in corso..."):
+                    success, status_msg, _ = update_tavern_diary(patron_name, st.session_state.get("messages", []))
+                    if success:
+                        st.success(status_msg)
+                        st.rerun()
+                    else:
+                        st.info(status_msg)
+
+        diary_content = read_diary_content(patron_name)
+
+        if diary_content:
+            st.download_button(
+                label="📥 Scarica Diario (.md)",
+                data=diary_content,
+                file_name=file_path.name,
+                mime="text/markdown",
+            )
+            st.markdown("---")
+            st.markdown(diary_content)
+        else:
+            st.info(
+                "📜 *Il tuo diario di bordo è ancora intonso.* "
+                "Parla con gli abitanti dello Scummbar per accumulare ricordi, "
+                "oppure premi **'Compila / Aggiorna Diario ORA'** per iniziare a scrivere la tua storia!"
+            )
 
 
 if __name__ == "__main__":
