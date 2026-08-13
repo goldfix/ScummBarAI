@@ -1,6 +1,6 @@
 # 🍺 ScummBar AI — A Collaborative Multi-Agent Study Project
 
-![scummbar](scummbar_4.jpg)
+![scummbar](assets/scummbar_4.jpg)
 
 > *"Where sabers rest, stories float, and agents run the bar."*
 
@@ -133,11 +133,11 @@ The heart of the application lives in `src/scummbar_chat/`. Everything else (Tel
 
 ### 4.1 Core Overview Diagram
 
-![Core Overview Diagram (C4-PlantUML)](https://kroki.io/c4plantuml/svg/eNqVVEtv2zAMvvtXcDl0KdA2l56KYWge62asjyzO0GMgW2yiTZYCiU6XDfvvI23HaZdi6HIJLZHfx8dHXUZSgarSJm-MK2ylEd6Nzwfj88XYO1LGYXifJFMM0bv-WlHw7gR609roiWWCIgRSGwwOiiqSLzFAf44Wl0GV4ANkFFCV1tBx7zhJsm0kLBcjXzmtwrYfi6oscxUYLGtNGKbQuPWO4VcC_Ouy6RfePZgle49rA45gSKWP6xUGlIwqMjaerbd8QabEBfsT_iA-kdsbr9HClSrIh-0JTCplYVjRir1TFylUBRnvpsFvjMbA-T4nD94To8z4j0990MYpRhJktUS3YxG3RX0AM18RN-QIHn2werCr9qzUwK0nU4DZ87Z8f5Gyu1M5Z9sbNZZQ5J7iIN9_8xWh45wv4AbLurisCN7ayFUaJd8fg5d23aCrIPtu-OqgvhqwsLjjYvM5WXswb-Y9VnQBM1T69M7ZbUf8gYfBKuDW3q9MXLN4DohM9FYLTVobHYnpPq8869IhsJKsVDVXgZueltzWKFVUlsfrdTu_FyqxtFI_a12NdvaTWp6c3KqNWcoYuZYsg1t85J5Nmd5b5Xbte3E0k7yvcxEuxsjjizAZCWD25drwUtwPr-UrtpdnOr-A8UoRcFNEflxFs1GLUhpn8LBNuplcb6zWcvI2wrVfCmh90aotdUXgfnOMhQcTIp2u630FpTd8WgUEcW_wfyfJDG23yq2gU96RwEsRWY2nxUqJjXVzPs3nUxhAt8_DacooArFbxA7iGwqA6raR6ytl3WL9UGxpVQtcQpuQva4ngs7viNCzikkChpPPh96NNF_j3gnsddh7sfzbv8u5nrtIPw7ugxH3eojb_fwPItpZfl3rGv5gplfGIqSDuy6wS-p_Qi_5FeD3_A-CXews)
+![Core Overview Diagram (C4-PlantUML)](assets/core_overview_diagram.svg)
 
 **Logical flow of a single turn:**
 
-![Turn Execution Sequence (C4-PlantUML)](https://kroki.io/c4plantuml/svg/eNptU8Fu2zAMvfsruByGFlibS4_D0NbpgGIDVtjd2WBtLhUqU55EBfW-fpRlp_G6E0XyPYl8pK6DoJfY2-KD4dbGjuBzebUtr5rS9YNjYvlSFGLEEtSG92oeo2e4e6U2inEMNf2OxC0VRelY0DD5sxjIf4LNA4p3vNHTTw1szk8QHVlzID9qbjcf4TuOitLII1nae-xhC7V4wt4aWbGxw0GmJ27yKbEaT8HZAzWGRcs-O19RfGTOjN03qCYnkXL4Uk2D-_-wnBNFVWqgdM53hlFcZmosc9alpYim6_h0cTNl1blFz_g0bm_RyjP-wbUW4pxNXasJCZ38cDmMCioqsrOaJ4rVxB30FII-pqCEecu-aVO5KARZDfgIYQxCPQxeByth5h3RR33u-eBeCE5kysgFMEvygCHo3UF8bNMeBH1BTE9Nq33RqyysCb2IskuDRS1KHOje7UkgqE6LilNBGTprkteMJncG5MxyY0WS1jEFQecf7T_3zNXe80X7jB5b7TXhdLMDrUo89v9VR2zfYebsyRB-RBmiQOpVW9dPZH7p9eHdPOa_UOnM9O0go6UO3ERW7LWG9ff9BcVrM2U=)
+![Turn Execution Sequence (C4-PlantUML)](assets/turn_execution_sequence.svg)
 
 ### 4.2 Multi-Agent Coordination (Router-Delegate)
 
@@ -274,7 +274,7 @@ Telegram provides the **multi-player** experience: a shared group where the 4 bo
 
 ### 5.1 Telegram Delivery Architecture
 
-![Telegram Delivery Architecture (C4-PlantUML)](https://kroki.io/c4plantuml/svg/eNplU8Fu2zAMvfsrOB-GFEjbS4_DUNfZ1mApkMUBegwUi3W0yKIh0d7y96McJ3Gym0g_8pHv0c-Blee2tskn40rbaoQv-dNj_rTJybEyDv3XJGHDFmGNFiuvapihNR36A2S-3BnGkluPSXKumIS2mULKA36zJX5oDqmk8sUcirZB35lAPmaWHu8_rKl2DOUOy32YAroOOmWNVmzITSGYyikb0rsRg9KqYfQjlschNTApQzvmBrJjNqYW5Kr7hqw1rpqCp5b7h6We1SnvFZMH437LRsJ8Rehb5675jpmBLpv9hFWf6KOmkTYirStR5scQpF2Az1BS3aj_m3-QrxXf7HNODhTfT3EM3pTfa_rjgOniy-v6bSEUTryJsLskKQ6Bsd58-8sTllXTM_SFGLLlPB3nckuthiKaU-J4vtl2oreCLE6LzF5iYfFrIebDe7aI0WnLB7292q0kjxFctnW9VR5yiSGr0HFvU3wMC_4gquTMeilJ5suJvDYumhJ3WaE9HtbF-yIeb9S1Vk46xROJqDOg33lsu0B7kWoZti-Q76_r9bK4rTzbvZIzwXApuMGNnTsaJNiRN5FtqDm17KVcodJx8CDLSftBPMBO5Ag3BYOCc9fRXrBRn162ATYa4aLMCuWfFKcCHyzq0xjP6LT86_8Awt5Wfg==)
+![Telegram Delivery Architecture (C4-PlantUML)](assets/telegram_delivery_architecture.svg)
 
 | File | Role |
 |------|------|
@@ -314,7 +314,7 @@ While Telegram is a real-time group chat, the **Streamlit Web App** (`src/scummb
 
 ### 6.1 Architecture & Concept
 
-![Multi-Frontend Architecture (C4-PlantUML)](https://kroki.io/c4plantuml/svg/eNqNVE1v2zAMvftXaDkMCdAll56GYWg-uixYCnR2ix4D2SZsY7ZkSFSyYNh_H2nLrr2kw3yyKL6nRz5KdxalQVeVwbtCJaVLQXxa3y7Wt4e1VigLBeZzEGCBJYgHV2Lx4YuhDVCpWJokLxASdAbE9AlKyIysxHsRoQFZlQXOgiA6W4TqsNJOpdKcp4k2cIj96kZMolwaIK7NN3GvMjpuMhO_AkFff36D4dTEVVUsDe3QgcsMFE4oLPlnXp_FQhinKJ_-Ob7VOiPRzDwAzMbcm3iaxswN1hZaWbFZMTb6vqfKxMtyzyvrN-dp_FF4wT4mLGpDCjxvCKVX27CGIFNLDTkZYrM9Bo6kxBLk92V_MBt2p2_qBsriCOZ8pTuEsK6mZPTJRIC-B-v9TkSuBnMsrDZ_F89QmcoawQzgCx_yFLLQOWItlm30Gkfb9iHFyAh2IGwCHuxrvv-JjM6MbuT3tW45wMB23h5LeQYyPZfsXt_mruxRDREPsx2YMdwdKg21Y0dodNU4u8vwM7dTR_2DEil8aAZtOnubvavEm2XF16eHvajIdYK-4bfF0W3obs6_DCeIzXksudiD7SBzm3PT9tKpJL9iFMFkXTc4j1jQ2nv0evCyrq9BE12NsRzQigfZUzzvCNHFLp0mjhPwpVgZfbJk6AvEInzcNqcXiq5q53SroG-yL7eXf-Fxt_OqMqTnifv_vLuS9l_ODjhb1Tt684xMkEzplbOhd3QUvZ5_ALUMvDk=)
+![Multi-Frontend Architecture (C4-PlantUML)](assets/multi_frontend_architecture.svg)
 
 **Zero business-logic duplication**: `app.py` uses the same `run_agent()` as Telegram and the same routing functions (`_resolve_intent()`).
 
@@ -368,7 +368,7 @@ Telegram and Streamlit share the same `sessions.db`. To avoid `database is locke
 
 This repository is designed to be developed, refactored, and maintained **in collaboration with an AI assistant (Pi-Agent)**. To this end, an autonomous **Agent Skills** system is configured directly in the codebase.
 
-![Pi-Agent Skills Architecture (C4-PlantUML)](https://kroki.io/c4plantuml/svg/eNptVE1v2zAMvedXcD0MGTo3wJDuNAx1YrcJ1mxpnG7YKZBtIhOsj0CS3aW_fpRst3axkyXy8enxkfCNdcy4WorJO64KUZcIX5bz2XJ-WGp50gqV-zqZOO4EwpZH8ZECkJ2tQwlZxYWwEJviD3dYuNrgZLLUyjGu0ExP_CNcvNSsmFFo7UWIQYINCn2SPhNby0mFchcffHn36tSwI2FtUUuZMxOVurARU0ycn9F4lvC6P6zOueEl7OI7yJCRGOJ5pZEohzR01eYc1aeSuTc8m3TzY_cbJD1yRK9sxPOE-ZCHrpHTkWSmKvWTGhH9whychk2Xg0KrBo1_bkhYGT0kpGvFo5Kzo2HSjvi--RR0KSA30TCnTWtX53aST0sv0Nt0IOuuyjxwPNzTaII3ycIHbvfZNSw2n67hEn7SzLSxQVU_NF__6sUM4rv0-z6jwy6Nk00afOr7uuUCx9WcmjPu0JH4zwzWITYqTDR1TR4wx7UignafDunf4ErFDxZNwwvse7_imkYbQp6HcGhoE2C1328h6XyJt2vvyA5F2Lx2fdaq0RVasP1i9Ol2Lfp0uxXQbsUA1Q69R_l-oG1xgGnn-IL535Q8NOgJI3qo0XCChlG8H0zBw4Kuzr_HIMcSpmGCh3OHCrrGZmesIWhvcYcL2t5amqpCl4R9Fjy_XDCLn-fwuLunkhtUJf0K_gFxQlkP)
+![Pi-Agent Skills Architecture (C4-PlantUML)](assets/pi_agent_skills_architecture.svg)
 
 ### 7.1 What is a Pi-Agent Skill (Progressive Disclosure)
 

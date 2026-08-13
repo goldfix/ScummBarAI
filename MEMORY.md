@@ -845,16 +845,17 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ## 📋 Log delle Sessioni di Lavoro
 
-### 2026-08-13 — Skill Kroki per Pi-Agent (`scummbar-kroki-diagrams`)
+### 2026-08-13 — Skill Kroki per Pi-Agent & Localizzazione SVG (`scummbar-kroki-diagrams`)
 
-**Obiettivo**: Creare una nuova skill Pi-Agent `.agents/skills/scummbar-kroki-diagrams/` per generare diagrammi ed infografiche vettoriali a supporto della documentazione e del README tramite Kroki.io (Excalidraw di default, zlib deflate + Base64 URL-safe).
+**Obiettivo**: Creare una nuova skill Pi-Agent `.agents/skills/scummbar-kroki-diagrams/` per generare diagrammi ed infografiche vettoriali a supporto della documentazione e del README tramite Kroki.io (C4-PlantUML di default, zlib deflate + Base64 URL-safe), con supporto al salvataggio locale ed alla localizzazione automatica dei file SVG.
 
 **Attività svolte**:
 - **Estensione RAG per file `.adoc` e codice**: Aggiornato `rag/chunker.py` per riconoscere intestazioni AsciiDoc (`= Title`) e `rag/indexer.py` per indicizzare 37 file in `docs/kroki/` (totale RAG: 897 documenti, 14.881 chunk).
 - **Nuova Skill Pi-Agent (`.agents/skills/scummbar-kroki-diagrams/`)**:
-  - `SKILL.md`: Documentazione della skill per Pi-Agent, tipi di diagramma supportati, e regole di default (Excalidraw).
-  - `scripts/kroki_generator.py`: Script CLI Python con codifica `zlib.compress(text, 9)` + `base64.urlsafe_b64encode`. Supporta flag `--type`, `--format`, `--output`, `--markdown`, `--html`.
-- **Verifica**: Testati con successo lo script CLI (`kroki_generator.py`) e la generazione di tag Markdown/HTML.
+  - `SKILL.md`: Documentazione della skill per Pi-Agent, tipi di diagramma supportati, e regole di default (C4-PlantUML).
+  - `scripts/kroki_generator.py`: Script CLI Python con codifica `zlib.compress(text, 9)` + `base64.urlsafe_b64encode`. Supporta flag `--type`, `--format`, `--output`, `--markdown`, `--html`, e la modalità `--localize` per scaricare automaticamente tutti gli SVG da un file Markdown e riscrivere i link con percorsi locali relativi.
+- **Localizzazione Diagrammi README**: Generati i 5 diagrammi C4-PlantUML, scaricati gli SVG in `assets/*.svg` ed aggiornato `README.md` per puntare ai file locali, garantendo il rendering offline e la totale indipendenza da API esterne.
+- **Verifica**: Testati con successo lo script CLI (`kroki_generator.py`), la modalità `--localize`, ed il rendering vettoriale SVG locale dei 5 diagrammi del README.
 
 ---
 

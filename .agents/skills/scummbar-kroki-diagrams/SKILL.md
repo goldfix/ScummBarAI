@@ -80,18 +80,24 @@ python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py "Taver
 Tavolo di Barnaby
 Mappa di Balthazar" --markdown
 
-# 2. Grafico Mermaid con output Markdown
+# 2. Localizzazione automatica dei diagrammi Markdown (download SVG in assets/ e riscrittura dei link)
+python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py --localize README.md
+
+# 3. Grafico Mermaid con output Markdown
 python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py "graph TD; A[Taverna]-->B[Barista];" --type mermaid --markdown
 
-# 3. Grafico Graphviz scaricato su disco come file SVG
+# 4. Grafico Graphviz scaricato su disco come file SVG
 python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py "digraph G { Taverna -> Grog; }" --type graphviz --output docs/images/taverna.svg
 
-# 4. Input da file sorgente
+# 5. Input da file sorgente
 python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py --file schema.dot --type graphviz --markdown
 ```
 
-### Nota sul download di immagini:
-Il servizio Kroki pubblico può rispondere `403 Forbidden` alle richieste con User-Agent Python di default (`Python-urllib`). Lo script usa quindi un User-Agent standard (`Mozilla/5.0 ...`). Gli URL generati funzionano comunque in qualsiasi browser e nei tag Markdown.
+### 💾 Localizzazione Offline e Salvataggio SVG
+Per rendere la documentazione del repository totalmente indipendente dal servizio Kroki online, lo script supporta la modalità `--localize` (o `-l`):
+- Scansiona un file Markdown (es. `README.md`).
+- Scarica tutti i file vettoriali SVG dai link Kroki remoti salvandoli nella cartella `assets/` alla root del progetto (creandola automaticamente se non esiste).
+- Sostituisce i link remoti `https://kroki.io/...` con i percorsi relativi locali dei file SVG (`assets/nome_diagramma.svg`).
 
 ---
 
