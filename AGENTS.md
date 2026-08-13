@@ -86,6 +86,17 @@ Il progetto fornisce delle skill di sistema sotto `.agents/skills/` che devi inv
 - `/skill:scummbar-memory-updater`: Per aggiornare `MEMORY.md`, `README.md` e `AGENTS.md` alla fine di una sessione di sviluppo o per modifiche rilevanti.
 - `/skill:scummbar-web-to-markdown`: Per convertire una pagina web in un file Markdown salvato nella cartella specificata dall'utente e auto-indicizzarlo nel RAG.
 
+### Come usare le skill
+
+| Situazione | Skill da invocare | Comando / esempio |
+|-----------|-------------------|-------------------|
+| Devo rispondere a una domanda tecnica su ADK/DeepSeek/Telegram/Streamlit | `scummbar-docs-analyzer` | `python3 .agents/skills/scummbar-docs-analyzer/rag/search.py "query" --top_k 5` |
+| Ho aggiunto/modificato documentazione in `docs/` | `scummbar-docs-analyzer` (re-index) | `python3 .agents/skills/scummbar-docs-analyzer/rag/indexer.py` |
+| Devo creare/aggiornare un diagramma nel README o in `docs/` | `scummbar-kroki-diagrams` | `python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py "Sistema\nComponente" --markdown` |
+| Devo rendere offline i diagrammi di un file Markdown | `scummbar-kroki-diagrams` (--localize) | `python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py --localize README.md` (salva SVG in `assets/`) |
+| Devo convertire una pagina web in Markdown e indicizzarla | `scummbar-web-to-markdown` | `python3 .agents/skills/scummbar-web-to-markdown/scripts/convert.py "URL" "docs/cartella/"` |
+| Ho chiuso una sessione di sviluppo / preso decisioni architetturali | `scummbar-memory-updater` | `/skill:scummbar-memory-updater` (aggiorna MEMORY/README/AGENTS) |
+
 ---
 
 ## 🔑 Comandi Essenziali
