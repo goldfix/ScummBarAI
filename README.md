@@ -4,436 +4,628 @@
 
 > *"Where sabers rest, stories float, and agents run the bar."*
 
-Welcome to the **Scummbar AI**! This is an open-source, hands-on **study repository** designed to teach developers how to build, orchestrate, and maintain a complex, multi-agent conversational application using **Google Agent Development Kit (ADK)**, Gemini, and DeepSeek, integrated directly into **Telegram** and **REST APIs**.
+**Scummbar AI** is an open-source, hands-on **study repository** that teaches how to design, orchestrate, and operate a complex **multi-agent conversational application** using **Google Agent Development Kit (ADK)**, **Gemini** and **DeepSeek**, delivered through **Telegram** (multi-player group chat) and a **Streamlit web RPG** (single-player adventure).
 
-Instead of a dry reference manual, this documentation is structured **didactically** to guide you through the architectural decisions, the code design, and the modern AI-assisted workflows used to build and evolve this project.
+The repository is intentionally structured **didactically**: every architectural choice, every file, and every integration is documented so you can understand *why* the system is built this way — not just *what* it does.
 
 ---
 
 ## 🗺️ Table of Contents
-1. [📖 The Story & The Characters](#-the-story--the-characters)
-2. [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
-3. [🏗️ Architectural Blueprint & Technical Choices (ADK + Telegram)](#️-architectural-blueprint--technical-choices-adk--telegram)
-   - [3.1 Component & File Dependency Map (Telegram + Core ADK)](#31-component--file-dependency-map-telegram--core-adk)
-   - [3.2 Collaborative Multi-Agent Coordination](#32-collaborative-multi-agent-coordination)
-   - [3.3 Core Architectural Choices](#33-core-architectural-choices)
-4. [🎮 Streamlit Single-Player RPG Frontend](#-streamlit-single-player-rpg-frontend)
-   - [4.1 Architecture & Concept](#41-architecture--concept)
-   - [4.2 Key Features & Capabilities](#42-key-features--capabilities)
-   - [4.3 Distinct Narrative & Action Styling](#43-distinct-narrative--action-styling)
-5. [🤖 AI-Assisted Development: The Pi-Agent Autopilot](#-ai-assisted-development-the-pi-agent-autopilot)
+
+1. [🎯 Project Purpose](#-project-purpose)
+2. [📖 The Story & The Characters](#-the-story--the-characters)
+3. [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
+4. [🏗️ The ADK Core: Architecture & How It Works](#-the-adk-core-architecture--how-it-works)
+   - [4.1 Core Overview Diagram](#41-core-overview-diagram)
+   - [4.2 Multi-Agent Coordination (Router-Delegate)](#42-multi-agent-coordination-router-delegate)
+   - [4.3 Agent Configuration](#43-agent-configuration)
+   - [4.4 ADK Skills (Auto-Discovery)](#44-adk-skills-auto-discovery)
+   - [4.5 ADK Function Tools](#45-adk-function-tools)
+   - [4.6 Time Management (Real Atmosphere)](#46-time-management-real-atmosphere)
+   - [4.7 World Context & Narration Rules](#47-world-context--narration-rules)
+   - [4.8 The Captain's Log (Tavern Journal)](#48-the-captains-log-tavern-journal)
+   - [4.9 Model Factory & Dual Authentication](#49-model-factory--dual-authentication)
+   - [4.10 Sessions, Compaction & Context Caching](#410-sessions-compaction--context-caching)
+5. [📡 Telegram Frontend (Multi-Player)](#-telegram-frontend-multi-player)
+   - [5.1 Telegram Delivery Architecture](#51-telegram-delivery-architecture)
+   - [5.2 Semantic Routing](#52-semantic-routing)
+   - [5.3 Concurrency, Ephemeral & Session Pruning](#53-concurrency-ephemeral--session-pruning)
+   - [5.4 HTML Message Formatting](#54-html-message-formatting)
+6. [🎮 Streamlit Frontend (Single-Player RPG)](#-streamlit-frontend-single-player-rpg)
+   - [6.1 Architecture & Concept](#61-architecture--concept)
+   - [6.2 Key Features](#62-key-features)
+   - [6.3 Narrative & Action Styling (3 Tiers)](#63-narrative--action-styling-3-tiers)
+7. [🤖 Pi-Agent: AI-Assisted Development & System Skills](#-pi-agent-ai-assisted-development--system-skills)
+   - [7.1 What is a Pi-Agent Skill (Progressive Disclosure)](#71-what-is-a-pi-agent-skill-progressive-disclosure)
+   - [7.2 scummbar-docs-analyzer (Hybrid RAG)](#72-scummbar-docs-analyzer-hybrid-rag)
+   - [7.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)](#73-scummbar-memory-updater-memoryreadmeagents-management)
+   - [7.4 scummbar-web-to-markdown (Docs Import)](#74-scummbar-web-to-markdown-docs-import)
+   - [7.5 How to Use the Autopilot](#75-how-to-use-the-autopilot)
+8. [🧭 Project Structure](#-project-structure)
+9. [⚙️ Environment Configuration (.env)](#-environment-configuration-env)
+
+---
+
+## 🎯 Project Purpose
+
+Scummbar AI is a **didactic laboratory** to explore the **Google ADK** ecosystem and multi-agent architectures in depth — without sacrificing a **fun and immersive** user experience.
+
+The main goals are:
+
+| Goal | How It Is Addressed |
+|------|---------------------|
+| **Multi-Agent Orchestration** | A `root_agent` coordinator that delegates to 4 specialized sub-agents (Router-Delegate pattern) |
+| **Tool Calling** | ADK Function Tools for persistent memory, artifacts, images, and live RSS feeds |
+| **Modular Skills** | ADK Skill auto-discovery: adding a capability = creating a `SKILL.md` folder, zero code |
+| **Dynamic Prompting** | An `InstructionProvider` that refreshes the tavern atmosphere on every turn |
+| **Multi-Model** | Switch between Gemini and DeepSeek by changing **a single line** in `.env` |
+| **Isolated Dual Auth** | API Key ↔ Vertex AI Service Account, with fully isolated image auth |
+| **Multi-Frontend** | Same shared ADK core, two frontends: **Telegram** (multi-player group) and **Streamlit** (single-player RPG) |
+| **Persistence & Compaction** | Shared SQLite WAL + automatic LLM compaction of long sessions |
+| **Persistent Storytelling** | The **Captain's Log** turns the chat into a first-person tale, updated incrementally |
+| **AI-Assisted Development** | A **Pi-Agent Skills** system with a local hybrid RAG engine for autonomous documentation |
 
 ---
 
 ## 📖 The Story & The Characters
 
-The **Scummbar** is a legendary Caribbean pirate tavern. It is a shared multi-agent environment where AI-powered characters live, listen, and interact with patrons in real-time.
+The **Scummbar** is a legendary Caribbean pirate tavern. It is a shared multi-agent environment where AI-powered characters live, listen, and interact with patrons in real time.
 
-| Character | Role | Didactic Purpose | Personality Vibe |
-|-----------|------|------------------|------------------|
-| 🍺 **Barnaby** | Bartender | Demonstrates **Tool Calling** (Memory Read/Write, Text Artifact generation) and ADK **Skills Auto-Discovery** | Empathetic, quiet, knows every pirate's secret, mixes unforgettable custom grogs. |
-| 🐱 **Barnacle** | Tavern Cat | Demonstrates **Read-Only Shared Memory** and **Ephemeral Telegram Messaging** (whispering to specific users) | Crotchety, speaks rarely, sleeps on ammo crates, dislikes loud patrons. |
-| 🔮 **Isolde** | Fortune Teller | Demonstrates **Independent Multi-Auth Routing** and **Multimodal Image Generation** (native Gemini 3.1 Flash Image + Pillow PIL fallback) | Cryptic, majestic, sits in the Shadow Corner, extracts mystical tarot cards. |
-| 🧭 **Balthazar** | Navigator & Cartographer | Demonstrates **Live RSS Feed Fetching & Pompous Comedic Translation**, **Sub-Agent Delegation**, and **Text Artifact Generation** (Portolans & Charts) | Eccentric, theatrically solemn, turns political bickering and tech news into epic maritime-fantasy lore with unintentional hilarity. |
+| Character | Role | Didactic Purpose | Personality |
+|-----------|------|------------------|-------------|
+| 🍺 **Barnaby** | Bartender | Tool Calling (read/write memory, text artifacts), Skills Auto-Discovery | Empathetic, quiet, knows every pirate's secret, mixes unforgettable custom grogs |
+| 🐱 **Barnacle** | Tavern Cat | Shared **read-only** memory, Telegram **ephemeral** messages (whispers) | Crotchety, speaks rarely, sleeps on ammo crates |
+| 🔮 **Isolde** | Fortune Teller | Independent multi-auth, multimodal image generation (Gemini Flash Image + PIL fallback) | Cryptic, majestic, sits in the Shadow Corner |
+| 🧭 **Balthazar** | Navigator & Cartographer | Live RSS feeds + comedic translation, text artifacts (portolans & charts), Captain's Log | Eccentric, theatrically solemn, turns real news into maritime lore |
 
 ---
 
 ## 🚀 Quick Start (Run First, Learn Later)
 
-Follow these steps to get the Scummbar running on your local machine, Web UI, or Telegram group in minutes.
-
 ### 1. Prerequisites
 - Python 3.11+
-- **Astral `uv`** (pre-installed on system: `brew install uv` or `curl -LsSf https://astral.sh/uv/install.sh`)
-- A Google Gemini API Key (from [Google AI Studio](https://aistudio.google.com/)) OR a Google Cloud Service Account (Vertex AI).
-- A Telegram Bot Token from [@BotFather](https://t.me/botfather) (optional, for Telegram delivery).
+- **Astral `uv`** (`brew install uv` or `curl -LsSf https://astral.sh/uv/install.sh`)
+- A Google Gemini API Key (Google AI Studio) **or** a Vertex AI Service Account
+- A Telegram Bot Token from [@BotFather](https://t.me/botfather) (optional, Telegram only)
 
 ### 2. Installation
 ```bash
-# Clone the repository
 git clone https://github.com/goldfix/ScummBarAI.git
 cd ScummBarAI
 
 # Initialize and create the virtual environment
-source py_env.sh init_py
+bash py_env.sh init_py
 
 # Activate the environment
-source py-env/bin/activate  # or: source py_env.sh active
+source py-env/bin/activate   # or: source py_env.sh active
 ```
 
-### 3. Environment Configuration
-Copy `.env.example` or create a file named `src/scummbar_chat/.env`. This file is divided into **6 logical sections** based on purpose:
+### 3. `.env` Configuration
+Create the file `src/scummbar_chat/.env` (see [Section 9](#-environment-configuration-env) for the full reference).
+
+### 4. Running the Applications
+
+| Frontend | Command | Description |
+|----------|---------|-------------|
+| ADK Web | `./start.sh` | ADK Web UI with SQLite persistence |
+| Telegram | `python telegram_bot.py --debug` | Telegram bot for groups |
+| Streamlit | `./start_streamlit.sh` | Single-player RPG on `http://localhost:8501` |
+
+---
+
+## 🏗️ The ADK Core: Architecture & How It Works
+
+The heart of the application lives in `src/scummbar_chat/`. Everything else (Telegram, Streamlit, Pi-Agent skills) is a **delivery layer** or **support** around this nucleus.
+
+### 4.1 Core Overview Diagram
+
+```
+                          ┌──────────────────────────────────────────────────┐
+                          │                   utils.py                      │
+                          │  (Config .env · Model Factory · Dual Auth ·     │
+                          │   load_md() · load_all_skills() · Context Cache)│
+                          └───────────────┬──────────────────┬──────────────┘
+                                          │                  │ builds MODEL / COMPACTION_LLM
+                                          ▼                  ▼
+                          ┌──────────────────────────────────────────────────┐
+                          │              time_context.py                     │
+                          │   (real clock → 6 atmospheric moments)           │
+                          └───────────────────┬──────────────────────────────┘
+                                              │ InstructionProvider (global_instruction)
+                                              ▼
+                          ┌──────────────────────────────────────────────────┐
+                          │                  agent.py                        │
+                          │      root_agent = Coordinator (Router)           │
+                          │   static_instruction = world/scummbar.md         │
+                          │   instruction = delegation to sub-agents         │
+                          └───────────────┬──────────────────┬──────────────┘
+                                          │ sub_agents       │
+              ┌───────────────────────────┼──────────────────┼───────────────────────────┐
+              ▼                           ▼                  ▼                           ▼
+     ┌────────────────┐         ┌────────────────┐  ┌────────────────┐        ┌────────────────┐
+     │   barnaby      │         │   barnacle     │  │    isolde      │        │   balthazar    │
+     │ (the bartender)│         │  (the cat)     │  │(the seer)      │        │(the navigator) │
+     └───────┬────────┘         └───────┬────────┘  └───────┬────────┘        └───────┬────────┘
+             │ tools + skills           │ tools            │ tools                   │ tools
+             ▼                          ▼                  ▼                         ▼
+     ┌──────────────────────────────────────────────────────────────────────────────────────┐
+     │                                  tools.py (FunctionTool)                              │
+     │  recall_patron_memory · memorize_patron_chat · write_secret_scroll ·                 │
+     │  draw_tarot_card · fetch_news_feed · update_tavern_diary_tool                        │
+     └──────────────────────────────────────────────────────────────────────────────────────┘
+             │                          │                  │
+             ▼                          ▼                  ▼
+     ┌─────────────────┐      ┌──────────────────┐  ┌──────────────────┐      ┌──────────────────┐
+     │  skills/        │      │  patron_memories │  │ InMemoryArtifact │      │  diary.py        │
+     │ (grog, menu)    │      │  (SQLite)        │  │ Service (ADK)    │      │  (Captain's Log) │
+     │  SKILL.md       │      │  sessions.db     │  │                  │      │  data/diaries/   │
+     └─────────────────┘      └──────────────────┘  └──────────────────┘      └──────────────────┘
+```
+
+**Logical flow of a single turn:**
+
+```
+Input (Telegram / Streamlit / ADK Web)
+        │
+        ▼
+┌────────────────────────────────────────────────────────────┐
+│ adapter / app: _resolve_intent()  →  [Risponde NOME]        │
+│   + prefix [avventore: X] [avventore_id: Y]                │
+│   + (every 3 turns) [NOTA DI SISTEMA: Narratore...]         │
+└────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────────────────────────────┐
+│ runner.run_agent(user_id, session_id, text)                │
+│   → App(root_agent) + DatabaseSessionService (SQLite)      │
+│   → ContextCacheConfig (Gemini) / KV cache (DeepSeek)      │
+│   → EventsCompactionConfig (every 30 events, overlap 2)    │
+└────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────────────────────────────┐
+│ root_agent: global_instruction (time_context) + world       │
+│   → delegates to barnaby / barnacle / isolde / balthazar    │
+│   → the sub-agent uses its tools (memory, artifacts, ...)   │
+└────────────────────────────────────────────────────────────┘
+        │
+        ▼
+Response text + artifact_delta → HTML formatter → delivery
+```
+
+### 4.2 Multi-Agent Coordination (Router-Delegate)
+
+Instead of a single monolithic prompt, Scummbar uses the ADK **Hierarchical Router-Delegate** pattern:
+
+- **`root_agent`** (`agent.py`): a coordinator `Agent` that **never answers directly** — it reads the routing prefix and delegates to the correct sub-agent.
+- **4 sub-agents** registered in `sub_agents=[barnaby_agent, barnacle_agent, isolde_agent, balthazar_agent]`.
+
+Routing happens at two priority levels (see [5.2 Semantic Routing](#52-semantic-routing)):
+1. **Explicit @mention** (e.g. `@balthazar`) → always wins
+2. **Keyword matching** (e.g. `grog` → Barnaby, `tarocchi` → Isolde)
+
+Once resolved, the router prepends `[Risponde NOME]` to the text, which the coordinator interprets to delegate.
+
+### 4.3 Agent Configuration
+
+Each agent lives in `bots/<name>/` with two files: `agent.py` (ADK config) and `persona.md` (Italian, channel-agnostic prompt).
+
+| Agent | Model | Skills | Tools | Read-Only? |
+|-------|-------|--------|-------|------------|
+| 🍺 **barnaby** | `MODEL` | ✅ grog + menu (auto-discovery) | recall, memorize, write_secret_scroll, **update_tavern_diary_tool** | No |
+| 🐱 **barnacle** | `MODEL` | ✅ grog + menu | recall (smell/read only) | **Yes** — cannot write memory |
+| 🔮 **isolde** | `MODEL` | — (no skills) | recall, draw_tarot_card | No |
+| 🧭 **balthazar** | `MODEL` | ✅ grog + menu | recall, memorize, write_secret_scroll, fetch_news_feed, **update_tavern_diary_tool** | No |
+
+**Base agent configuration (Barnaby example):**
+```python
+barnaby_agent = Agent(
+    name="barnaby",
+    model=MODEL,
+    description="Barnaby, il barista dello Scummbar.",
+    instruction=_PERSONA,                        # persona.md
+    generate_content_config=THINKING_CONFIG,     # thinking_level=medium
+    retry_config=DEFAULT_RETRY_CONFIG,           # retry with backoff
+    tools=[_barnaby_toolset, recall_patron_tool, memorize_patron_tool,
+           update_tavern_diary_tool, write_secret_scroll_tool],
+)
+```
+
+### 4.4 ADK Skills (Auto-Discovery)
+
+Skills live in `src/scummbar_chat/skills/` as folders containing `SKILL.md`:
+
+```
+skills/
+├── grog/     → SKILL.md + references/  (dynamic grog preparation)
+└── menu/     → SKILL.md                (two-level galley menu)
+```
+
+**How auto-discovery works**: `utils.load_all_skills()` scans the `skills/` folder at runtime and instantiates a `SkillToolset` for every `SKILL.md` found. **Adding a new skill = creating a folder, zero Python code.**
+
+Skills are **self-contained**: all content (rules, examples, references) lives inside `SKILL.md`, loaded on demand by the model.
+
+### 4.5 ADK Function Tools
+
+All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They receive the user identity exclusively from `tool_context.user_id` (never from the LLM, for safety).
+
+| Tool | Function | Description |
+|------|----------|-------------|
+| `recall_patron_memory` | Memory read | Retrieves the patron's traits and summaries from `patron_memories` (SQLite) |
+| `memorize_patron_chat` | Memory write | Updates stable traits (max 10) and chat summary (max 300 chars) |
+| `write_secret_scroll` | Text artifacts | Generates scrolls/recipes/portolans `.txt` via `InMemoryArtifactService` |
+| `draw_tarot_card` | Multimodal images | Generates tarot cards with `gemini-3.1-flash-lite-image` (isolated `IMAGE_*` auth), PIL fallback, PNG/JPEG detection via byte headers |
+| `fetch_news_feed` | Live RSS feeds | ANSA + HDBlog, 3 categories (IT politics, world, tech), comedic translation with HTML links |
+| `update_tavern_diary_tool` | Captain's Log | Updates the patron's diary using the real `tool_context.session.id` and filtering by `user_id` (avoids mixing patrons in a group) |
+
+### 4.6 Time Management (Real Atmosphere)
+
+`time_context.py` maps the system clock into **6 Caribbean moments of the day**:
+
+| Time | Moment | Atmosphere |
+|------|--------|------------|
+| 07–09 | 🌅 Dawn | Bar opens, silence, first pink light |
+| 09–12 | ☀️ Morning | The bar wakes up, first serious customers |
+| 12–14 | 🍺 Noon | Peak activity, crowd at the counter |
+| 14–16 | 😴 Afternoon | Sleepy post-lunch calm |
+| 16–18 | 🌇 Sunset | Golden light, lanterns lit |
+| 18–∞ | 🌙 Night | The bar never closes, night pirates |
+
+**How it is used**: `agent.py` exposes `_time_instruction_provider(context)` — an ADK **`InstructionProvider`** bound to `global_instruction`. On **every model turn**, the atmospheric description of the current moment is regenerated and injected into the context. This is cache-friendly for Gemini and guarantees the bots always know whether it is dawn or deep night.
+
+### 4.7 World Context & Narration Rules
+
+`world/scummbar.md` is the tavern's **master prompt**: geography, ambient rules, character relationships, and the **Narratore rules** (environmental description injection every 3 turns).
+
+It is loaded with `load_md()` and passed as `static_instruction` to the `root_agent`, so every sub-agent inherits the context without duplicating it.
+
+**Key rule**: all `.md` files are **channel-agnostic** — no references to Telegram or Streamlit. Visual rendering is exclusively the frontends' responsibility.
+
+### 4.8 The Captain's Log (Tavern Journal)
+
+`diary.py` turns the conversation into a **first-person tale** ("I"), as if the patron himself were writing down his deeds.
+
+| Aspect | Detail |
+|--------|--------|
+| **File** | `data/scummbar_chat/diaries/Diary_<Pirate_Name>.md` (one per patron) |
+| **Tracking** | HTML comment at the top of the file: `<!-- DIARY_METADATA: {"last_saved_index": N} -->` |
+| **Incremental update** | Reads `last_saved_index`, extracts only new messages (`messages[last_saved_index:]`), generates a chapter, appends it |
+| **Idempotency** | No new messages → returns without consuming tokens |
+| **Style** | Dedicated prompt: first person, Caribbean adventure, discursive, rich in detail |
+| **Automatic trigger** | In Streamlit, every 10 total session messages (with confirmation toast) |
+| **Manual trigger** | "🔄 Compila / Aggiorna Diario ORA" button in the Captain's Log tab |
+| **ADK tool** | `update_tavern_diary_tool` (Barnaby and Balthazar can update it in-character) |
+| **Download** | "📥 Scarica Diario (.md)" button |
+| **Dual-provider** | Generation uses `_build_model_instance(COMPACTION_MODEL)` → works with Gemini and DeepSeek |
+
+### 4.9 Model Factory & Dual Authentication
+
+`utils.py` centralizes model creation:
+
+- **`_build_model_instance(model_name, is_main_model)`** → returns `Gemini` (native ADK) if the name has no prefix, `LiteLlm` (DeepSeek) if it starts with `deepseek/`. For the main model it enables `thinking` + `reasoning_effort=high`.
+- **`get_gemini_client_kwargs(prefix="")`** → parameterizes authentication between:
+  - **API Key** (Google AI Studio): forces `vertexai=False`, clears `project/location`
+  - **Vertex AI / Service Account**: loads credentials in RAM as a `Credentials` object (without mutating `os.environ`, thread-safe)
+  - With the `IMAGE_` prefix it fully isolates image-generation authentication
+
+**Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=medium` (Gemini) / `reasoning_effort=high` (DeepSeek); `include_thoughts=False` with `thought` part filtering.
+
+### 4.10 Sessions, Compaction & Context Caching
+
+| Mechanism | Configuration | Detail |
+|-----------|---------------|--------|
+| **Persistence** | `DatabaseSessionService` → `data/scummbar_chat/sessions.db` | WAL mode + `busy_timeout=10000` for multi-frontend concurrency |
+| **Compaction** | `EventsCompactionConfig` + `LlmEventSummarizer` | Every `COMPACTION_INTERVAL=30` events, summarizes the past with `COMPACTION_MODEL`, keeps `COMPACTION_OVERLAP=2` events verbatim |
+| **Context Caching** | `ContextCacheConfig` (Gemini 2.0+) | `min_tokens=2048`, `ttl=600s`, `cache_intervals=5`; automatically skipped for DeepSeek (server-side KV caching) |
+| **Artifacts** | `InMemoryArtifactService` | Scrolls, portolans, and images saved into the ADK session |
+| **Session Pruning** | `purge_old_sessions(hours=24)` + hourly cron | Keeps the DB clean by deleting events older than 24h |
+
+---
+
+## 📡 Telegram Frontend (Multi-Player)
+
+Telegram provides the **multi-player** experience: a shared group where the 4 bots respond in real time.
+
+### 5.1 Telegram Delivery Architecture
+
+```
+telegram_bot.py (CLI Supervisor: env check, logging, signals)
+        │
+        ▼
+telegram/adapter.py (aiohttp long-polling, routing, locks, narrator injection)
+        │                          │
+        ▼                          ▼
+telegram/formatter.py         telegram/runner.py (ADK App + sessions + compaction)
+        │
+        ▼
+Telegram Bot API (HTML messages, documents, photos, ephemeral)
+```
+
+| File | Role |
+|------|------|
+| `telegram_bot.py` | Pre-flight env checks (Gemini/DeepSeek auth), rotating logs (`bot.log`, `errors.log`), signal trapping, delegates to `adapter.main()` |
+| `telegram/adapter.py` | Long-polling engine via `aiohttp` (no extra libraries). DM redirect to the group, routing, concurrency locks, Narratore injection every 3 messages, artifact upload via `sendDocument`/`sendPhoto`, Barnacle's ephemeral whispers, pruning cron |
+| `telegram/formatter.py` | Converts raw markdown to Telegram-safe HTML: speech → text, `*action*` → `<i>action</i>`, `_narration_` → `<blockquote><i>narration</i></blockquote>`; escapes `<`, `>`, `&` |
+| `telegram/runner.py` | Initializes `App(root_agent)` with `DatabaseSessionService`, `EventsCompactionConfig`, `ContextCacheConfig`, `InMemoryArtifactService`. Exposes `run_agent()` and `purge_old_sessions()` |
+
+### 5.2 Semantic Routing
+
+The `_resolve_intent()` function applies two priority levels:
+
+1. **Explicit @mention** → `@barnaby`, `@barnacle`, `@isolde`, `@balthazar` (always wins)
+2. **Keyword matching** on `_INTENT_MAP` (e.g. `grog`/`birra`/`ordinare` → Barnaby; `tarocchi`/`carte`/`predizione` → Isolde; `mappa`/`rotta`/`bussola` → Balthazar; `gatto`/`fusa` → Barnacle)
+
+### 5.3 Concurrency, Ephemeral & Session Pruning
+
+- **Per-bot locks**: `asyncio.Lock` with a **15s timeout** (`asyncio.wait_for`) → if a bot is busy, the user receives "è occupato" instead of waiting forever.
+- **Barnacle ephemeral**: the cat's messages use `sendMessage` with ephemeral/reply mode if the bot is admin in the group; public fallback with a `🐱` note.
+- **Pruning**: `_session_cleaner_cron()` every hour removes events older than 24 hours (direct DELETE on the ADK `events` table, wrapped in try/except).
+
+### 5.4 HTML Message Formatting
+
+The `format_response()` pipeline applies a 3-tier hierarchy:
+
+| Element | Source pattern | Telegram HTML output |
+|---------|---------------|----------------------|
+| **Environmental narration** | full lines `_text_` | `<blockquote><i>text</i></blockquote>` |
+| **Character actions** | inline `*action*` | `<i>action</i>` |
+| **Spoken dialogue** | plain text | unstyled text |
+
+---
+
+## 🎮 Streamlit Frontend (Single-Player RPG)
+
+While Telegram is a real-time group chat, the **Streamlit Web App** (`src/scummbar_chat/streamlit/`) turns the Scummbar into a **single-player narrative RPG**.
+
+### 6.1 Architecture & Concept
+
+```
+                    ┌─────────────────────────────┐
+                    │   Google ADK Core Agent     │
+                    │ (agent.py / runner.py)      │
+                    └──────────────┬──────────────┘
+                                   │
+              ┌────────────────────┴────────────────────┐
+              ▼                                         ▼
+  ┌──────────────────────────┐              ┌──────────────────────────┐
+  │  Telegram Adapter        │              │  Streamlit App Frontend  │
+  │  (telegram/adapter.py)   │              │  (streamlit/app.py)      │
+  └────────────┬─────────────┘              └────────────┬─────────────┘
+               ▼                                        ▼
+       [ Telegram Group ]                       [ Browser Web UI ]
+```
+
+**Zero business-logic duplication**: `app.py` uses the same `run_agent()` as Telegram and the same routing functions (`_resolve_intent()`).
+
+| File | Role |
+|------|------|
+| `streamlit/app.py` | Entry point. Manages session, automatic routing, Narratore trigger, history restoration, Chat tab + Captain's Log tab, automatic diary trigger every 10 messages |
+| `streamlit/components.py` | Avatars, 3-tier narrative formatting, artifact rendering, sidebar (mandatory patron name, character legend, game management) |
+| `start_streamlit.sh` | `streamlit run src/scummbar_chat/streamlit/app.py` |
+
+### 6.2 Key Features
+
+#### A. Mandatory "Patron Name" Field
+On startup the field is **empty** and the chat is **locked** (`st.chat_input(disabled=True)`) with a pirate warning: the user must enter their name to enter.
+
+#### B. Automatic Semantic Intent Routing
+Same engine as Telegram: `maga`/`veggente` → Isolde, `navigatore`/`mappe` → Balthazar, `gatto`/`micio` → Barnacle, `barista`/`grog` → Barnaby.
+
+#### C. Automatic History Restoration
+When the player enters their name:
+1. Stable `user_id` computed via `sha256(patron_name)`
+2. Deterministic `session_id` = `st_session_{user_id}`
+3. `load_session_chat_history()` queries the SQLite `events` table and **instantly restores** the pirate's entire past story
+
+#### D. Narratore Synchronization
+`narrator_counter`: every **3 turns** it appends `[NOTA DI SISTEMA: È il momento del Narratore...]` to the prompt, like in Telegram.
+
+#### E. Integrated Captain's Log
+"📜 Captain's Log" view with: registered/total message stats, **"🔄 Compila / Aggiorna Diario ORA"** button, **"📥 Scarica Diario (.md)"** button, live Markdown preview, and automatic trigger every 10 messages with confirmation toast.
+
+#### F. Segmented Control Navigation
+The frontend uses `st.segmented_control` (not `st.tabs`) to alternate between **Chat Tavern** ↔ **Captain's Log**. This keeps `st.chat_input` at top level, preserving the **sticky bottom anchoring** (known `st.chat_input`-inside-`st.tabs` bug).
+
+#### G. Multi-Process Concurrency & WAL
+Telegram and Streamlit share the same `sessions.db`. To avoid `database is locked`:
+- `PRAGMA journal_mode=WAL;`
+- `PRAGMA busy_timeout=10000;` + `sqlite3.connect(timeout=10.0)`
+
+### 6.3 Narrative & Action Styling (3 Tiers)
+
+`format_streamlit_narrative()` applies a 3-tier visual hierarchy:
+
+| Element | Source pattern | Streamlit visual output |
+|---------|---------------|-------------------------|
+| **Environmental narration** | full lines `_text_` | Italic **between guillemets** `«...»` on a **light gray box** (`#e9ecef`) |
+| **Character actions** | inline `*action*` | Italic between guillemets `«...»` on a **light gray badge** |
+| **Spoken dialogue** | plain text | **Plain sans-serif text** (maximum readability) |
+
+---
+
+## 🤖 Pi-Agent: AI-Assisted Development & System Skills
+
+This repository is designed to be developed, refactored, and maintained **in collaboration with an AI assistant (Pi-Agent)**. To this end, an autonomous **Agent Skills** system is configured directly in the codebase.
+
+```
+                            [.agents/skills/]
+                                    │
+          ┌─────────────────────────┼──────────────────────────┐
+          ▼                         ▼                          ▼
+[scummbar-docs-analyzer]  [scummbar-memory-updater]  [scummbar-web-to-markdown]
+  - Hybrid RAG engine        - Logging rules               - HTML→MD converter
+  - FTS5 BM25 + Vector       - Roadmap compiler            - bs4 + html2text
+  - gemini-embedding-2       - Fence marker validator      - Auto RAG indexing
+  - Reciprocal Rank Fusion
+```
+
+### 7.1 What is a Pi-Agent Skill (Progressive Disclosure)
+
+A Pi-Agent skill is a self-contained package in `.agents/skills/`, consisting of `SKILL.md` (full instructions) + optional Python scripts. Pi-Agent scans this folder at startup and learns the capabilities from the **description**; the full instructions are loaded **on-demand** when the skill is invoked.
+
+This implements **Progressive Disclosure**: it keeps the AI's context window clean, saving tokens and improving reasoning focus.
+
+### 7.2 scummbar-docs-analyzer (Hybrid RAG)
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Semantic + keyword search across 860+ Markdown documents in `docs/` |
+| **Engine** | Local hybrid RAG: **FTS5 BM25** + **Vector Cosine Similarity** with `sqlite-vec` |
+| **Embeddings** | Google `gemini-embedding-2` (768 dimensions) |
+| **Fusion** | **Reciprocal Rank Fusion (RRF)** between the two rankings |
+| **Cleanup** | The indexer compares DB vs disk and **automatically removes orphan documents** |
+| **DB** | `.agents/skills/scummbar-docs-analyzer/data/docs_rag.db` (860 docs, 14,728 chunks) |
+
+```bash
+# Hybrid search (semantic + keyword)
+PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
+  .agents/skills/scummbar-docs-analyzer/rag/search.py "context compaction" --top_k 5
+
+# Incremental re-indexing after adding new docs
+PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
+  .agents/skills/scummbar-docs-analyzer/rag/indexer.py
+```
+
+### 7.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Keep `MEMORY.md`, `README.md`, and `AGENTS.md` in sync |
+| **Rules** | Standardizes how to document: session logs, roadmap, architectural decisions |
+| **Validator** | Automatic Python script that verifies no Markdown code block is left open (balanced fence markers) |
+| **Key rule** | Pure documentation additions (docs imports) do **not** auto-update `MEMORY.md` |
+
+### 7.4 scummbar-web-to-markdown (Docs Import)
+
+| Aspect | Detail |
+|--------|--------|
+| **Purpose** | Convert web pages into clean Markdown inside `docs/` |
+| **Pipeline** | `beautifulsoup4` + `html2text` |
+| **Extras** | Automatic updates, relative→absolute link resolution, UTF-8 emoji preservation, overwrite protection |
+| **Post-conversion** | Automatic trigger of the RAG indexer to update the vector database |
+
+### 7.5 How to Use the Autopilot
+
+```bash
+# 1. Search the documentation (hybrid RAG FTS5 + Cosine)
+PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
+  .agents/skills/scummbar-docs-analyzer/rag/search.py "agent evaluation" --top_k 5
+
+# 2. Convert a web page to Markdown and index it into the RAG
+python3 .agents/skills/scummbar-web-to-markdown/scripts/convert.py \
+  "https://adk.dev/evaluate/" "docs/google-api/"
+PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
+  .agents/skills/scummbar-docs-analyzer/rag/indexer.py
+
+# 3. Update memory, roadmap, and check fence-marker health
+/skill:scummbar-memory-updater
+```
+
+---
+
+## 🧭 Project Structure
+
+```
+scummbar/
+├── .agents/skills/                 # 🤖 Pi-Agent system skills
+│   ├── scummbar-docs-analyzer/     #    Hybrid RAG (FTS5 + sqlite-vec + gemini-embedding-2)
+│   ├── scummbar-memory-updater/    #    MEMORY/README/AGENTS update rules
+│   └── scummbar-web-to-markdown/   #    Web → Markdown converter
+├── docs/                           # 📚 Technical docs (ADK, DeepSeek, Telegram, Streamlit...)
+├── data/
+│   └── scummbar_chat/
+│       ├── sessions.db             # SQLite session database (ADK)
+│       ├── diaries/                # 📜 Patron Captain's Logs (Diary_Name.md)
+│       └── logs/                   # bot.log + errors.log (rotating)
+├── src/scummbar_chat/              # 🤖 Main application (Google ADK)
+│   ├── agent.py                    # root_agent + temporal InstructionProvider
+│   ├── utils.py                    # config, model factory, dual auth, load_md/load_all_skills
+│   ├── time_context.py             # real clock → tavern atmosphere
+│   ├── tools.py                    # ADK FunctionTool (memory, scrolls, tarot, news, diary)
+│   ├── diary.py                    # 📜 Captain's Log (incremental first-person generation)
+│   ├── .env                        # ⚠️ DO NOT commit — tokens and API keys
+│   ├── world/scummbar.md           # world context + Narratore rules
+│   ├── bots/                       # barnaby, barnacle, isolde, balthazar (agent.py + persona.md)
+│   ├── skills/                     # grog/, menu/ (auto-discovery)
+│   ├── telegram/                   # adapter.py, formatter.py, runner.py
+│   └── streamlit/                  # app.py, components.py
+├── telegram_bot.py                 # Telegram entry point (--debug flag)
+├── start.sh                        # ADK web with SQLite persistence
+├── start_streamlit.sh              # Streamlit RPG launcher
+├── py_env.sh                       # Environment setup (uv + venv)
+├── pyproject.toml                  # PEP 621 dependencies (uv)
+├── ruff.toml                       # Linter & formatter config
+├── AGENTS.md                       # Instructions for AI agents
+├── MEMORY.md                       # Live project memory
+└── README.md                       # This file
+```
+
+---
+
+## ⚙️ Environment Configuration (.env)
+
+The `src/scummbar_chat/.env` file is divided into **6 logical sections**:
 
 ```env
 # ===========================================================================
-# 🔐 SECTION 1: CORE GEMINI AUTHENTICATION (Chat & Compaction Auth)
+# 🔐 SECTION 1: GEMINI AUTHENTICATION (Chat & Compaction)
 # ===========================================================================
-# Choose ONE of the two options (A or B) and comment out the other.
+# Choose ONE of the two options (A or B).
 
-# --- OPTION A: Google AI Studio (API Key) — Simple, no GCP project needed ---
+# --- OPTION A: Google AI Studio (API Key) ---
 GEMINI_API_KEY=your-api-key-here
 
-# --- OPTION B: Vertex AI / Google Cloud (Service Account) — GCP Enterprise ---
+# --- OPTION B: Vertex AI / Google Cloud (Service Account) ---
 # GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 # GOOGLE_CLOUD_LOCATION=global
 # GOOGLE_GENAI_USE_VERTEXAI=True
 # GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/key.json
 
 # ===========================================================================
-# 💬 SECTION 2: CHAT CONVERSATION (Core LLM Settings)
+# 💬 SECTION 2: CONVERSATION MODEL
 # ===========================================================================
-# The main model used by the bots for chatting.
-# You can easily switch to DeepSeek by using the "deepseek/" prefix.
-
-# --- Example 1: Google Gemini (uses Section 1 Auth) ---
 LLM_MODEL=gemini-3.6-flash
 LLM_THINKING_LEVEL=medium
-
-# --- Example 2: DeepSeek (requires Section 5 Auth) ---
-# LLM_MODEL=deepseek/deepseek-v4-flash
+# LLM_MODEL=deepseek/deepseek-v4-flash   # DeepSeek alternative
 
 # ===========================================================================
-# 🗜️ SECTION 3: CONTEXT COMPACTION (Compression Settings)
+# 🗜️ SECTION 3: CONTEXT COMPACTION
 # ===========================================================================
-# Summarization settings (can also use DeepSeek models).
 COMPACTION_MODEL=gemini-3.5-flash-lite
 COMPACTION_INTERVAL=30
 COMPACTION_OVERLAP=2
 
 # ===========================================================================
-# 💾 SECTION 3b: EXPLICIT CONTEXT CACHING (Gemini only, ADK 2.6+)
+# 💾 SECTION 3b: EXPLICIT CONTEXT CACHING (Gemini 2.0+)
 # ===========================================================================
-# Explicit App-level caching (ContextCacheConfig). Requires Gemini 2.0+.
-# Automatically skipped for DeepSeek (server-side KV caching is automatic).
 CONTEXT_CACHE_ENABLED=true
 CONTEXT_CACHE_MIN_TOKENS=2048
 CONTEXT_CACHE_TTL_SECONDS=600
 CONTEXT_CACHE_INTERVALS=5
 
 # ===========================================================================
-# 🔮 SECTION 4: IMAGE GENERATION (Isolde Settings & INDEPENDENT AUTH)
+# 🔮 SECTION 4: IMAGE GENERATION (Isolde — INDEPENDENT AUTH)
 # ===========================================================================
-# Isolde's Tarot model and its FULLY INDEPENDENT, isolated authentication.
 IMAGE_MODEL=gemini-3.1-flash-lite-image
-
-# --- OPTION A: Google AI Studio (Dedicated API Key for Images) ---
 IMAGE_GEMINI_API_KEY=your-dedicated-image-api-key-here
-
-# --- OPTION B: Vertex AI / Google Cloud (Dedicated Service Account for Images) ---
 # IMAGE_GOOGLE_CLOUD_PROJECT=another-gcp-project-id
 # IMAGE_GOOGLE_CLOUD_LOCATION=europe-west1
 # IMAGE_GOOGLE_GENAI_USE_VERTEXAI=True
 # IMAGE_GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/another-key.json
 
 # ===========================================================================
-# 🧠 SECTION 5: DEEPSEEK PROVIDER OVERRIDES (Optional)
+# 🧠 SECTION 5: DEEPSEEK PROVIDER (Optional)
 # ===========================================================================
 DEEPSEEK_API_KEY=your-deepseek-api-key-here
 DEEPSEEK_REASONING_EFFORT=high
 
 # ===========================================================================
-# 📡 SECTION 6: TELEGRAM INTEGRATION (Optional)
+# 📡 SECTION 6: TELEGRAM (Optional)
 # ===========================================================================
 TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 TELEGRAM_BOT_USERNAME=your_bot_username
 TELEGRAM_GROUP_LINK=https://t.me/your-group-link
 ```
-
-### 4. Running the Applications
-
-#### Option A: Google ADK Web Interface
-```bash
-./start.sh  # Launches Google ADK Web with persistent SQLite session tracking
-```
-Open `http://localhost:8000` to chat with the ADK coordinator.
-
-#### Option B: Telegram Bot (Group Delivery)
-```bash
-python telegram_bot.py --debug
-```
-
-#### Option C: Streamlit Single-Player Web App
-```bash
-./start_streamlit.sh
-```
-Open `http://localhost:8501` to play the single-player Scummbar RPG adventure in your browser.
-
----
-
-## 🏗️ Architectural Blueprint & Technical Choices (ADK + Telegram)
-
-The Scummbar ADK application (`src/scummbar_chat/`) is designed around clean software engineering and multi-agent patterns. Here is how the system is organized:
-
-### 3.1 Component & File Dependency Map (Telegram + Core ADK)
-
-The following diagram illustrates the import hierarchy and data flow between the Telegram delivery layer, the Google ADK runtime, and the core agent logic:
-
-```
-                          ┌────────────────────────────────┐
-                          │       telegram_bot.py          │ (CLI Process Supervisor)
-                          └───────────────┬────────────────┘
-                                          │ imports
-                                          ▼
-                          ┌────────────────────────────────┐
-                          │   telegram/adapter.py          │ (Polling, Semantic Router,
-                          └───────┬──────────────┬─────────┘  Locks, System Prompt Injections)
-                     imports      │              │ imports
-         ┌────────────────────────┘              └────────────────────────┐
-         ▼                                                                ▼
-┌──────────────────┐                                            ┌──────────────────┐
-│telegram/formatter│                                            │telegram/runner.py│ (ADK App & Session Runner,
-└──────────────────┘                                            └────────┬─────────┘  Compaction, Context Cache)
-                                                                         │ imports
-                                                                         ▼
-                                                                ┌──────────────────┐
-                                                                │     agent.py     │ (Root Coordinator &
-                                                                └──┬─────────────┬─┘  InstructionProvider)
-                                                imports sub-agents │             │ imports
-                                 ┌─────────────────────────────────┘             └──────────────────┐
-                                 ▼                                                                  ▼
-              ┌──────────────────────────────────────┐                                   ┌────────────────────┐
-              │              bots/                   │                                   │  time_context.py   │ (Real-Time Atmosphere)
-              │ (barnaby, barnacle, isolde, balthazar)│                                   └────────────────────┘
-              └──────────────────┬───────────────────┘
-                                 │ imports tools & utils
-                                 ▼
-              ┌──────────────────────────────────────┐               ┌────────────────────────────────────────┐
-              │               tools.py               ├──────────────►│               utils.py                 │ (Model Factory, Dual Auth,
-              │ (Memory, Scrolls, Tarot, RSS Feed)   │  imports      │ (Config, Dual Auth, Skills Loader, MD) │  Skills & MD Loader)
-              └──────────────────────────────────────┘               └──────────────────┬─────────────────────┘
-                                                                                        │ loads
-                                                                                        ▼
-                                                                     ┌────────────────────────────────────────┐
-                                                                     │    world/scummbar.md & skills/         │ (World Prompt & Skills)
-                                                                     └────────────────────────────────────────┘
-```
-
-#### A. Telegram Delivery Layer (`telegram_bot.py` & `src/scummbar_chat/telegram/`)
-
-*   **`telegram_bot.py` (CLI Supervisor)**:
-    *   *Role*: Top-level executable script for running Scummbar in Telegram mode.
-    *   *How it works*: Performs pre-flight environment checks (`_check_env()`), validates Google Service Account JSON keys or API keys at boot, configures rotating log files (`data/scummbar_chat/logs/bot.log` and `errors.log`), traps lifecycle signals (`SIGINT`, `SIGTERM`), logs uncaught traceback dumps, and hands execution over to `adapter.main()`.
-*   **`src/scummbar_chat/telegram/adapter.py` (API Adapter & Event Loop)**:
-    *   *Role*: Asynchronous long-polling engine communicating directly with the Telegram Bot API via `aiohttp`.
-    *   *How it works*: Receives raw updates, redirects private DM messages in-character to the public group link, resolves intent via `@mention` priority or keyword matching (`_INTENT_MAP`), manages per-bot concurrency locks (`asyncio.Lock` with a 15s busy timeout), injects Narratore environment prompts every 3 messages, executes ADK turns via `runner.run_agent()`, captures `artifact_delta` streams to upload downloadable `.txt` documents or tarot photos, handles ephemeral whispers for Barnacle, and schedules the hourly background session-pruning cron job.
-*   **`src/scummbar_chat/telegram/formatter.py` (HTML Output Formatter)**:
-    *   *Role*: Text transformation and HTML escaper for Telegram API delivery.
-    *   *How it works*: Takes raw markdown or plain text responses from ADK agents and converts them into Telegram-safe HTML (`format_response()`). Implements a 3-tier parsing scheme: standard dialogue text, character physical action asterisks (`*action*` → `<i>action</i>`), and ambient narration underscores (`_line_` → `<blockquote><i>line</i></blockquote>`), escaping reserved HTML entities (`<`, `>`, `&`).
-*   **`src/scummbar_chat/telegram/runner.py` (ADK Session Runtime & Compaction)**:
-    *   *Role*: Google ADK `App` and `Runner` initialization and state orchestrator.
-    *   *How it works*: Wraps `root_agent` into an ADK `App`. Configures persistent SQLite session storage (`DatabaseSessionService` pointing to `data/scummbar_chat/sessions.db`), configures automated LLM-based event compaction (`EventsCompactionConfig` + `LlmEventSummarizer`), attaches explicit Gemini context caching (`ContextCacheConfig`), and initializes `InMemoryArtifactService` for secret scrolls and portolans. Exposes `run_agent()` and `purge_old_sessions()` (24-hour event retention cleanup).
-
-#### B. Core ADK Agent & Business Logic Layer (`src/scummbar_chat/`)
-
-*   **`src/scummbar_chat/agent.py` (Root Coordinator & Dynamic Instruction)**:
-    *   *Role*: ADK Root Agent (`root_agent`) definition and global instruction provider.
-    *   *How it works*: Instantiates the central `root_agent` (`LlmAgent`). Binds `_world_instruction_provider()`, an ADK `InstructionProvider` function that re-reads `world/scummbar.md` and evaluates real-time Caribbean tavern atmosphere from `time_context.py` at every single model turn. Registers sub-agents (`barnaby`, `barnacle`, `isolde`, `balthazar`) and attaches `DEFAULT_RETRY_CONFIG` for API call resilience.
-*   **`src/scummbar_chat/utils.py` (Central Factory, Dual Auth & Toolset Discovery)**:
-    *   *Role*: Application configuration, LLM model factory, credential isolation, and skill loader.
-    *   *How it works*: Loads `.env` environment variables. Implements `get_gemini_client_kwargs()` to parameterize authentication between Google AI Studio API Keys and Vertex AI Service Accounts without environment pollution, isolating image generation auth (`IMAGE_*`) independently. Implements `_build_model_instance()` to construct `Gemini` or `LiteLlm` (DeepSeek with thinking mode & reasoning effort) instances. Exposes `load_md()` for prompt files and `load_all_skills()` for scanning and instantiating ADK `SkillToolset` packages.
-*   **`src/scummbar_chat/tools.py` (ADK Function Tools)**:
-    *   *Role*: Callable function tools for agents (Memory, Media Generation, RSS Feeds).
-    *   *How it works*:
-        1.  `recall_patron_memory` / `memorize_patron_chat`: Reads/writes patron profile memories in SQLite `patron_memories`, retrieving real Telegram IDs safely via `ToolContext.user_id`.
-        2.  `write_secret_scroll`: Generates recipe, tarot reading, or nautical portolan text files into ADK `InMemoryArtifactService`.
-        3.  `draw_tarot_card`: Multimodal image generation tool invoking `gemini-3.1-flash-lite-image` with isolated auth (`IMAGE_*`) or PIL fallback.
-        4.  `fetch_news_feed`: Live RSS reader (ANSA, HDBlog) for Balthazar's news translation.
-*   **`src/scummbar_chat/time_context.py` (Real-Time Atmosphere Engine)**:
-    *   *Role*: Real-world clock mapping to tavern atmosphere.
-    *   *How it works*: Maps system UTC/local time into 6 Caribbean time periods (Dawn, Morning, Noon, Afternoon, Sunset, Night), returning evocative ambient descriptions for `_world_instruction_provider()`.
-*   **`src/scummbar_chat/world/scummbar.md` (Master World Prompt)**:
-    *   *Role*: Markdown prompt source for the tavern environment.
-    *   *How it works*: Defines tavern geography, ambient rules, NPC relationships, and strict Narratore injection guidelines.
-*   **`src/scummbar_chat/bots/` (Individual Agent Personas)**:
-    *   *Role*: Individual agent persona prompts and module wrappers.
-    *   *How it works*: Contains `agent.py` + `persona.md` for each bot (`barnaby`, `barnacle`, `isolde`, `balthazar`). Defines persona-specific instructions and mounts required tools/skills.
-*   **`src/scummbar_chat/skills/` (Auto-Discovered ADK Skills)**:
-    *   *Role*: Modular, folder-based capabilities (`grog/`, `menu/`).
-    *   *How it works*: Standard ADK skill folders containing `SKILL.md` frontmatter and instructions. Auto-discovered at startup by `utils.load_all_skills()` and mounted to Barnaby.
-
----
-
-### 3.2 Collaborative Multi-Agent Coordination
-Instead of a single monolith prompt, the Scummbar uses a **Hierarchical Router-Delegate** pattern using Google ADK's `root_agent` and `sub_agents`.
-
-```
-                    [Telegram / Web Input]
-                              │
-                              ▼
-                        [root_agent]
-                    (Shared Coordinator)
-                              │
-         ┌────────────────────┼────────────────────┬────────────────────┐
-         ▼                    ▼                    ▼                    ▼
-    [Barnaby]             [Barnacle]            [Isolde]           [Balthazar]
- (The Bartender)         (The Tavern Cat)    (The Fortune Teller)  (The Navigator)
-  - Memory read/write     - Read-only Memory   - Independent Auth    - RSS Feed Fetching
-  - Auto-discovered       - Ephemeral replies  - Gemini Nano Image   - Comedic News
-    Skills (Grog/Menu)                           generation tool       Translation
-```
-
-*   **How routing works**: In `src/scummbar_chat/telegram/adapter.py`, the function `_resolve_intent()` applies two priority levels:
-    1.  **Explicit Mention**: `@barnaby`, `@barnacle`, `@isolde`, `@balthazar` (always wins).
-    2.  **Semantic Keyword Matching**: The message is scanned against `_INTENT_MAP` (e.g., `grog` routes to Barnaby, `tarocchi` or `carte` to Isolde, `politica` or `mappe` to Balthazar).
-*   **Routing Prefix**: Once resolved, the router prepends `[Risponde NAME]` to the text, which instructs the coordinator (`root_agent`) to route the call to the corresponding sub-agent.
-
-### 3.3 Core Architectural Choices
-
-#### A. Centralized Temporal World Context (InstructionProvider)
-To create an immersive atmosphere, the bar never closes but changes its mood in real-time. In `src/scummbar_chat/time_context.py`, the day is split into 6 periods (Dawn, Noon, Sunset, Night, etc.).
-*   **The Choice**: Instead of passing the world description statically, we use ADK's `global_instruction` bound to an **`InstructionProvider`** function. This dynamically updates the bar's description *at every model turn* based on the actual system hour.
-*   **Why**: This is cache-friendly for Gemini and ensures the agents always know if it's sunset or dawn without manual prompt editing.
-
-#### B. SQLite Session Persistence & Database Compaction
-All group chats are mapped to a single persistent SQLite database (`data/scummbar_chat/sessions.db`) via ADK's `DatabaseSessionService`.
-*   **Context Compaction**: As history grows, the context window fills up. We configured an automated, LLM-based compaction scheme (`EventsCompactionConfig` + `LlmEventSummarizer`):
-    *   After every **30 events**, the older portion of the conversation is replaced by an LLM-generated summary (`COMPACTION_MODEL`).
-    *   The last **2 events** are kept verbatim to maintain immediate conversational context.
-
-#### C. Smart Dual-Authentication & Isolation
-One of the key technical highlights of this repository is how authentication is parameterized:
-*   **The Problem**: The standard Google GenAI SDK throws a fatal error if you supply both an API Key and Vertex AI variables globally in the environment (they are mutually exclusive).
-*   **The Solution**: We built `get_gemini_client_kwargs(prefix="")` in `utils.py`.
-    *   If `GEMINI_API_KEY` is present, it forces `vertexai=False` and programmatically overrides `project=None` and `location=None`, shielding the client from environment pollution.
-    *   If `prefix="IMAGE_"` is specified, it isolates the **Image Generation** auth entirely, allowing Isolde to run on a separate billing project, key, or Vertex regional project without affecting Chat/Compaction!
-    *   **Thread Safety**: For Vertex AI Service Accounts, we load the JSON directly as an in-memory `Credentials` object rather than mutating `os.environ` globally, ensuring perfect safety during async concurrent loops.
-
-#### D. Tangible Media Delivery (Artifacts)
-We wanted the agents to be able to "hand over" items to players:
-*   **Barnaby & Balthazar's Scrolls & Portolans**: Generates recipes, nautical maps, and portolans as `.txt` files using ADK's `InMemoryArtifactService` via the `write_secret_scroll` tool. Delivered as downloadable Telegram documents.
-*   **Isolde's Tarot Images**: Uses `draw_tarot_card` tool via Gemini's native `response_modalities=["IMAGE"]` or a customized **Pillow (PIL) local rendering fallback** if the API is offline. Automatically detects the file format (PNG vs. JPEG) via byte headers and delivers it as an inline native photo via `/sendPhoto`.
-
-#### E. Multi-Model Support (Gemini & DeepSeek)
-The Scummbar is designed to be model-agnostic. You can switch the brain of the tavern simply by changing one line in the `.env` file (`LLM_MODEL`).
-*   **Gemini Support**: Native ADK support for the `gemini-3.6`, `gemini-3.5`, and `gemini-3.1` families.
-*   **DeepSeek Support**: Fully integrated using ADK's `LiteLlm` adapter. The `utils.py` factory automatically detects the `"deepseek/"` prefix in the model name, enables DeepSeek's `thinking` mode, and sets the `reasoning_effort` natively without requiring any code changes.
-
----
-
-## 🎮 Streamlit Single-Player RPG Frontend
-
-While Telegram provides a real-time, multi-player group chat experience, the **Streamlit Web Application** (`src/scummbar_chat/streamlit/`) transforms the Scummbar into an **interactive, single-player narrative RPG adventure game**.
-
-```
-                         ┌───────────────────────────┐
-                         │   Google ADK Core Agent   │
-                         │ (agent.py / runner.py)    │
-                         └─────────────┬─────────────┘
-                                       │
-                ┌──────────────────────┴──────────────────────┐
-                ▼                                             ▼
-   ┌──────────────────────────┐                  ┌──────────────────────────┐
-   │  Telegram Adapter        │                  │  Streamlit App Frontend  │
-   │  (telegram/adapter.py)   │                  │  (streamlit/app.py)      │
-   └────────────┬─────────────┘                  └────────────┬─────────────┘
-                ▼                                             ▼
-        [ Telegram Group ]                            [ Browser Web UI ]
-```
-
-### 4.1 Architecture & Concept
-
-The Streamlit frontend is implemented as a standalone, modular package under `src/scummbar_chat/streamlit/`. It operates alongside Telegram with **zero business logic duplication**:
-
-- **`src/scummbar_chat/streamlit/app.py`**: Main Streamlit application entry point. Manages session state, handles automatic intent routing, enforces Narratore trigger intervals, and loads historical dialogue.
-- **`src/scummbar_chat/streamlit/components.py`**: Rendering helper functions for avatars, custom narrative formatting, artifact downloads, and sidebar controls.
-- **`start_streamlit.sh`**: Launch script executing `streamlit run src/scummbar_chat/streamlit/app.py`.
-
-### 4.2 Key Features & Capabilities
-
-#### A. Automatic Semantic Intent Routing
-Instead of requiring manual bot selection widgets, Streamlit leverages the same semantic routing engine used by Telegram (`_resolve_intent()`). Users can address characters naturally by name or title:
-- **`maga` / `veggente` / `tarocchi`** ➔ Routes to **Isolde** 🔮
-- **`navigatore` / `cartografo` / `mappe` / `notizie`** ➔ Routes to **Balthazar** 🧭
-- **`gatto` / `micio` / `fusa`** ➔ Routes to **Barnacle** 🐱
-- **`barista` / `grog` / `menu` / `oste`** ➔ Routes to **Barnaby** 🍺
-
-#### B. Automatic History Restoration by Patron Name
-When a player enters or updates their **"Nome Avventore"** in the sidebar (e.g. *"Guybrush"* or *"Capitan Morgan"*):
-1. A stable numerical `user_id` is computed (`hashlib.sha256(patron_name)`).
-2. A deterministic session ID is bound to the character (`st_session_{user_id}`).
-3. The function `load_session_chat_history()` queries SQLite's `events` table and **instantly restores all past dialogue turns** for that pirate, allowing players to resume previous game sessions seamlessly.
-
-#### C. Narratore Trigger Synchronization
-To maintain parity with Telegram, Streamlit tracks dialogue turns using a session counter (`narrator_counter`). Every **3 turns**, it appends `[NOTA DI SISTEMA: È il momento del Narratore...]` to the prompt, instructing the agent to append an environmental atmosphere description.
-
-#### D. Multi-Process Concurrency & WAL Database Safety
-Both Telegram and Streamlit share the exact same SQLite database (`data/scummbar_chat/sessions.db`). To prevent file locking conflicts (`database is locked`) when both applications write simultaneously:
-- Database connections enforce **WAL Mode** (`PRAGMA journal_mode=WAL;`).
-- Busy timeouts are configured to 10 seconds (`PRAGMA busy_timeout=10000;` and `sqlite3.connect(timeout=10.0)`).
-
-### 4.3 Distinct Narrative & Action Styling
-
-To ensure players can immediately distinguish between **spoken dialogue**, **character actions**, and **environmental narration**, the rendering pipeline (`format_streamlit_narrative()`) applies a 3-tier visual hierarchy:
-
-| Message Element | Source Pattern | Visual Resa in Streamlit |
-|-----------------|----------------|--------------------------|
-| **Environmental Narration** | Full lines in `_text_` | Dark callout box with gold left border (`📜`) and monospace font |
-| **Character Physical Actions** | Inline text in `*action*` | Crisp **black monospace text** (`color: #000000 !important; font-weight: 600`) inside a soft grey badge (`✦ action ✦`) |
-| **Spoken Character Dialogue** | Standard text | Clean, unstyled sans-serif text standing out prominently |
-
----
-
-## 🤖 AI-Assisted Development: The Pi-Agent Autopilot
-
-This repository was designed to be developed, refactored, and maintained **collaboratively with an AI coding assistant (Pi-Agent)**.
-
-To achieve this, we configured a specialized autonomous system directly in the codebase using **Agent Skills**.
-
-```
-                                    [.agents/skills/]
-                                            │
-          ┌─────────────────────────────────┼─────────────────────────────────┐
-          ▼                                 ▼                                 ▼
-[scummbar-docs-analyzer]        [scummbar-memory-updater]       [scummbar-web-to-markdown]
-  - Hybrid RAG engine              - Automated logging rules       - HTML/Web to Markdown
-    (FTS5 BM25 + Vector)           - Roadmap state compiler          converter & updater
-  - gemini-embedding-2             - Fence marker validator        - BS4 + html2text pipeline
-  - Reciprocal Rank Fusion
-```
-
-### 1. What is an Agent Skill?
-A Pi-Agent skill is a self-contained, capability package located in `.agents/skills/`. At startup, Pi-Agent scans this directory and learns about the available capabilities via the skill's description. The full instructions are kept separate and loaded **on-demand** when the skill is called.
-
-This implements **Progressive Disclosure**: it keeps the AI's initial context window incredibly clean, saving tokens, speeding up response times, and maximizing the LLM's reasoning focus.
-
-### 2. Our Customized Skills
-
-#### A. Documentation Analyzer & RAG Engine (`/skill:scummbar-docs-analyzer`)
--   **Why**: The `docs/` folder contains dozens of framework guides. Storing their indexes in the main developer instructions (`AGENTS.md` or `MEMORY.md`) wasted thousands of tokens. Plain `rg`/`grep` searches can't capture semantic intent.
--   **What it does**: This skill provides a **local Hybrid RAG Search Engine** (`rag/`) that chunks all 860 Markdown documents (14,728 chunks), generates embeddings via Google `gemini-embedding-2`, stores vectors in SQLite (`sqlite-vec`), and performs hybrid search using **Reciprocal Rank Fusion (RRF)** between FTS5 keyword matching (BM25) and Vector Cosine Similarity — no manual index needed.
--   **How to use**:
-    ```bash
-    # Semantic + keyword search (returns ranked chunk results)
-    PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 .agents/skills/scummbar-docs-analyzer/rag/search.py "context compaction" --top_k 5
-
-    # Incremental re-indexing after adding new docs
-    PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 .agents/skills/scummbar-docs-analyzer/rag/indexer.py
-    ```
-
-#### B. Memory & Documentation Updater (`/skill:scummbar-memory-updater`)
--   **Why**: Keeping architectural decisions (`MEMORY.md`), developer guides (`AGENTS.md`), and public manuals (`README.md`) synchronized across dozens of commits is extremely error-prone for humans and AIs alike.
--   **What it does**: Standardizes how the AI must document changes. It enforces rules on how to append session logs, update the roadmap, register design decisions, and includes an automated Python validator to ensure no markdown code blocks are left open or broken.
-
-#### C. Web-to-Markdown Converter (`/skill:scummbar-web-to-markdown`)
--   **Why**: Importing external technical documentation or web guides into clean Markdown format for the offline `docs/` repository can be tedious and prone to formatting issues.
--   **What it does**: Automatically converts web pages or URL lists into clean, standardized Markdown files using `beautifulsoup4` and `html2text`. Supports auto-updates, relative-to-absolute link resolution, UTF-8 emoji preservation, and file overwrite protection. After conversion, automatically triggers the RAG incremental indexer to update the vector database.
-
-### 3. How to Use the Autopilot (For Developers)
-If you are developing this repository using Pi-Agent, you can invoke these skills or execute their CLI tools directly:
-
-```bash
-# 1. Search framework documentation across 443 docs using Hybrid RAG (FTS5 + Cosine)
-PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 .agents/skills/scummbar-docs-analyzer/rag/search.py "agent evaluation custom metrics" --top_k 5
-
-# 2. Convert a web page to clean Markdown and auto-index into the RAG vector database
-python3 .agents/skills/scummbar-web-to-markdown/scripts/convert.py "https://adk.dev/evaluate/" "docs/google-api/"
-PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 .agents/skills/scummbar-docs-analyzer/rag/indexer.py
-
-# 3. Update memory, roadmap, and check markdown fence health after refactoring
-/skill:scummbar-memory-updater
-```
-
-By combining Google ADK and Pi-Agent Skills for autonomous workspace organization, this repository stands as a **state-of-the-art template for modern, AI-collaborative software engineering**.
 
 ---
 

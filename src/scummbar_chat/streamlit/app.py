@@ -175,10 +175,18 @@ def main() -> None:
                 }
             ]
 
-    # 4. Main Interface Tabs: Chat vs Diario di Bordo
-    tab_chat, tab_diary = st.tabs(["💬 Chat Taverna", "📜 Diario di Bordo"])
+    # 4. Main Interface Views: Chat vs Diario di Bordo
+    # NOTE: st.chat_input must NOT be placed inside st.tabs/st.container/st.expander
+    # or it loses its sticky bottom anchoring. We use a segmented control for
+    # navigation and render the chat input at top-level so it stays pinned.
+    view = st.segmented_control(
+        "Vista",
+        options=["💬 Chat Taverna", "📜 Diario di Bordo"],
+        default="💬 Chat Taverna",
+        key="view_selector",
+    )
 
-    with tab_chat:
+    if view == "💬 Chat Taverna":
         # A. Render Historical Chat Messages
         for msg in st.session_state.get("messages", []):
             role = msg["role"]
@@ -191,7 +199,7 @@ def main() -> None:
                 if msg.get("artifacts"):
                     render_artifacts(msg["artifacts"])
 
-        # B. User Chat Input (Automatic Semantic Routing)
+        # B. User Chat Input (Automatic Semantic Routing) — top-level for sticky bottom
         if prompt := st.chat_input("Rivolgiti alla taverna, al barista, alla maga o al navigatore..."):
             # Display user message immediately
             st.session_state.messages.append(
@@ -262,7 +270,8 @@ def main() -> None:
                 if success:
                     st.toast("📜 Il tuo Diario di Bordo si è arricchito di un nuovo capitolo!", icon="📜")
 
-    with tab_diary:
+    else:
+        # Diario di Bordo view
         st.subheader(f"📜 Il Diario di Bordo di {patron_name}")
 
         file_path = get_diary_file_path(patron_name)
