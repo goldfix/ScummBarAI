@@ -1,6 +1,6 @@
 ---
 name: scummbar-kroki-diagrams
-description: Genera grafici, mappe mentali e diagrammi vettoriali (C4-PlantUML, Excalidraw, Mermaid, PlantUML, Graphviz, D2, ecc.) tramite Kroki usando la codifica URL zlib+Base64. Stile di default: C4-PlantUML. Uso esclusivo per documentazione (Pi-Agent), non integrata nell'applicazione.
+description: Genera grafici, mappe mentali e diagrammi vettoriali (C4-PlantUML, Excalidraw, Mermaid, PlantUML, Graphviz, D2, ecc.) tramite Kroki usando la codifica URL zlib+Base64. Stile di default 'C4-PlantUML'. Uso esclusivo per documentazione (Pi-Agent), non integrata nell'applicazione.
 ---
 
 # Scummbar Kroki Diagram Generator
@@ -115,10 +115,10 @@ def generate_kroki_url(
     """Genera l'URL Kroki per il diagramma fornito."""
     diagram_type = (diagram_type or "excalidraw").lower().strip()
     output_format = (output_format or "svg").lower().strip()
-    
+
     compressed = zlib.compress(source_text.encode('utf-8'), level=9)
     payload = base64.urlsafe_b64encode(compressed).decode('ascii')
-    
+
     return f"https://kroki.io/{diagram_type}/{output_format}/{payload}"
 ```
 
