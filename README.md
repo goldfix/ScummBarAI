@@ -13,7 +13,7 @@ The repository is intentionally structured **didactically**: every architectural
 ## 🗺️ Table of Contents
 
 - [🍺 ScummBar AI — A Collaborative Multi-Agent Study Project](#-scummbar-ai--a-collaborative-multi-agent-study-project)
-  - [🗺️ Table of Contents](#️-table-of-contents)
+  - [🗺️ Table of Contents](#-table-of-contents)
   - [🎯 Project Purpose](#-project-purpose)
   - [📖 The Story \& The Characters](#-the-story--the-characters)
   - [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
@@ -21,7 +21,7 @@ The repository is intentionally structured **didactically**: every architectural
     - [2. Installation](#2-installation)
     - [3. `.env` Configuration](#3-env-configuration)
     - [4. Running the Applications](#4-running-the-applications)
-  - [🏗️ The ADK Core: Architecture \& How It Works](#️-the-adk-core-architecture--how-it-works)
+  - [🏗️ The ADK Core: Architecture \& How It Works](#-the-adk-core-architecture--how-it-works)
     - [4.1 Core Overview Diagram](#41-core-overview-diagram)
     - [4.2 Multi-Agent Coordination (Router-Delegate)](#42-multi-agent-coordination-router-delegate)
     - [4.3 Agent Configuration](#43-agent-configuration)
@@ -56,7 +56,7 @@ The repository is intentionally structured **didactically**: every architectural
     - [7.5 scummbar-kroki-diagrams (Kroki Diagram Generator)](#75-scummbar-kroki-diagrams-kroki-diagram-generator)
     - [7.6 How to Use the Autopilot](#76-how-to-use-the-autopilot)
   - [🧭 Project Structure](#-project-structure)
-  - [⚙️ Environment Configuration (.env)](#️-environment-configuration-env)
+  - [⚙️ Environment Configuration (.env)](#-environment-configuration-env)
 
 ---
 
@@ -115,7 +115,7 @@ source py-env/bin/activate   # or: source py_env.sh active
 ```
 
 ### 3. `.env` Configuration
-Create the file `src/scummbar_chat/.env` (see [Section 9](#️-environment-configuration-env) for the full reference).
+Create the file `src/scummbar_chat/.env` (see [the Environment Configuration section](#-environment-configuration-env) for the full reference).
 
 ### 4. Running the Applications
 
@@ -170,7 +170,7 @@ barnaby_agent = Agent(
     model=MODEL,
     description="Barnaby, il barista dello Scummbar.",
     instruction=_PERSONA,                        # persona.md
-    generate_content_config=THINKING_CONFIG,     # thinking_level=medium
+    generate_content_config=THINKING_CONFIG,     # thinking_level=LOW
     retry_config=DEFAULT_RETRY_CONFIG,           # retry with backoff
     tools=[_barnaby_toolset, recall_patron_tool, memorize_patron_tool,
            update_tavern_diary_tool, write_secret_scroll_tool],
@@ -254,7 +254,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
   - **Vertex AI / Service Account**: loads credentials in RAM as a `Credentials` object (without mutating `os.environ`, thread-safe)
   - With the `IMAGE_` prefix it fully isolates image-generation authentication
 
-**Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=medium` (Gemini) / `reasoning_effort=high` (DeepSeek); `include_thoughts=False` with `thought` part filtering.
+**Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=LOW` (Gemini) / `reasoning_effort=high` (DeepSeek); `include_thoughts=False` with `thought` part filtering.
 
 ### 4.10 Sessions, Compaction & Context Caching
 
@@ -457,7 +457,7 @@ python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py --loca
 scummbar/
 ├── .agents/skills/                 # 🤖 Pi-Agent system skills
 │   ├── scummbar-docs-analyzer/     #    Hybrid RAG (FTS5 + sqlite-vec + gemini-embedding-2)
-│   ├── scummbar-kroki-diagrams/    #    Kroki diagram generator (Excalidraw, Mermaid...)
+│   ├── scummbar-kroki-diagrams/    #    Kroki diagram generator (C4-PlantUML, Excalidraw, Mermaid...)
 │   ├── scummbar-memory-updater/    #    MEMORY/README/AGENTS update rules
 │   └── scummbar-web-to-markdown/   #    Web → Markdown converter
 ├── docs/                           # 📚 Technical docs (ADK, DeepSeek, Telegram, Streamlit...)

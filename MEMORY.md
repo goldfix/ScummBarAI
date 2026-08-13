@@ -65,7 +65,7 @@ GOOGLE_GENAI_USE_VERTEXAI=True
 # Gemini:   LLM_MODEL=gemini-3.5-flash
 # DeepSeek: LLM_MODEL=deepseek/deepseek-v4-flash
 LLM_MODEL=deepseek/deepseek-v4-flash
-LLM_THINKING_LEVEL=medium
+LLM_THINKING_LEVEL=LOW
 
 # DeepSeek
 DEEPSEEK_API_KEY=...                    # da platform.deepseek.com/api_keys
@@ -475,7 +475,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 - **`MODEL` vs `COMPACTION_LLM`** — istanze separate: conversazione vs riassunto sessioni
 - **`COMPACTION_LLM`** — segue `COMPACTION_MODEL` nel `.env`; default `gemini-3.5-flash` (richiede ADC); supporta anche DeepSeek
 - **Isolamento dell'Autenticazione delle Immagini**: Abbiamo progettato l'autenticazione del modello di generazione delle immagini (`IMAGE_MODEL`) in modo che sia indipendente rispetto alla conversazione principale e alla compattazione. La factory `get_gemini_client_kwargs()` accetta un prefisso (es: `IMAGE_`) che isola le chiavi API o i Service Account dedicati. Per Vertex AI, le credenziali del Service Account per le immagini vengono istanziate in RAM come oggetto, evitando modifiche globali distruttive alle variabili di ambiente e garantendo una perfetta stabilità multi-thread.
-- **`thinking_level=medium`** / **`reasoning_effort=high`** per Gemini/DeepSeek
+- **`thinking_level=LOW`** / **`reasoning_effort=high`** per Gemini/DeepSeek
 - **`include_thoughts=False`** / filtro `part.thought=True` — reasoning rimane interno
 - **`location=global`** per `gemini-3.5-flash` su Vertex AI
 - **Context Compaction** — `App` + `EventsCompactionConfig` [EXPERIMENTAL] + `LlmEventSummarizer`; usa `COMPACTION_LLM` (default Gemini, configurabile)
@@ -752,7 +752,7 @@ response.usage.prompt_cache_miss_tokens  # token calcolati ex novo
 |---------|-----------|----------|
 | SDK | `google-genai` | `openai` (compatible) via LiteLlm |
 | Auth | ADC / Vertex AI | `DEEPSEEK_API_KEY` |
-| Thinking | `thinking_level: medium` | `reasoning_effort: high` + `thinking: enabled` |
+| Thinking | `thinking_level: LOW` | `reasoning_effort: high` + `thinking: enabled` |
 | Tool calls + thinking | automatico | `reasoning_content` va ripassato all'API |
 | `temperature` | non raccomandato | ignorato in thinking mode |
 
