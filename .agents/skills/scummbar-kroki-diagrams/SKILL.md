@@ -1,6 +1,6 @@
 ---
 name: scummbar-kroki-diagrams
-description: Genera grafici, mappe mentali e diagrammi vettoriali (Excalidraw, Mermaid, PlantUML, Graphviz, D2, ecc.) tramite Kroki usando la codifica URL zlib+Base64. Stile di default: Excalidraw.
+description: Genera grafici, mappe mentali e diagrammi vettoriali (Excalidraw, Mermaid, PlantUML, Graphviz, D2, ecc.) tramite Kroki usando la codifica URL zlib+Base64. Stile di default: Excalidraw. Uso esclusivo per documentazione (Pi-Agent), non integrata nell'applicazione.
 ---
 
 # Scummbar Kroki Diagram Generator
@@ -9,15 +9,17 @@ Questa skill permette di generare diagrammi, schemi architetturali, mappe pirate
 
 L'integrazione si basa sull'interfaccia HTTP `GET` con codifica del contenuto tramite **zlib deflate (livello 9) + Base64 URL-safe**.
 
+> ⚠️ **Uso esclusivo per documentazione**: questa skill è destinata SOLO a Pi-Agent per generare diagrammi da inserire nella documentazione (`README.md`, `docs/`). NON è registrata nei tool degli agenti ADK dell'applicazione Scummbar (`src/scummbar_chat/`).
+
 ---
 
 ## 📐 Regole di Default e Comportamento
 
 1. **Stile di Default (Excalidraw)**:
    Se l'utente o la richiesta **non specifica uno stile**, il tipo di diagramma predefinito è **`excalidraw`** (stile fatto a mano / hand-drawn, ideale per mappe e schemi informali).
-2. **Formato Output Predefinito**:
-   Di default l'output è generato in formato **`svg`** (vettoriale scalabile), ma sono supportati anche `png`, `jpeg` e `pdf`.
-3. **Algoritmo di Codifica URL**:
+2. **Formato Output**:
+   Di default l'output è generato in formato **`svg`** (vettoriale scalabile). Il formato **`png`** è il secondo supportato (entrambi documentati). Altri formati (`jpeg`, `pdf`) possono funzionare ma **non sono garantiti** per tutti i tipi di diagramma.
+3. **Algoritmo di Codifica URL** (allineato alla doc `setup/pages/encode-diagram.adoc`):
    Il testo sorgente del grafico viene compresso in Python tramite:
    ```python
    import base64
@@ -27,10 +29,15 @@ L'integrazione si basa sull'interfaccia HTTP `GET` con codifica del contenuto tr
    payload = base64.urlsafe_b64encode(compressed).decode('ascii')
    url = f"https://kroki.io/{diagram_type}/{output_format}/{payload}"
    ```
+   - Compressione **deflate a livello 9** (massima).
+   - **Base64 URL-safe** (`+` → `-`, `/` → `_`).
+   - Opzioni aggiuntive passabili come **query parameter** (`?key=value`, es. `?theme=dark`).
 
 ---
 
-## 🎨 Tipi di Diagramma Supportati
+## 🎨 Tipi di Diagramma Supportati (lista non esaustiva)
+
+Fonte: `docs/kroki/pages/index.adoc` e `docs/kroki/setup/pages/install.adoc`.
 
 | Tipo (`diagram_type`) | Descrizione |
 | :--- | :--- |
@@ -41,9 +48,22 @@ L'integrazione si basa sull'interfaccia HTTP `GET` con codifica del contenuto tr
 | **`d2`** | Linguaggio moderno per diagrammi architetturali e di sistema. |
 | **`bpmn`** | Diagrammi di processo di business. |
 | **`blockdiag`** / **`nwdiag`** | Schemi a blocchi e di rete. |
+| **`seqdiag`** / **`actdiag`** | Diagrammi di sequenza e di attività. |
+| **`packetdiag`** / **`rackdiag`** | Diagrammi di pacchetti di rete e rack. |
 | **`erd`** | Entity-Relationship diagram. |
 | **`structurizr`** | Diagrammi architetturali C4 as code. |
 | **`svgbob`** | Conversione da ASCII art a grafici SVG vettoriali! |
+| **`bytefield`** | Diagrammi di strutture binarie (bytefields). |
+| **`ditaa`** | Diagrammi da disegni ASCII grezzi. |
+| **`goat`** | Diagrammi ASCII in stile GoAT. |
+| **`nomnoml`** | Diagrammi UML rapidi con sintassi semplice. |
+| **`symbolator`** | Schemi di componenti HDL. |
+| **`umlet`** | Diagrammi UML via UMLet. |
+| **`vega`** / **`vegalite`** | Visualizzazioni dati (chart, plot, mappe geografiche). |
+| **`wavedrom`** | Diagrammi temporali (waveforms) digitali. |
+| **`wireviz`** | Diagrammi di cablaggio e harness. |
+
+> La lista completa dei tipi supportati dal container Docker è in `docs/kroki/setup/pages/install.adoc`.
 
 ---
 
@@ -69,9 +89,12 @@ python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py "digra
 python3 .agents/skills/scummbar-kroki-diagrams/scripts/kroki_generator.py --file schema.dot --type graphviz --markdown
 ```
 
+### Nota sul download di immagini:
+Il servizio Kroki pubblico può rispondere `403 Forbidden` alle richieste con User-Agent Python di default (`Python-urllib`). Lo script usa quindi un User-Agent standard (`Mozilla/5.0 ...`). Gli URL generati funzionano comunque in qualsiasi browser e nei tag Markdown.
+
 ---
 
-## 🐍 Integrazione in Python / ADK
+## 🐍 Integrazione in Python (per uso script/documentazione)
 
 ```python
 import base64
@@ -91,3 +114,5 @@ def generate_kroki_url(
     
     return f"https://kroki.io/{diagram_type}/{output_format}/{payload}"
 ```
+
+> Questo snippet è solo a scopo documentale: la generazione dei diagrammi avviene tramite la CLI della skill, non nel codice dell'applicazione.
