@@ -6,14 +6,15 @@
 
 ---
 
-## 🍺 STATO DEL PROGETTO (aggiornato: 2026-08-12)
+## 🍺 STATO DEL PROGETTO (aggiornato: 2026-08-13)
 
 ### Cos'è Scummbar
 Chat interattiva multi-bot ambientata in una taverna piratesca caraibica.
 I partecipanti includono bot gestiti da AI (Barnaby il barista, Barnacle il gatto, Isolde la veggente, Balthazar il navigatore).
-- **Applicazione Principale (Google ADK 2.6.0 + Telegram + Streamlit Web RPG)**: **attiva e completata** ✅.
+- **Applicazione Principale (Google ADK 2.6+ + Telegram + Streamlit Web RPG)**: **attiva e completata** ✅.
 - **Frontend Streamlit Single-Player RPG**: **attivo e completato** ✅ (`src/scummbar_chat/streamlit/`, avvio con `./start_streamlit.sh`).
-- **Cheshire Cat AI**: La cartella dell'esperimento `src/scummbar_cat/` è stata completamente rimossa per mantenere il progetto focalizzato al 100% su Google ADK + Telegram/Streamlit.
+- **Diario di Bordo (Captain's Log)**: **attivo e completato** ✅ (`src/scummbar_chat/diary.py`, aggiornamento incrementale ogni 10 messaggi).
+- **Cheshire Cat AI**: esperimento concluso e rimosso; il progetto è focalizzato al 100% su Google ADK + Telegram/Streamlit.
 
 ---
 
@@ -28,7 +29,8 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory, load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed
+│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed, update_tavern_diary
+│       ├── diary.py                   # 📜 Diario di Bordo (Captain's Log) incrementale in prima persona
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/                     # scummbar.md (world context + regole narrazione)
 │       ├── bots/                      # barnaby, barnacle, isolde, balthazar (agent.py + persona.md)
@@ -36,12 +38,12 @@ scummbar/
 │       ├── telegram/                  # Adapter Telegram (adapter, formatter, runner)
 │       └── streamlit/                 # 🎮 Frontend Web Streamlit (app.py, components.py)
 ├── data/                              # Dati e log persistenti
-│   └── scummbar_chat/                 # Dati ADK / Telegram / Streamlit (sessions.db + logs/)
+│   └── scummbar_chat/                 # Dati ADK / Telegram / Streamlit (sessions.db + diaries/ + logs/)
 ├── start.sh                           # avvio ADK web con persistenza SQLite
 ├── start_streamlit.sh                 # avvio frontend Streamlit Web RPG Single-Player
 ├── py_env.sh                          # setup ambiente Python (venv + uv)
 ├── telegram_bot.py                    # avvio bot Telegram (--debug flag, log su file)
-├── pyproject.toml                     # dipendenze progetto
+├── pyproject.toml                     # dipendenze progetto (PEP 621 + uv)
 ├── AGENTS.md                          # istruzioni per agenti AI
 ├── MEMORY.md                          # questo file — memoria del progetto
 └── README.md                          # documentazione pubblica (English)
@@ -91,10 +93,13 @@ TELEGRAM_GROUP_LINK=https://t.me/...   # mostrato nel redirect dai DM
 - Location: `global` (necessaria per `gemini-3.5-flash`)
 - ⚠️ Verificare che Vertex AI API sia abilitata sul progetto GCP
 
-**Dipendenze** (`pyproject.toml`):
+**Dipendenze** (`pyproject.toml`, PEP 621 + `uv`):
 ```
-google-adk[db]==2.4.0   litellm      aiohttp
-greenlet                orjson       python-dotenv
+google-adk[db]>=2.4.0   litellm      aiohttp
+greenlet>=3.1.0         streamlit>=1.40.0   python-dotenv
+
+[dependency-groups.dev]  # skill Pi-Agent
+ruff   html2text   beautifulsoup4   sqlite-vec   jupyter
 ```
 
 **Avvio**:
@@ -121,12 +126,15 @@ python telegram_bot.py --debug          # log DEBUG su console + file
 
 ```
 root_agent  (scummbar_chat)
-├── global_instruction = _world_instruction_provider()   ← funzione, aggiornata ad ogni turno
-│     └── WORLD_CONTEXT + get_time_description()         ← world context + momento del giorno
+├── static_instruction = WORLD_CONTEXT (scummbar.md)   ← statico, cache-friendly
+├── global_instruction = _time_instruction_provider()   ← funzione, aggiornata ad ogni turno
+│     └── get_time_description()                        ← momento del giorno
 ├── instruction = COORDINATOR_INSTRUCTION
 └── sub_agents:
-    ├── barnaby   → instruction = persona.md + tools=[SkillToolset]
-    └── barnacle  → instruction = persona.md
+    ├── barnaby   → persona.md + tools=[SkillToolset, recall, memorize, update_tavern_diary, write_secret_scroll]
+    ├── barnacle  → persona.md + tools=[SkillToolset, recall] (read-only)
+    ├── isolde    → persona.md + tools=[recall, draw_tarot_card]
+    └── balthazar → persona.md + tools=[SkillToolset, recall, memorize, update_tavern_diary, write_secret_scroll, fetch_news_feed]
 ```
 
 ### Sistema Narratore (`scummbar.md` + `adapter.py`)
@@ -327,8 +335,8 @@ Cambiare modello = **una riga nel `.env`**:
 
 | `LLM_MODEL` | Provider | Note |
 |-------------|----------|------|
-| `gemini-3.5-flash` | Vertex AI | Richiede ADC + progetto abilitato |
-| `gemini-3.1-flash-lite` | Vertex AI | Più veloce, meno potente |
+| `gemini-3.6-flash` | Vertex AI | **Default attivo** — richiede ADC + progetto abilitato |
+| `gemini-3.5-flash-lite` | Vertex AI | Più veloce, meno potente |
 | `deepseek/deepseek-v4-flash` | DeepSeek via LiteLlm | Richiede `DEEPSEEK_API_KEY` |
 | `deepseek/deepseek-v4-pro` | DeepSeek via LiteLlm | Più potente |
 
@@ -430,17 +438,13 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Logging verboso + error export | ✅ | `--debug`, `bot.log`, `errors.log`, `_dump_exception()` |
 | Nuove skills | 🔲 | Aggiungere cartelle in `skills/` |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
-| Sviluppo ex-novo Plugin Scummbar per Cheshire Cat AI | ✅ | Plugin dedicato in `plugins/scummbar/` con Barnaby, Barnacle e Isolde come `cat.Agent`, `user` per memoria, `Directive` per orario e memoria condivisa multi-agente, e `Settings` Pydantic |
-| Indicizzazione di dettaglio modulare docs (Pydantic, FastAPI, HTTPX) | 🔲 | Lettura integrale on-demand dei file di dettaglio durante lo sviluppo del plugin `plugins/scummbar/` |
-| Importazione Documentazione Pydantic (`docs/pydantic/`) | ✅ | Scaricati 88 file in `docs/pydantic/` e registrata la Sezione 17 in `scummbar-docs-analyzer` |
-| Importazione Documentazione FastAPI (`docs/fast_api/`) | ✅ | Scaricati 133 file in `docs/fast_api/` e registrata la Sezione 18 in `scummbar-docs-analyzer` |
-| Importazione Documentazione HTTPX (`docs/httpx/`) | ✅ | Scaricati 22 file in `docs/httpx/` e registrata la Sezione 19 in `scummbar-docs-analyzer` |
+| Importazione Documentazione (Pydantic, FastAPI, HTTPX, DeepSeek, ADK, Streamlit, UV, Ruff) | ✅ | docs/ indicizzati nel RAG (860 documenti, 14.728 chunk) |
 | Supporto duale autenticazione (Service Account ↔ API Key) | ✅ | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |
 | Autenticazione Gemini via Service Account | ✅ | `.env` + `GOOGLE_APPLICATION_CREDENTIALS`; pre-flight check in `telegram_bot.py` |
 | Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
 | Sistema Pi-Agent Skills (`scummbar-*`) | ✅ | Introduzione di skill per progressive disclosure documentale |
 | Unificazione API Immagini | ✅ | Deprecato branch Imagen, architettura unificata su `generate_content` Gemini Nano |
-| Frontend Web Streamlit (Single-Player RPG) | ✅ | `src/scummbar_chat/streamlit/` (`app.py`, `components.py`), routing automatico, recupero storico da DB, WAL mode |
+| Frontend Web Streamlit (Single-Player RPG) | ✅ | `src/scummbar_chat/streamlit/` (`app.py`, `components.py`), routing automatico, recupero storico da DB, WAL mode, segmented control per chat input sticky |
 | Diario di Bordo Narrativo in Prima Persona | ✅ | `src/scummbar_chat/diary.py`: file `data/scummbar_chat/diaries/Diary_NOME.md`, tracciamento `last_saved_index` (idempotente), aggiornamento automatico ogni 10 messaggi + pulsante manuale nel Tab "📜 Diario di Bordo", download `.md`, tool ADK `update_tavern_diary_tool` su Barnaby e Balthazar |
 | Fase 2a Streamlit: Sacca del Pirata (Inventario) | 🔲 | Registro persistente nella sidebar per collezionare e riscaricare pergamene, mappe, ricette e carte tarocchi |
 | Fase 2b Streamlit: Ispezione Memoria Avventore | 🔲 | Visualizzatore nella sidebar dei tratti e ricordi registrati su di te da Barnaby (`recall_patron_memory`) |
@@ -841,6 +845,24 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ## 📋 Log delle Sessioni di Lavoro
 
+### 2026-08-13 — Diario di Bordo, Fix Chat Input e Ristrutturazione README
+
+**Obiettivo**: Implementare il Diario di Bordo narrativo (Captain's Log), correggere il bug del chat input Streamlit e ristrutturare completamente il README in inglese.
+
+**Attività svolte**:
+- **Diario di Bordo (`src/scummbar_chat/diary.py`)** (nuovo modulo):
+  - File Markdown per avventore in `data/scummbar_chat/diaries/Diary_NOME.md` con metadati `last_saved_index` in testa al file.
+  - Aggiornamento **incrementale e deterministico**: legge `last_saved_index`, estrae solo i messaggi nuovi (`messages[last_saved_index:]`), genera un capitolo in prima persona ("Io") e appende — idempotente se nessun messaggio nuovo.
+  - Pipeline **async dual-provider**: `generate_chapter_async()` usa `_build_model_instance(COMPACTION_MODEL)` + `LlmRequest`/`generate_content_async` → funziona con Gemini (API Key/Vertex) e DeepSeek.
+  - Fix critico: `LlmResponse` espone `content.parts` (non `parts` diretto).
+  - Tool ADK `update_tavern_diary_tool` (Barnaby + Balthazar): usa `tool_context.session.id` reale (non `st_session_` hardcodato — errato su Telegram dove `session_id = chat_id`), filtra per `user_id` (evita mescolanza in gruppo) e per i `thought` parts.
+  - Streamlit: trigger automatico ogni 10 messaggi (toast di conferma), pulsante manuale "Compila / Aggiorna Diario ORA", pulsante download `.md`, anteprima Markdown nel Tab "📜 Diario di Bordo".
+- **Fix Bug Chat Input Streamlit**: `st.chat_input` dentro `st.tabs` perdeva l'ancoraggio sticky in fondo alla pagina (bug noto). Sostituiti i `tabs` con `st.segmented_control` + rendering condizionale → il chat input resta a livello top-level e si ancora correttamente in fondo.
+- **Ristrutturazione completa README.md in inglese**: nuova struttura a 9 sezioni (Project Purpose, Story & Characters, Quick Start, The ADK Core, Telegram Frontend, Streamlit Frontend, Pi-Agent, Project Structure, Environment Configuration) con 2 diagrammi ASCII del core, tabelle dettagliate su agenti/tools/skills/diario, e verifica automatica degli anchor TOC (fix variation selector U+FE0F nei link).
+- **Verifica lingua**: codice Python tutto in inglese (commenti + docstring confermati), README in inglese, MEMORY.md/AGENTS.md restano in italiano (documentazione interna per l'agente).
+
+---
+
 ### 2026-07-25 — Implementazione RAG Ibrido per `scummbar-docs-analyzer`
 
 **Obiettivo**: Evolvere la skill Pi-Agent `scummbar-docs-analyzer` implementando un motore di ricerca RAG locale ibrido (FTS5 BM25 + Vector Cosine Similarity `gemini-embedding-2`) con architettura modulare in Python.
@@ -992,28 +1014,11 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ---
 
-### 2026-07-25 — Studio Cheshire Cat AI: Memoria Condivisa (Esperimento Concluso)
+### 2026-07-23/25 — Esperimento Cheshire Cat AI (Archiviato)
 
-**Obiettivo**: Testare la condivisione dello storico multi-agente nel plugin Cheshire Cat AI (`src/scummbar_cat/`).
-
-**Sintesi**:
-- Implementato l'hook `@hook after_agent_run` per salvare le interazioni nello store `user` under `tavern_shared_history`.
-- Inserita la sezione `# CONTESTO DELLA TAVERNA` nella `TimeAtmosphereDirective` per dare consapevolezza cross-agente tra Barnaby, Isolde e Barnacle.
-- Svolto test multi-turno positivo con script Python. Esperimento concluso e archiviato.
-
----
-
-### 2026-07-23 — Semplificazione Immagini, Pi-Agent Skills e Prototipo Cheshire Cat
-
-**Obiettivo**: Unificare la pipeline di generazione immagini su Gemini Nano, introdurre le Skill Pi-Agent e prototipare il plugin Cheshire Cat AI.
-
-**Attività svolte**:
-1. **Generazione Immagini Unificata**: Deprecato Imagen 3.0, adottato `generate_content` con `gemini-3.1-flash-lite-image` e client neutro `genai.Client()`.
-2. **Integrazione Pi-Agent Skills**: Create le skill `.agents/skills/scummbar-docs-analyzer`, `scummbar-memory-updater` e `scummbar-web-to-markdown` per gestire in autonomia documentazione, aggiornamenti e conversioni web-to-md.
-3. **Autenticazione Duale ed Isolamento**: Implementata `get_gemini_client_kwargs()` in `utils.py` per supportare in modo parametrizzato sia API Key che Service Account GCP (con prefisso `IMAGE_` indipendente per Isolde).
-4. **Fix Narratore**: Risolta l'iniziativa spontanea del Narratore vincolandolo solo alla nota di sistema dell'adapter Telegram.
-5. **Riorganizzazione Dati**: Spostati DB sessioni e log sotto `data/scummbar_chat/`.
-6. **Prototipo Cheshire Cat AI**: Importata documentazione ed implementato il plugin `src/scummbar_cat/plugins/scummbar/` con agenti, direttive e tool.
+Esperimento concluso e rimosso (plugin `src/scummbar_cat/`, data `scummbar_cat/`, `start_cat.sh`).
+Il progetto è focalizzato al 100% su Google ADK + Telegram/Streamlit. Dettagli storici: condivisione
+storico multi-agente via hook `after_agent_run` + `tavern_shared_history`, direttiva temporale, test positivo.
 
 ---
 

@@ -30,11 +30,13 @@ scummbar/
 ├── README.md                          # documentazione pubblica (English)
 ├── telegram_bot.py                    # entry point Telegram (--debug flag)
 ├── start.sh                           # avvio ADK web con SQLite persistence
-├── src/scummbar_chat/                 # 🤖 Applicazione Google ADK + Telegram
+├── start_streamlit.sh                 # avvio RPG single-player Streamlit
+├── src/scummbar_chat/                 # 🤖 Applicazione Google ADK + Telegram + Streamlit
 │   ├── agent.py                       # root agent + InstructionProvider temporale
 │   ├── utils.py                       # factory modello, config, load_md, load_all_skills
 │   ├── time_context.py                # real time → tavern atmosphere
-│   ├── tools.py                       # FunctionTool ADK: recall, memorize, write_secret_scroll, fetch_news_feed
+│   ├── tools.py                       # FunctionTool ADK: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed, update_tavern_diary
+│   ├── diary.py                       # Diario di Bordo (Captain's Log) in prima persona
 │   ├── .env                           # ⚠️ NON committare — contiene token e API key
 │   ├── world/scummbar.md              # world context + regole Narratore (prompt)
 │   ├── bots/barnaby/                  # agente Barnaby
@@ -42,12 +44,18 @@ scummbar/
 │   ├── bots/isolde/                   # agente Isolde
 │   ├── bots/balthazar/                # agente Balthazar
 │   ├── skills/                        # ADK skills auto-discovery
-│   └── telegram/                      # adapter Telegram (adapter, formatter, runner)
+│   ├── telegram/                      # adapter Telegram (adapter, formatter, runner)
+│   └── streamlit/                     # 🎮 frontend Web RPG (app.py, components.py)
+├── .agents/skills/                    # 🤖 Pi-Agent Skills di sistema
+│   ├── scummbar-docs-analyzer/        # RAG ibrido (FTS5 + sqlite-vec + gemini-embedding-2)
+│   ├── scummbar-memory-updater/       # regole aggiornamento MEMORY/README/AGENTS
+│   └── scummbar-web-to-markdown/      # convertitore web → Markdown
 ├── data/                              # Dati e log persistenti dell'applicazione
-│   └── scummbar_chat/                 # Dati ADK / Telegram
+│   └── scummbar_chat/                 # Dati ADK / Telegram / Streamlit
 │       ├── sessions.db                # Database sessioni SQLite (auto-creato)
+│       ├── diaries/                   # 📜 Diari di bordo (Diary_Nome.md)
 │       └── logs/                      # Log rotativi bot.log ed errors.log
-└── docs/                              # documentazione ADK, DeepSeek, Telegram, ecc.
+└── docs/                              # documentazione ADK, DeepSeek, Telegram, Streamlit, ecc.
 ```
 
 ---
@@ -72,7 +80,7 @@ scummbar/
 
 ## 🤖 Pi-Agent Skills
 Il progetto fornisce delle skill di sistema sotto `.agents/skills/` che devi invocare o consultare:
-- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra i 443 documenti nella cartella `docs/`.
+- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra gli **860 documenti** (14.728 chunk) nella cartella `docs/`.
 - `/skill:scummbar-memory-updater`: Per aggiornare `MEMORY.md`, `README.md` e `AGENTS.md` alla fine di una sessione di sviluppo o per modifiche rilevanti.
 - `/skill:scummbar-web-to-markdown`: Per convertire una pagina web in un file Markdown salvato nella cartella specificata dall'utente e auto-indicizzarlo nel RAG.
 
@@ -96,6 +104,9 @@ adk web src/ --log_level DEBUG      # debug verboso
 # Avvio bot Telegram
 python telegram_bot.py              # normale (INFO)
 python telegram_bot.py --debug      # DEBUG su console + file
+
+# Avvio RPG Streamlit single-player
+./start_streamlit.sh                # http://localhost:8501
 ```
 
 ---
@@ -110,6 +121,7 @@ python telegram_bot.py --debug      # DEBUG su console + file
 | Cambiare personalità di un bot | Modificare `bots/barnaby/persona.md`, `bots/barnacle/persona.md`, `bots/isolde/persona.md` o `bots/balthazar/persona.md` |
 | Nuovo tipo di grog | Modificare `skills/grog/SKILL.md` |
 | Nuovo piatto nel menu | Modificare `skills/menu/SKILL.md` |
+| Cambiare stile diario di bordo | Modificare il prompt in `diary.py` (`generate_chapter_async`) |
 
 ### Aggiungere un nuovo bot
 1. Creare `bots/nomepersonaggio/` con `agent.py` + `persona.md`
@@ -119,8 +131,8 @@ python telegram_bot.py --debug      # DEBUG su console + file
 
 ### Switch modello (solo `.env`)
 ```env
-LLM_MODEL=gemini-3.5-flash           # Gemini via Vertex AI (ADC o Service Account)
-LLM_MODEL=gemini-3.1-flash-lite      # Gemini Lite
+LLM_MODEL=gemini-3.6-flash           # Gemini via Vertex AI (ADC o Service Account)
+LLM_MODEL=gemini-3.5-flash-lite      # Gemini Lite
 LLM_MODEL=deepseek/deepseek-v4-flash # DeepSeek Flash (richiede DEEPSEEK_API_KEY)
 LLM_MODEL=deepseek/deepseek-v4-pro   # DeepSeek Pro
 ```
@@ -145,7 +157,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro   # DeepSeek Pro
 
 ## 📚 Dove Trovare la Documentazione
 
-Tutta la documentazione è nella cartella `docs/` (406 file Markdown, 11.647 chunk vettorializzati).
+Tutta la documentazione è nella cartella `docs/` (**860 file Markdown, 14.728 chunk vettorializzati**).
 Usa la skill **`scummbar-docs-analyzer`** (`/skill:scummbar-docs-analyzer`) per effettuare ricerche ibride (semantiche + keyword) sul database RAG locale.
 
 ---
