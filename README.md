@@ -133,61 +133,11 @@ The heart of the application lives in `src/scummbar_chat/`. Everything else (Tel
 
 ### 4.1 Core Overview Diagram
 
-![Core Overview Diagram](https://kroki.io/mermaid/svg/eNp1UUtPAjEQvvMretQDJDzOJrtwIYJBWQ-mMaS7HcrE0pLpLHENP95SzKKuzq3fa6YzhtRhJ4pZT8QKdWnSe-rdFk3CzvUsa0YbBofmVfT7d6eyRquDWHoN9iQyqQw4PrOto5CMe9hU3jG8c2uce8BUV4zercgfUQNFf3KB073fQxC0gZkk73mTOkXGk0an2FPKFflQloqcKhuRK-KYBXQdJrtoRhdNZUFMFXfoscTgrQaxhj_Mk2i2vFMfisSDOqJJzf-ZvPDehphDR6wgtFH5MGUVK8lnwY-F5aMv7oqMO8ikg1wS1_cyvKGNPQ15I_bg6m-nWCXNLJc368cFMogAIcQLhIEubzu67EnO3RL2npqMGLeq4m7Wi9SoqIk_iKs8sEIXxMKbdh-f2yKnmQ==)
-
-```mermaid
-graph TD
-    subgraph Config & Infrastructure
-        U[utils.py] -->|Config, Model Factory & Dual Auth| A[agent.py]
-        T[time_context.py] -->|InstructionProvider| A
-    end
-
-    subgraph ADK Agent Core
-        A[root_agent - Coordinator] --> B1[barnaby - Bartender]
-        A --> B2[barnacle - Cat]
-        A --> B3[isolde - Seer]
-        A --> B4[balthazar - Navigator]
-    end
-
-    subgraph Tools & Services
-        B1 --> TP[tools.py FunctionTools]
-        B2 --> TP
-        B3 --> TP
-        B4 --> TP
-        B1 --> SK[skills/ grog & menu]
-        TP --> DB[(SQLite sessions.db)]
-        TP --> AR[InMemoryArtifactService]
-        TP --> DY[diary.py Captain's Log]
-    end
-```
+![Core Overview Diagram (Excalidraw Style)](https://kroki.io/excalidraw/svg/eNrNV8tqHDkU_RVRA4MDbaee_RiYhcchmzEzmcSQRWwKlepWl4haaiSV2x3jTxjIIvsss0ogq0CW-aJ8wlxVP9ydtjrGUDCr1qukc8-5ujp9Hdj5FILfSABXjApeajoLeiS4BG24kjgRY8-oRrN2lWHNZFJQfaiBlhNwS0HABKQ1OP3qOuClW1aoq5wpWfGxW7E6QgOzVI5F-9mV2zsLsTV3LdeY8dLW2ElC16uBj2uL3YHrGavVazhRQmm31S8RxKOkcBsVlL0ea9XI8nYWYhhWoZutuBAv7Fy0AGrK6ka3xy_2e7k80QWJW4xrCcYFEmFfTSnj1oGLWjyCFiCwdx1YuHK4gsZyYY6mc_IrsXwCLmI3hSPn8uCkDb9HnjRUkOPG1j1yhovIM60ueQn6UXBz0yMrwqjWarakLNdK2U3e2skVZ2m44my0ydkWY9ldjKWDLOuP7hf7VPGloq9wq_CiR9xvFl5cbGB2Iv8IdVfiZAU3Src0Tu-jcUKH1KdxWQCtoGuNXYA5HWOCE5RU6ZJLapUmj8lz1ViU8VwaSy1nOceGbpjFa0N-JzOlRfl4dV2OJuWW3I46HJa0mO9nb30_-pvkRf0t8vp3kTfM0jIEH3kVVAkbdE3e9_f_fiXLOPFK_EG1BbmT-2sy2CLwPWw8nI6k6sdR7K0XrGKs6J6Ot5_JKlJXIqh1eYSV9PBvKea7rHCjRLmfk2T4cE4GYUQHmTdFEqyhVfecvPtEFnEiI0-Vto0EcgZC3J0mwtb0DdV7Ocn6D-dkf82BsIq7rznf33_4SNahIi1_0Us-dmVn59HIdV5E3rciub0w0SYRh3HY-XuxOOOHJ2OJOPYjzjyIB90DHnjxJv7X2IM36hxu5EWbetFmnnyI0u7hpncbCKuUMHtv87rAJYNNzNnw5wZiNIqKqPC_gWgT464vcxugM4kHTxvZuoMzN4K-ASOlQpBvX8gEJkrzN-DaM80t5AaYBpsbptViiTPmuaUa3QijunRDFVhW5xJmJsdQ2qFmWlL82lL07zIvOdXznYpR5H5zuaC4JTv-H7hLgyUPvdfe9IjW-ZEOtwzm8OfFPuxnVdr3GsyoopB1nR_P3D8tg76IAf6PONaWV5RZcy5f_HOKmUAMboZJY47Kghy8PD595HQ-oVNL0XCSUzV2_eMnf95-uqM45tE9FE9Tr-JpN4qnTvGLm_8Aedlclg==)
 
 **Logical flow of a single turn:**
 
-![Turn Execution Sequence](https://kroki.io/mermaid/svg/eNptkstOw0AMRff9Cq8QCBX2WSBVFCTEAtTCupqmpoyYjIPtqejfY0_6oCrZ5OFzPffaEfwumFucxrDm0I3ArlCUcumWyMNrq8TwLsgQBF6DMuVa6ANrbGMfssIUU9wgbx15w4TeDG5hroyhS1HPBJNV6HVouX-8hQWjUNrgImbFrJdXZ7J7YnQNl5yRb-y2COv_0RmRVtTuA3Ruwr86My_L8eRf5I0oOfFYcquRsr_LqGI-kc3d7T16A3PMK-hQxE6rxL5k1C5kY7aKIgwB4QI-iLugIFtR7KBn6nqVKt4pTOuhG3jKG_pCmEyfYVbTV8prhnjYxpYjYq1FuVSzAtegscNFS3bez5DOUTfkcRu3iOtgjpRAbArHQVXAQE_cwMMPtqVilGrZP4-PfWaohXMtg22xpL9NDgaf8rj9DGy_lO3bsN484tHVIetjzCGdAjXoybhfivZFwYNZTt_ZhzWW08mbwvfkBvPKDhXdJlwBVe0vfQ8AVA==)
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as Patron (User)
-    participant Delivery as Telegram / Streamlit
-    participant Adapter as Adapter / _resolve_intent()
-    participant Core as runner.run_agent()
-    participant Root as root_agent (Coordinator)
-    participant Agent as Sub-Agent (e.g. Barnaby/Balthazar)
-    participant Tool as FunctionTools (tools.py)
-
-    User->>Delivery: Send message ("Un grog per favore!")
-    Delivery->>Adapter: Route intent & format system prompts
-    Adapter->>Core: Invoke ADK Runner with user_id & session_id
-    Core->>Root: Pass instructions + time_context
-    Root->>Agent: Delegate to target sub-agent
-    Agent->>Tool: Execute tool (memory/scroll/news/diary)
-    Tool-->>Agent: Return tool result
-    Agent-->>Root: In-character response
-    Root-->>Core: Final response
-    Core-->>Delivery: Output text + artifacts
-    Delivery-->>User: Render styled HTML / Markdown
-```
+![Turn Execution Sequence](https://kroki.io/mermaid/svg/eNp1ks9uwjAMxu88hV-APUAPSNUYEtphE7AzCq3HorVOZzsI3n52-DcE6yVN_LPzfXYEfzJSg9MYthz6EdgXsibK_Qb5uG00MXwIMgSB96CcqASGwBqbOARSmGIXd8gHR1bYoRcDS1sqY-i7qHcZdRsGPdY8_xofSZHu4efE6CRnIuQnW9Zh-whcpKQFtPUfpPZTZ5Z5M64fIquUOidmmRqNiXwvo4J5H8aTydlvBUukFnoUsdsKcQ4ZdTJWmayseDIHwRLkIIo9DJz6QaXknWBLc7cVzGmXvhHq6Sssiu1CecwQ91nZMESsqijnolNKbY09rptkl-2P1hx2Ne61cn24DSZHE4i14NqlAhjodit42WOTC5a6Evbj8bXOAjUzlTAwSu7-FrlInNO4-Qpsj8gGbNhgKvGq6uJ2Fil0t0CxetPrt6xDVnBjxamP7NNKy23jLcfH5BKptWtFDx22kEr2L7kS_b0=)
 
 ### 4.2 Multi-Agent Coordination (Router-Delegate)
 
@@ -326,17 +276,6 @@ Telegram provides the **multi-player** experience: a shared group where the 4 bo
 
 ![Telegram Delivery Architecture](https://kroki.io/mermaid/svg/eNplkMFOhDAQhu8-xZyMHljfwARkWY2YIHAjG1PY2dIIHWynm5jw8JZiXBJ7m_b7_j9TacTUQ53egD9xwzigNGL8aIl30zdUbkJzUZbMEaLocS4MRudByZ6h67H7tDMkf9KDOImJ0XjxGPKS4OSkZVTQMCgtQSjqmacZ6kNT_3qQEENcvGylkhwv_C3kFGrKa41xWv9ryciMghdnhuzKntfrDV4GvEJrFWmfv7-gZl-QJs1d9Z4rRrDro92d2vutFKevsNdSaZzhiQw2VefGsRUmTBBLn7TyWeCf67fcNySDX-HLEePyXT-oL3mR)
 
-```mermaid
-graph TD
-    A[telegram_bot.py Supervisor] -->|Pre-flight checks| B[telegram/adapter.py]
-    B -->|Long-Polling aiohttp| TG[Telegram Bot API]
-    B -->|Routing & Locks| R[telegram/runner.py]
-    B -->|Formatting| F[telegram/formatter.py]
-    R -->|Session & Events| DB[(SQLite sessions.db)]
-    R -->|ADK Engine| Core[Scummbar Core Agent]
-    F -->|HTML & Blockquotes| B
-```
-
 | File | Role |
 |------|------|
 | `telegram_bot.py` | Pre-flight env checks (Gemini/DeepSeek auth), rotating logs (`bot.log`, `errors.log`), signal trapping, delegates to `adapter.main()` |
@@ -376,29 +315,6 @@ While Telegram is a real-time group chat, the **Streamlit Web App** (`src/scummb
 ### 6.1 Architecture & Concept
 
 ![Multi-Frontend Architecture](https://kroki.io/mermaid/svg/eNp1kc9qhDAQxu_7FHNsD6tvUPDPYg9b2hrBQxCJ66CCJiGJLfv2Tdyarq3NIUzm-83wfaRTTPZQpAewR89Nt7wToRBIzxS2cOLdwHHR3Ule8xMll3maGqZuYNQhN8DcHcgrhKBmzlHZuvJjaUwfyPt5MAgatR4E10HbQBmdH6vNbjgenyy99JC3h62xAke01QQpjsMHqqufLbI6puZbrhvhrFTLMqtEXglZy6T5Zc4RK5r_oDsxHLCQzuru_Av1HjMlZln9k4QYhWwaB_M3Cilq8ky1YcrUesUC3d_iWDWivh0yKTcOnbxyyR13EZMU3H6R3sc3ge6XlDRW4lOjghIbyN8yn-gLudinPQ==)
-
-```mermaid
-graph TD
-    subgraph Core Shared Engine
-        CORE[Scummbar Core Agent agent.py / runner.py]
-        DB[(SQLite sessions.db WAL)]
-        CORE --> DB
-    end
-
-    subgraph Telegram Delivery
-        TG_B[telegram_bot.py] --> TG_A[telegram/adapter.py]
-        TG_A --> TG_R[telegram/runner.py]
-        TG_R --> CORE
-        TG_A --> TG_M[Telegram Group]
-    end
-
-    subgraph Streamlit Delivery
-        ST_SH[start_streamlit.sh] --> ST_A[streamlit/app.py]
-        ST_A --> ST_C[streamlit/components.py]
-        ST_A --> CORE
-        ST_A --> ST_W[Browser Web RPG]
-    end
-```
 
 **Zero business-logic duplication**: `app.py` uses the same `run_agent()` as Telegram and the same routing functions (`_resolve_intent()`).
 
@@ -453,20 +369,6 @@ Telegram and Streamlit share the same `sessions.db`. To avoid `database is locke
 This repository is designed to be developed, refactored, and maintained **in collaboration with an AI assistant (Pi-Agent)**. To this end, an autonomous **Agent Skills** system is configured directly in the codebase.
 
 ![Pi-Agent Skills Architecture](https://kroki.io/mermaid/svg/eNpdkNFqwjAUhu99inM1NkZaGG6Xg3btRKSrpGUygoy0DTU0MS6JOqUPv6QKxeUqnPN9Of9Jq-luA2UyAXeWEQloy7bWhKbjQpgQlhxFvrK-AoDQK-BoRky9l7KiGjWqNohuqTidmb7BsjQbMcmk0ie03zXU_uNWaTxyR1Yhq5CkumvUcXsDLnA-gp1WHUcNp62m0qwnA-iSebJ_L4tneATzI7hl6MDqHpKY3Pus35q2QVM9XF52GQcB7wUzcAefVHCXUGkn5G8Fcf0cf0EI0Sz9KAt3wWmUZOnFdskHuzJTN21jpXiy7Nf2MM-WOS6JnxfCXO6Uvv6gW2EwzoJXTompYS_T3pcXc7LwKwVcQXLZCgqmD7xm6z8De4F2)
-
-```mermaid
-graph TD
-    PA[.agents/skills/ Pi-Agent]
-    PA --> RAG[scummbar-docs-analyzer]
-    PA --> MEM[scummbar-memory-updater]
-    PA --> WEB[scummbar-web-to-markdown]
-    PA --> KRO[scummbar-kroki-diagrams]
-
-    RAG -->|FTS5 + sqlite-vec| DB[(docs_rag.db)]
-    MEM -->|Rules & Validator| DOCS[MEMORY / AGENTS / README]
-    WEB -->|bs4 + html2text| IMPORT[docs/ Import]
-    KRO -->|zlib + Base64| KROKI[Kroki.io Diagram Service]
-```
 
 ### 7.1 What is a Pi-Agent Skill (Progressive Disclosure)
 
