@@ -12,37 +12,50 @@ The repository is intentionally structured **didactically**: every architectural
 
 ## 🗺️ Table of Contents
 
-1. [🎯 Project Purpose](#-project-purpose)
-2. [📖 The Story & The Characters](#-the-story--the-characters)
-3. [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
-4. [🏗️ The ADK Core: Architecture & How It Works](#-the-adk-core-architecture--how-it-works)
-   - [4.1 Core Overview Diagram](#41-core-overview-diagram)
-   - [4.2 Multi-Agent Coordination (Router-Delegate)](#42-multi-agent-coordination-router-delegate)
-   - [4.3 Agent Configuration](#43-agent-configuration)
-   - [4.4 ADK Skills (Auto-Discovery)](#44-adk-skills-auto-discovery)
-   - [4.5 ADK Function Tools](#45-adk-function-tools)
-   - [4.6 Time Management (Real Atmosphere)](#46-time-management-real-atmosphere)
-   - [4.7 World Context & Narration Rules](#47-world-context--narration-rules)
-   - [4.8 The Captain's Log (Tavern Journal)](#48-the-captains-log-tavern-journal)
-   - [4.9 Model Factory & Dual Authentication](#49-model-factory--dual-authentication)
-   - [4.10 Sessions, Compaction & Context Caching](#410-sessions-compaction--context-caching)
-5. [📡 Telegram Frontend (Multi-Player)](#-telegram-frontend-multi-player)
-   - [5.1 Telegram Delivery Architecture](#51-telegram-delivery-architecture)
-   - [5.2 Semantic Routing](#52-semantic-routing)
-   - [5.3 Concurrency, Ephemeral & Session Pruning](#53-concurrency-ephemeral--session-pruning)
-   - [5.4 HTML Message Formatting](#54-html-message-formatting)
-6. [🎮 Streamlit Frontend (Single-Player RPG)](#-streamlit-frontend-single-player-rpg)
-   - [6.1 Architecture & Concept](#61-architecture--concept)
-   - [6.2 Key Features](#62-key-features)
-   - [6.3 Narrative & Action Styling (3 Tiers)](#63-narrative--action-styling-3-tiers)
-7. [🤖 Pi-Agent: AI-Assisted Development & System Skills](#-pi-agent-ai-assisted-development--system-skills)
-   - [7.1 What is a Pi-Agent Skill (Progressive Disclosure)](#71-what-is-a-pi-agent-skill-progressive-disclosure)
-   - [7.2 scummbar-docs-analyzer (Hybrid RAG)](#72-scummbar-docs-analyzer-hybrid-rag)
-   - [7.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)](#73-scummbar-memory-updater-memoryreadmeagents-management)
-   - [7.4 scummbar-web-to-markdown (Docs Import)](#74-scummbar-web-to-markdown-docs-import)
-   - [7.5 How to Use the Autopilot](#75-how-to-use-the-autopilot)
-8. [🧭 Project Structure](#-project-structure)
-9. [⚙️ Environment Configuration (.env)](#-environment-configuration-env)
+- [🍺 ScummBar AI — A Collaborative Multi-Agent Study Project](#-scummbar-ai--a-collaborative-multi-agent-study-project)
+  - [🗺️ Table of Contents](#️-table-of-contents)
+  - [🎯 Project Purpose](#-project-purpose)
+  - [📖 The Story \& The Characters](#-the-story--the-characters)
+  - [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
+    - [1. Prerequisites](#1-prerequisites)
+    - [2. Installation](#2-installation)
+    - [3. `.env` Configuration](#3-env-configuration)
+    - [4. Running the Applications](#4-running-the-applications)
+  - [🏗️ The ADK Core: Architecture \& How It Works](#️-the-adk-core-architecture--how-it-works)
+    - [4.1 Core Overview Diagram](#41-core-overview-diagram)
+    - [4.2 Multi-Agent Coordination (Router-Delegate)](#42-multi-agent-coordination-router-delegate)
+    - [4.3 Agent Configuration](#43-agent-configuration)
+    - [4.4 ADK Skills (Auto-Discovery)](#44-adk-skills-auto-discovery)
+    - [4.5 ADK Function Tools](#45-adk-function-tools)
+    - [4.6 Time Management (Real Atmosphere)](#46-time-management-real-atmosphere)
+    - [4.7 World Context \& Narration Rules](#47-world-context--narration-rules)
+    - [4.8 The Captain's Log (Tavern Journal)](#48-the-captains-log-tavern-journal)
+    - [4.9 Model Factory \& Dual Authentication](#49-model-factory--dual-authentication)
+    - [4.10 Sessions, Compaction \& Context Caching](#410-sessions-compaction--context-caching)
+  - [📡 Telegram Frontend (Multi-Player)](#-telegram-frontend-multi-player)
+    - [5.1 Telegram Delivery Architecture](#51-telegram-delivery-architecture)
+    - [5.2 Semantic Routing](#52-semantic-routing)
+    - [5.3 Concurrency, Ephemeral \& Session Pruning](#53-concurrency-ephemeral--session-pruning)
+    - [5.4 HTML Message Formatting](#54-html-message-formatting)
+  - [🎮 Streamlit Frontend (Single-Player RPG)](#-streamlit-frontend-single-player-rpg)
+    - [6.1 Architecture \& Concept](#61-architecture--concept)
+    - [6.2 Key Features](#62-key-features)
+      - [A. Mandatory "Patron Name" Field](#a-mandatory-patron-name-field)
+      - [B. Automatic Semantic Intent Routing](#b-automatic-semantic-intent-routing)
+      - [C. Automatic History Restoration](#c-automatic-history-restoration)
+      - [D. Narratore Synchronization](#d-narratore-synchronization)
+      - [E. Integrated Captain's Log](#e-integrated-captains-log)
+      - [F. Segmented Control Navigation](#f-segmented-control-navigation)
+      - [G. Multi-Process Concurrency \& WAL](#g-multi-process-concurrency--wal)
+    - [6.3 Narrative \& Action Styling (3 Tiers)](#63-narrative--action-styling-3-tiers)
+  - [🤖 Pi-Agent: AI-Assisted Development \& System Skills](#-pi-agent-ai-assisted-development--system-skills)
+    - [7.1 What is a Pi-Agent Skill (Progressive Disclosure)](#71-what-is-a-pi-agent-skill-progressive-disclosure)
+    - [7.2 scummbar-docs-analyzer (Hybrid RAG)](#72-scummbar-docs-analyzer-hybrid-rag)
+    - [7.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)](#73-scummbar-memory-updater-memoryreadmeagents-management)
+    - [7.4 scummbar-web-to-markdown (Docs Import)](#74-scummbar-web-to-markdown-docs-import)
+    - [7.5 How to Use the Autopilot](#75-how-to-use-the-autopilot)
+  - [🧭 Project Structure](#-project-structure)
+  - [⚙️ Environment Configuration (.env)](#️-environment-configuration-env)
 
 ---
 
@@ -101,7 +114,7 @@ source py-env/bin/activate   # or: source py_env.sh active
 ```
 
 ### 3. `.env` Configuration
-Create the file `src/scummbar_chat/.env` (see [Section 9](#-environment-configuration-env) for the full reference).
+Create the file `src/scummbar_chat/.env` (see [Section 9](#️-environment-configuration-env) for the full reference).
 
 ### 4. Running the Applications
 
@@ -585,7 +598,7 @@ GEMINI_API_KEY=your-api-key-here
 # 💬 SECTION 2: CONVERSATION MODEL
 # ===========================================================================
 LLM_MODEL=gemini-3.6-flash
-LLM_THINKING_LEVEL=medium
+LLM_THINKING_LEVEL=LOW
 # LLM_MODEL=deepseek/deepseek-v4-flash   # DeepSeek alternative
 
 # ===========================================================================
