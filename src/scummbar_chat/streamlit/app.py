@@ -183,7 +183,7 @@ def main() -> None:
                 }
             ]
 
-    # 4. Main Interface Views: Chat vs Diario di Bordo
+    # 4. Main Interface Views: Chat vs Captain's Log
     # NOTE: st.chat_input must NOT be placed inside st.tabs/st.container/st.expander
     # or it loses its sticky bottom anchoring. We use a segmented control for
     # navigation and render the chat input at top-level so it stays pinned.
@@ -279,7 +279,7 @@ def main() -> None:
                     st.toast("📜 Il tuo Diario di Bordo si è arricchito di un nuovo capitolo!", icon="📜")
 
     else:
-        # Diario di Bordo view
+        # Captain's Log view
         st.subheader(f"📜 Il Diario di Bordo di {patron_name}")
 
         file_path = get_diary_file_path(patron_name)

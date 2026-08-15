@@ -169,7 +169,7 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     for sx, sy in [(25, 25), (width - 35, 25), (25, height - 35), (width - 35, height - 35)]:
         draw.text((sx, sy), "*", fill="#c5a059", font=font)
 
-    # Glifo mistico al centro
+    # Mystic glyph at the center
     cx, cy = width // 2, height // 2 - 20
     r = 80
     for i in range(8):
@@ -182,11 +182,11 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
 
     draw.ellipse([(cx - r // 2, cy - r // 2), (cx + r // 2, cy + r // 2)], outline="#c5a059", width=2)
 
-    # Onde marittime stilizzate all'interno del glifo centrale
+    # Stylized maritime waves inside the central glyph
     draw.arc([(cx - r // 3, cy + r // 8), (cx, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
     draw.arc([(cx, cy + r // 8), (cx + r // 3, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
 
-    # Luna crescente stilizzata in alto a sinistra del glifo
+    # Stylized crescent moon at the top-left of the glyph
     draw.arc([(cx - r // 2, cy - r // 2), (cx - r // 4, cy - r // 4)], start=90, end=270, fill="#c5a059", width=1)
 
     draw.ellipse([(cx - 10, cy - 10), (cx + 10, cy + 10)], fill="#c5a059")
@@ -603,7 +603,7 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
         }
 
 
-# Esportazione degli strumenti ADK
+# Export ADK tools
 recall_patron_tool = FunctionTool(recall_patron_memory)
 memorize_patron_tool = FunctionTool(memorize_patron_chat)
 write_secret_scroll_tool = FunctionTool(write_secret_scroll)
