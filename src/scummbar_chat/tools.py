@@ -288,37 +288,37 @@ async def draw_tarot_card(
 
 async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_italiana") -> dict:
     """
-    Recupera gli ultimi dispacci e notizie reali focalizzati esclusivamente su 3 argomenti:
-    - Politica Italiana ('politica_italiana', 'politica', 'italia', 'governo')
-    - Politica Americana ed Estera ('politica_americana', 'usa', 'america', 'esteri', 'mondo')
-    - Tecnologia ed Alchimie Moderne ('tecnologia', 'tech', 'alchimia', 'scienza', 'gadget')
+    Recupera gli ultimi dispacci e notizie reali focalizzati esclusivamente su 2 argomenti:
+    - Politica Italiana ('politica_italiana', 'politica', 'italia', 'governo', 'senato', 'parlamento')
+    - Politica Americana ('politica_americana', 'usa', 'america', 'stati_uniti', 'washington', 'casa_bianca')
 
-    Usa questo strumento quando un avventore ti chiede notizie sui bisticci dei governanti,
-    sulle dispute dei consigli italiani o americani, o sulle invenzioni e specchi incantati della tecnologia.
+    Usa questo strumento quando un avventore ti chiede notizie sui bisticci dei governanti italiani
+    o sulle contese del Grande Impero d'Oltreoceano (USA).
     """
     import xml.etree.ElementTree as ET
+    from email.utils import parsedate_to_datetime
 
     import httpx
 
     rss_feeds = {
+        # Politica Italiana
         "politica_italiana": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "politica": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "italia": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "governo": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
-        "politica_americana": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "usa": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "america": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "esteri": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "mondo": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "tecnologia": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "tech": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "alchimia": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "scienza": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "gadget": "https://www.hdblog.it/feed/",
+        "senato": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
+        "parlamento": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
+        # Politica Americana
+        "politica_americana": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "usa": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "america": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "stati_uniti": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "washington": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "casa_bianca": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
     }
 
     cat_key = category.lower().strip()
-    url = rss_feeds.get(cat_key, "https://www.ansa.it/sito/notizie/politica/politica_rss.xml")
+    url = rss_feeds.get(cat_key, rss_feeds["politica_italiana"])
     headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
     try:
@@ -327,44 +327,86 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
             resp.raise_for_status()
 
             root = ET.fromstring(resp.content)
-            items = root.findall(".//item")
-            if not items:
-                items = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+            raw_items = root.findall(".//item")
+            if not raw_items:
+                raw_items = root.findall(".//{http://www.w3.org/2005/Atom}entry")
 
-            items = items[:5]
-
-            headlines = []
-            for item in items:
+            parsed_items = []
+            for item in raw_items:
                 title_elem = item.find("title")
                 desc_elem = item.find("description")
                 date_elem = item.find("pubDate")
+                if date_elem is None:
+                    date_elem = item.find("{http://www.w3.org/2005/Atom}updated")
                 link_elem = item.find("link")
                 guid_elem = item.find("guid")
 
                 title = title_elem.text.strip() if title_elem is not None and title_elem.text else "Senza titolo"
                 desc = desc_elem.text.strip() if desc_elem is not None and desc_elem.text else ""
-                date = date_elem.text.strip() if date_elem is not None and date_elem.text else ""
+                date_str = date_elem.text.strip() if date_elem is not None and date_elem.text else ""
+
+                # Robust datetime parsing to sort chronologically
+                dt = None
+                if date_str:
+                    try:
+                        dt = parsedate_to_datetime(date_str)
+                    except Exception:
+                        try:
+                            dt = datetime.fromisoformat(date_str)
+                        except Exception:
+                            dt = None
+
+                if dt is None:
+                    dt = datetime.min.replace(tzinfo=UTC)
 
                 link = ""
                 if link_elem is not None and link_elem.text:
                     link = link_elem.text.strip()
+                elif link_elem is not None and link_elem.attrib.get("href"):
+                    link = link_elem.attrib.get("href", "").strip()
                 elif guid_elem is not None and guid_elem.text and guid_elem.text.startswith("http"):
                     link = guid_elem.text.strip()
 
-                headlines.append({"titolo_originale": title, "sintesi_originale": desc, "ora_dispaccio": date, "link_sorgente": link})
+                formatted_date = dt.strftime("%d/%m/%Y alle ore %H:%M") if dt.year > 1 else "Recente"
+
+                parsed_items.append({
+                    "titolo_originale": title,
+                    "sintesi_originale": desc,
+                    "datetime": dt,
+                    "ora_pubblicazione": formatted_date,
+                    "link_sorgente": link,
+                })
+
+            # Rigorously sort items in descending order so the FRESHEST / MOST RECENT news come first
+            parsed_items.sort(key=lambda x: x["datetime"], reverse=True)
+
+            # Keep only the top 3 freshest dispatches
+            top_headlines = parsed_items[:3]
+
+            cleaned_headlines = [
+                {
+                    "titolo_originale": h["titolo_originale"],
+                    "sintesi_originale": h["sintesi_originale"],
+                    "ora_pubblicazione": h["ora_pubblicazione"],
+                    "link_sorgente": h["link_sorgente"],
+                }
+                for h in top_headlines
+            ]
+
+            category_label = "Politica Americana" if "america" in cat_key or "usa" in cat_key else "Politica Italiana"
 
             return {
                 "status": "success",
-                "categoria_richiesta": cat_key,
-                "numero_dispacci": len(headlines),
-                "dispacci": headlines,
+                "categoria_richiesta": category_label,
+                "numero_dispacci": len(cleaned_headlines),
+                "dispacci": cleaned_headlines,
                 "istruzione_traduzione": (
-                    "Riferisci queste notizie all'avventore con drammatica, pomposa e ridicola solennità teatrale! "
-                    "Trasponi i bisticci politici italiani/americani o i fatti tecnologici nella tua ambientazione "
-                    "fantasy-marittima (es: 'Il Senato dei Senatori Borbottanti', 'La Gilda della Mela d'Oro', "
-                    "'Il Gran Mogol d'Oltreoceano'). "
+                    "Riferisci queste notizie freschissime all'avventore con drammatica, pomposa e ridicola solennità teatrale! "
+                    "Trasponi i bisticci politici italiani o americani nella tua ambientazione "
+                    "fantasy-marittima (es: 'L\\'Arengo dei Senatori Borbottanti', 'Il Primo Visir del Ducato', "
+                    "'Il Gran Mogol d\\'Oltreoceano', 'L\\'Impero delle Cinquanta Province'). "
                     "Includi SEMPRE per ogni notizia il link HTML originale fornito da 'link_sorgente' "
-                    "(es. '<a href=\"LINK\">Srotola il pergamena originale</a>')."
+                    "(es. '<a href=\"LINK\">Srotola la pergamena originale</a>' o '<a href=\"LINK\">Fonte del dispaccio</a>')."
                 ),
             }
 

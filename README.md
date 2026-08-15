@@ -202,7 +202,7 @@ All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They r
 | `memorize_patron_chat` | Memory write | Updates stable traits (max 10) and chat summary (max 300 chars) |
 | `write_secret_scroll` | Text artifacts | Generates scrolls/recipes/portolans `.txt` via `InMemoryArtifactService` |
 | `draw_tarot_card` | Multimodal images | Generates tarot cards with `gemini-3.1-flash-lite-image` (isolated `IMAGE_*` auth), PIL fallback, PNG/JPEG detection via byte headers |
-| `fetch_news_feed` | Live RSS feeds | ANSA + HDBlog, 3 categories (IT politics, world, tech), comedic translation with HTML links |
+| `fetch_news_feed` | Live RSS feeds | ANSA Politica + Google News USA, 2 categories (IT & US politics), strictly sorted chronologically (freshest first) with HTML links |
 
 ### 4.6 Time Management (Real Atmosphere)
 

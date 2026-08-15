@@ -846,20 +846,22 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ## 📋 Log delle Sessioni di Lavoro
 
-### 2026-08-15 — Refactoring Diario di Bordo: Agente Cronista Dedicato
+### 2026-08-15 — Refactoring Balthazar (Feed Politica IT/USA & Ordinamento Cronologico) e Diario
 
-**Obiettivo**: Disaccoppiare la gestione del Diario di Bordo dai bot di conversazione (Barnaby e Balthazar) e affidarla ad un agente dedicato (`chronicler`) con system prompt specializzato, alleggerendo il contesto dei bot RP e rendendo la redazione deterministica a livello di sistema.
+**Obiettivo**: Riorganizzare il funzionamento dell'agente Balthazar restringendo i feed informativi alle sole notizie di Politica Italiana ed Americana ed introducendo l'ordinamento cronologico rigoroso per data di pubblicazione (`pubDate`).
 
 **Attività svolte**:
-- **Rimozione tool dai bot**: Eliminato `update_tavern_diary_tool` da `src/scummbar_chat/tools.py` (funzione + `FunctionTool`) e da `barnaby_agent`/`balthazar_agent`. I bot di conversazione ora espongono solo tool RP/memoria (recall, memorize, scroll, tarot, news).
-- **Nuovo agente `chronicler` (`bots/chronicler/`)**:
-  - `persona.md`: system prompt "Il Cronista dello Scummbar" (immedesimazione assoluta in prima persona "Io", stile caraibico ironico Monkey Island, divieto riassunti/elenchi, lingua italiana esclusiva, no titoli Markdown).
-  - `agent.py`: `chronicler_agent = Agent(name="chronicler", model=COMPACTION_LLM, instruction=_PERSONA, ...)` — riusa l'istanza di compattazione (Gemini o DeepSeek).
-  - Esportato in `bots/__init__.py`.
-- **Integrazione in `diary.py`**: `generate_chapter_async()` ora importa `chronicler_agent`, compone `full_prompt = instruction + user_prompt` (trascrizione nuovi messaggi) e genera con `chronicler_agent.model` via `LlmRequest`/`generate_content_async`. Rimosso l'uso diretto di `_build_model_instance(COMPACTION_MODEL)` (l'istanza è già nell'agente).
-- **Diagramma C4 aggiornato**: Rigenerato `assets/core_overview_diagram.svg` (rimosso "Diary" da Barnaby/Balthazar, aggiunti i componenti `Chronicler [bots/chronicler]` e `Captain's Logs [diaries/]`).
-- **Allineamento documentazione**: Aggiornati `README.md` (sezioni 4.3/4.5/4.8, Project Structure, trigger ogni 10 messaggi), `MEMORY.md` (architettura agenti, tabella stato, decisioni architetturali) e `AGENTS.md` (struttura progetto).
-- **Verifica finale**: Nessun riferimento residuo a `update_tavern_diary_tool` in `src/`; import di tutti i moduli/agenti riuscito; fence markers bilanciati; trigger automatico confermato a `+10` messaggi (non 6).
+- **Refactoring Tool `fetch_news_feed` (`src/scummbar_chat/tools.py`)**:
+  - Rimosse completamente le categorie e i feed su tecnologia/gadget (HDBlog, ANSA tecnologia).
+  - Ristretto l'ambito a 2 sole categorie: **Politica Italiana** (`https://www.ansa.it/sito/notizie/politica/politica_rss.xml`) e **Politica Americana** (`Google News USA in italiano` con query mirata per politica, Casa Bianca, Trump, governo USA).
+  - **Ordinamento cronologico decrescente**: parsing rigoroso di `<pubDate>` con `email.utils.parsedate_to_datetime`, ordinamento per data decrescente e restituzione delle sole 3 notizie più fresche in assoluto, complete di orario e link sorgente HTML.
+- **Aggiornamento Prompt & Intent Routing**:
+  - Aggiornato `bots/balthazar/persona.md`: eliminati tutti i riferimenti alla tecnologia (Mela d'Oro, gadget, AI) focalizzando la comicità teatrale sui bisticci del *Ducato d'Italia* e del *Grande Impero d'Oltreoceano*.
+  - Aggiornati `_COORDINATOR_INSTRUCTION` in `agent.py` e `_INTENT_MAP` in `telegram/adapter.py` (aggiunte keyword politiche).
+- **Refactoring Diario di Bordo**:
+  - Disaccoppiata la gestione del diario dai bot di conversazione (rimosso `update_tavern_diary_tool`) ed affidata all'agente dedicato `chronicler` (`bots/chronicler/`).
+  - Aggiornato `assets/core_overview_diagram.svg` (C4-PlantUML).
+- **Verifica**: Testati con successo il parsing e l'ordinamento RSS delle notizie live ANSA e Google News USA.
 
 ---
 
