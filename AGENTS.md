@@ -42,7 +42,7 @@ scummbar/
 │   ├── bots/barnaby/                  # agente Barnaby
 │   ├── bots/barnacle/                 # agente Barnacle
 │   ├── bots/isolde/                   # agente Isolde
-│   ├── bots/balthazar/                # agente Balthazar
+│   ├── bots/balthazar/                # agente Balthazar (+ consult_barnaby/consult_barnacle AgentTool infra-agent)
 │   ├── bots/chronicler/               # agente Cronista (compilazione Diario di Bordo)
 │   ├── skills/                        # ADK skills auto-discovery
 │   ├── telegram/                      # adapter Telegram (adapter, formatter, runner)
@@ -82,7 +82,7 @@ scummbar/
 
 ## 🤖 Pi-Agent Skills
 Il progetto fornisce delle skill di sistema sotto `.agents/skills/` che devi invocare o consultare:
-- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra gli **897 documenti** (14.881 chunk in formato `.md`, `.adoc`, `.yaml`, ecc.) nella cartella `docs/`.
+- `/skill:scummbar-docs-analyzer`: Motore RAG ibrido (FTS5 + Vector `gemini-embedding-2`) per cercare semanticamente tra gli **908 documenti** (15.430 chunk in formato `.md`, `.adoc`, `.yaml`, ecc.) nella cartella `docs/`.
 - `/skill:scummbar-kroki-diagrams`: Genera diagrammi, schemi e mappe vettoriali (C4-PlantUML di default, Excalidraw, Mermaid, Graphviz, PlantUML, D2, ecc.) tramite codifica URL zlib+Base64 per Kroki.io.
 - `/skill:scummbar-memory-updater`: Per aggiornare `MEMORY.md`, `README.md` e `AGENTS.md` alla fine di una sessione di sviluppo o per modifiche rilevanti.
 - `/skill:scummbar-web-to-markdown`: Per convertire una pagina web in un file Markdown salvato nella cartella specificata dall'utente e auto-indicizzarlo nel RAG.
@@ -171,7 +171,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro   # DeepSeek Pro
 
 ## 📚 Dove Trovare la Documentazione
 
-Tutta la documentazione è nella cartella `docs/` (**897 file di testo, 14.881 chunk vettorializzati**).
+Tutta la documentazione è nella cartella `docs/` (**908 file di testo, 15.430 chunk vettorializzati**).
 Usa la skill **`scummbar-docs-analyzer`** (`/skill:scummbar-docs-analyzer`) per effettuare ricerche ibride (semantiche + keyword) sul database RAG locale.
 
 ---

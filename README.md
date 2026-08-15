@@ -161,7 +161,7 @@ Each agent lives in `bots/<name>/` with two files: `agent.py` (ADK config) and `
 | 🍺 **barnaby** | `MODEL` | ✅ grog + menu (auto-discovery) | recall, memorize, write_secret_scroll | No |
 | 🐱 **barnacle** | `MODEL` | ✅ grog + menu | recall (smell/read only) | **Yes** — cannot write memory |
 | 🔮 **isolde** | `MODEL` | — (no skills) | recall, draw_tarot_card | No |
-| 🧭 **balthazar** | `MODEL` | ✅ grog + menu | recall, memorize, write_secret_scroll, draw_nautical_map, fetch_news_feed | No |
+| 🧭 **balthazar** | `MODEL` | ✅ grog + menu | recall, memorize, write_secret_scroll, draw_nautical_map, consult_barnaby (AgentTool), consult_barnacle (AgentTool), fetch_news_feed | No |
 | 📜 **chronicler** | `COMPACTION_LLM` | — (internal scribe) | — (dedicated diary generator) | **Yes** — writes to Captain's Log `.md` |
 
 **Base agent configuration (Barnaby example):**
@@ -203,6 +203,7 @@ All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They r
 | `write_secret_scroll` | Text artifacts | Generates scrolls/recipes/portolans `.txt` via `InMemoryArtifactService` |
 | `draw_tarot_card` | Multimodal images | Generates tarot cards with `gemini-3.1-flash-lite-image` (isolated `IMAGE_*` auth, 1:1), PIL fallback, PNG/JPEG detection via byte headers |
 | `draw_nautical_map` | Multimodal images | Generates vintage 17th-century nautical charts and archipelago maps (`gemini-3.1-flash-lite-image`, 4:3), PIL fallback |
+| `consult_barnaby` / `consult_barnacle` | Infra-Agent `AgentTool` | Single-turn peer consultations: Balthazar asks Barnaby/Barnacle for advice to enrich map details |
 | `fetch_news_feed` | Live RSS feeds | ANSA Politica + Google News USA, 2 categories (IT & US politics), strictly sorted chronologically (freshest first) with HTML links |
 
 ### 4.6 Time Management (Real Atmosphere)
@@ -254,7 +255,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
   - **Vertex AI / Service Account**: loads credentials in RAM as a `Credentials` object (without mutating `os.environ`, thread-safe)
   - With the `IMAGE_` prefix it fully isolates image-generation authentication
 
-**Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=medium` (Gemini) / `reasoning_effort=high` (DeepSeek); `include_thoughts=False` with `thought` part filtering.
+**Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=medium` (Gemini chat) / `reasoning_effort=high` (DeepSeek); image generation uses dedicated `IMAGE_MODEL` with independent `IMAGE_*` auth and its own `IMAGE_THINKING_LEVEL=high`; `include_thoughts=False` with `thought` part filtering.
 
 ### 4.10 Sessions, Compaction & Context Caching
 
@@ -380,12 +381,12 @@ This implements **Progressive Disclosure**: it keeps the AI's context window cle
 
 | Aspect | Detail |
 |--------|--------|
-| **Purpose** | Semantic + keyword search across **897 text documents** in `docs/` (Markdown, AsciiDoc, YAML, source code) |
+| **Purpose** | Semantic + keyword search across **908 text documents** in `docs/` (Markdown, AsciiDoc, YAML, source code) |
 | **Engine** | Local hybrid RAG: **FTS5 BM25** + **Vector Cosine Similarity** with `sqlite-vec` |
 | **Embeddings** | Google `gemini-embedding-2` (768 dimensions) |
 | **Fusion** | **Reciprocal Rank Fusion (RRF)** between the two rankings |
 | **Cleanup** | The indexer compares DB vs disk and **automatically removes orphan documents** |
-| **DB** | `.agents/skills/scummbar-docs-analyzer/data/docs_rag.db` (897 docs, 14,881 chunks) |
+| **DB** | `.agents/skills/scummbar-docs-analyzer/data/docs_rag.db` (908 docs, 15,430 chunks) |
 
 ```bash
 # Hybrid search (semantic + keyword)
@@ -470,7 +471,7 @@ scummbar/
 │   ├── agent.py                    # root_agent + temporal InstructionProvider
 │   ├── utils.py                    # config, model factory, dual auth, load_md/load_all_skills
 │   ├── time_context.py             # real clock → tavern atmosphere
-│   ├── tools.py                    # ADK FunctionTool (memory, scrolls, tarot, news)
+│   ├── tools.py                    # ADK FunctionTool (memory, scrolls, tarot, maps, news)
 │   ├── diary.py                    # 📜 Captain's Log (incremental first-person generation via Chronicler)
 │   ├── .env                        # ⚠️ DO NOT commit — tokens and API keys
 │   ├── world/scummbar.md           # world context + Narratore rules
@@ -533,9 +534,10 @@ CONTEXT_CACHE_TTL_SECONDS=600
 CONTEXT_CACHE_INTERVALS=5
 
 # ===========================================================================
-# 🔮 SECTION 4: IMAGE GENERATION (Isolde — INDEPENDENT AUTH)
+# 🔮 SECTION 4: IMAGE GENERATION (Isolde & Balthazar — INDEPENDENT AUTH)
 # ===========================================================================
 IMAGE_MODEL=gemini-3.1-flash-lite-image
+IMAGE_THINKING_LEVEL=high
 IMAGE_GEMINI_API_KEY=your-dedicated-image-api-key-here
 # IMAGE_GOOGLE_CLOUD_PROJECT=another-gcp-project-id
 # IMAGE_GOOGLE_CLOUD_LOCATION=europe-west1
