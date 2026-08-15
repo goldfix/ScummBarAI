@@ -240,6 +240,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
 | **Incremental update** | Reads `last_saved_index`, extracts only new messages (`messages[last_saved_index:]`), generates a chapter, appends it |
 | **Idempotency** | No new messages → returns without consuming tokens |
 | **Chronicler Agent** | Dedicated agent (`bots/chronicler/`) with its own `persona.md` system prompt specialized in first-person pirate prose |
+| **Illustrated Artifacts** | Tarot cards and nautical maps are automatically saved to `data/scummbar_chat/diaries/assets/` and embedded directly into the diary prose with relative Markdown links (`![...](assets/filename)`) |
 | **Automatic trigger** | In Streamlit, every 10 total session messages (with confirmation toast) |
 | **Manual trigger** | "🔄 Compila / Aggiorna Diario ORA" button in the Captain's Log tab |
 | **Download** | "📥 Scarica Diario (.md)" button |

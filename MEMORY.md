@@ -872,7 +872,12 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 - **Refactoring Feed Notizie Live**:
   - Ristretto `fetch_news_feed` alle sole categorie **Politica Italiana** (ANSA) e **Politica Americana** (Google News USA in italiano).
   - Ordinamento cronologico decrescente con parsing RFC 822 / ISO `<pubDate>`.
-- **Verifica**: Testate con successo l'orchestrazione collaborativa multi-agente, la generazione JPEG 1200x896 C2PA e il fallback PIL.
+- **Diario di Bordo Illustrato con Mappe e Tarocchi (`diaries/assets/`)**:
+  - `draw_tarot_card` e `draw_nautical_map` (`tools.py`) salvano automaticamente le immagini generate sia come artifact di sessione sia come file su disco in `data/scummbar_chat/diaries/assets/<filename>`.
+  - `_build_transcript` in `diary.py` annota le illustrazioni svelate (`[ILLUSTRAZIONE SVELATA: assets/<filename>]`).
+  - `chronicler_agent` (`bots/chronicler/persona.md`, Regola 5) include direttamente l'immagine Markdown `![Descrizione](assets/nome_file)` nel testo del capitolo nel momento della narrazione, commentandone i dettagli in prima persona.
+  - Streamlit (`app.py`) riscrive trasparentemente i percorsi relativi `assets/` in `data/scummbar_chat/diaries/assets/` per il rendering a video, preservando il file `.md` pulito e portabile per il download.
+- **Verifica**: Testate con successo l'orchestrazione collaborativa multi-agente, la generazione JPEG 1200x896 C2PA, il salvataggio degli asset illustrati e la composizione automatica del capitolo con immagini.
 
 ---
 

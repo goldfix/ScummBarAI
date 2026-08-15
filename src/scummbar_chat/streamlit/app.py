@@ -90,10 +90,18 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                     parts = content.get("parts", [])
                     role = content.get("role", "")
 
-                    # Extract plain text from user or assistant turns
+                    # Extract plain text and artifacts from user or assistant turns
                     text_parts: list[str] = []
+                    event_artifacts: list[str] = []
                     for p in parts:
-                        if "text" in p and not p.get("thought", False):
+                        if "function_response" in p:
+                            fr = p["function_response"]
+                            res = fr.get("response", {})
+                            if isinstance(res, dict) and "result" in res and isinstance(res["result"], str):
+                                m = re.search(r"Salvata come ([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg))", res["result"])
+                                if m:
+                                    event_artifacts.append(m.group(1))
+                        elif "text" in p and not p.get("thought", False):
                             text = p["text"]
                             # Clean up internal prompt tags if user message
                             if role == "user" and "[avventore:" in text:
@@ -111,7 +119,7 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                                     "role": norm_role,
                                     "content": full_text,
                                     "bot_name": "barnaby" if norm_role == "assistant" else None,
-                                    "artifacts": [],
+                                    "artifacts": event_artifacts,
                                 }
                             )
                 except (json.JSONDecodeError, KeyError, TypeError):
@@ -304,7 +312,13 @@ def main() -> None:
                 mime="text/markdown",
             )
             st.markdown("---")
-            st.markdown(diary_content)
+            # Resolve relative 'assets/' path for Streamlit preview
+            rendered_diary = re.sub(
+                r"!\[(.*?)\]\(assets/([^\)]+)\)",
+                r"![\1](data/scummbar_chat/diaries/assets/\2)",
+                diary_content,
+            )
+            st.markdown(rendered_diary, unsafe_allow_html=True)
         else:
             st.info(
                 "📜 *Il tuo diario di bordo è ancora intonso.* "

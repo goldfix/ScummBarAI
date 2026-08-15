@@ -283,6 +283,15 @@ async def draw_tarot_card(
     safe_title = "".join(c if c.isalnum() else "_" for c in card_name.strip().lower())
     filename = f"tarocco_{safe_title}.{file_ext}"
 
+    # Save the image directly to the diaries assets folder for the Captain's Log
+    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+    diaries_assets_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        (diaries_assets_dir / filename).write_bytes(img_bytes)
+        log.info("Tarot card saved to diaries assets: %s", diaries_assets_dir / filename)
+    except Exception as e:
+        log.warning("Impossibile salvare il tarocco in diaries assets: %s", e)
+
     # Save the artifact to the current ADK session
     version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
 
@@ -444,6 +453,15 @@ async def draw_nautical_map(
 
     safe_title = "".join(c if c.isalnum() else "_" for c in archipelago_name.strip().lower())
     filename = f"mappa_{safe_title}.{file_ext}"
+
+    # Save the image directly to the diaries assets folder for the Captain's Log
+    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+    diaries_assets_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        (diaries_assets_dir / filename).write_bytes(img_bytes)
+        log.info("Nautical map saved to diaries assets: %s", diaries_assets_dir / filename)
+    except Exception as e:
+        log.warning("Impossibile salvare la mappa in diaries assets: %s", e)
 
     version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
 

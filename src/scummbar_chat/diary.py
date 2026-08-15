@@ -67,12 +67,19 @@ def read_diary_content(patron_name: str) -> str:
 
 
 def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int) -> str:
-    """Builds the plain-text transcript of new messages for the LLM prompt."""
+    """Builds the plain-text transcript of new messages for the LLM prompt, noting any illustrations."""
     transcript_lines = []
     for idx, msg in enumerate(new_messages, start=start_idx + 1):
         role = msg.get("role", "user")
         bot_name = msg.get("bot_name")
         content = msg.get("content", "").strip()
+        artifacts = list(msg.get("artifacts", []))
+
+        # Also search for image filenames in content as fallback
+        found_files = re.findall(r"(?:tarocco|mappa)_[a-zA-Z0-9_]+\.(?:png|jpg|jpeg)", content, re.IGNORECASE)
+        for fn in found_files:
+            if fn not in artifacts:
+                artifacts.append(fn)
 
         if role == "user":
             speaker = f"Avventore {patron_name}"
@@ -81,7 +88,12 @@ def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int
         else:
             speaker = "Taverna / Narratore"
 
-        transcript_lines.append(f"- [Msg #{idx} - {speaker}]: {content}")
+        line = f"- [Msg #{idx} - {speaker}]: {content}"
+        if artifacts:
+            for art in artifacts:
+                line += f"\n  [ILLUSTRAZIONE SVELATA: assets/{art}]"
+
+        transcript_lines.append(line)
 
     return "\n".join(transcript_lines)
 
