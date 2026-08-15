@@ -66,6 +66,17 @@ def read_diary_content(patron_name: str) -> str:
     return ""
 
 
+def _extract_artifact_filename(art: object) -> str | None:
+    """Extracts only the clean filename string from an artifact (string or dict with bytes)."""
+    if isinstance(art, str):
+        return Path(art).name
+    if isinstance(art, dict):
+        fn = art.get("filename")
+        if fn and isinstance(fn, str):
+            return Path(fn).name
+    return None
+
+
 def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int) -> str:
     """Builds the plain-text transcript of new messages for the LLM prompt, noting any illustrations."""
     transcript_lines = []
@@ -73,13 +84,20 @@ def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int
         role = msg.get("role", "user")
         bot_name = msg.get("bot_name")
         content = msg.get("content", "").strip()
-        artifacts = list(msg.get("artifacts", []))
+
+        # Extract only clean filename strings (never binary bytes or dict objects!)
+        raw_artifacts = msg.get("artifacts", [])
+        artifact_filenames: list[str] = []
+        for art in raw_artifacts:
+            fn = _extract_artifact_filename(art)
+            if fn and fn not in artifact_filenames:
+                artifact_filenames.append(fn)
 
         # Also search for image filenames in content as fallback
         found_files = re.findall(r"(?:tarocco|mappa)_[a-zA-Z0-9_]+\.(?:png|jpg|jpeg)", content, re.IGNORECASE)
         for fn in found_files:
-            if fn not in artifacts:
-                artifacts.append(fn)
+            if fn not in artifact_filenames:
+                artifact_filenames.append(fn)
 
         if role == "user":
             speaker = f"Avventore {patron_name}"
@@ -89,9 +107,9 @@ def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int
             speaker = "Taverna / Narratore"
 
         line = f"- [Msg #{idx} - {speaker}]: {content}"
-        if artifacts:
-            for art in artifacts:
-                line += f"\n  [ILLUSTRAZIONE SVELATA: assets/{art}]"
+        if artifact_filenames:
+            for fn in artifact_filenames:
+                line += f"\n  [ILLUSTRAZIONE SVELATA: assets/{fn}]"
 
         transcript_lines.append(line)
 
