@@ -16,7 +16,7 @@ from pathlib import Path
 from google.adk.models import LlmRequest
 from google.genai import types
 
-from src.scummbar_chat.utils import COMPACTION_MODEL, _build_model_instance
+from src.scummbar_chat.utils import COMPACTION_MODEL
 
 log = logging.getLogger("scummbar.diary")
 
@@ -87,34 +87,30 @@ def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int
 
 
 async def generate_chapter_async(patron_name: str, new_messages: list[dict], start_idx: int, end_idx: int) -> str:
-    """Invokes the LLM (Gemini or DeepSeek) to generate a first-person narrative chapter."""
+    """Invokes the Chronicler agent to generate a first-person narrative chapter."""
+    from src.scummbar_chat.bots.chronicler.agent import chronicler_agent
+
     transcript_text = _build_transcript(patron_name, new_messages, start_idx)
 
-    prompt = (
-        f"Sei l'avventore '{patron_name}'.\n"
-        f"Rileggi i seguenti dialoghi ed avvenimenti avvenuti recentemente nello Scummbar "
-        f"(dal messaggio #{start_idx + 1} al messaggio #{end_idx}):\n\n"
+    user_prompt = (
+        f"Avventore attuale: '{patron_name}'\n"
+        f"Trascrizione degli avvenimenti recenti nello Scummbar (dal messaggio #{start_idx + 1} al messaggio #{end_idx}):\n\n"
         f"--- INIZIO TRASCRIZIONE ---\n"
         f"{transcript_text}\n"
         f"--- FINE TRASCRIZIONE ---\n\n"
-        f"IL TUO COMPITO:\n"
-        f"Scrivi una pagina o capitolo per il TUO diario di bordo personale in PRIMA PERSONA ('Io').\n"
-        f"Racconta la tua esperienza nello Scummbar, cosa hai chiesto, come ti hanno risposto i vari pirati della taverna "
-        f"(Barnaby, Barnacle, Isolde, Balthazar) e le tue sensazioni o pensieri da pirata.\n\n"
-        f"REGOLE DI STILE E FORMATO:\n"
-        f"1. Scrivi SEMPRE ed ESCLUSIVAMENTE in PRIMA PERSONA ('Oggi sono entrato nello Scummbar...', 'Ho chiesto a Barnaby...').\n"
-        f"2. Mantieni uno stile d'avventura caraibica, discorsivo, vivace, ricco di dettagli d'atmosfera e piacevole da leggere.\n"
-        f"3. NON fare un riassunto burocratico né un elenco di punti. Scrivi un vero e proprio capitolo di diario personale.\n"
-        f"4. NON includere intestazioni di capitolo o titoli Markdown (es. # o ##) nel tuo testo (saranno aggiunti automaticamente).\n"
-        f"5. Rispondi ESCLUSIVAMENTE in lingua ITALIANA.\n"
+        f"COMPITO:\n"
+        f"Redigi il nuovo capitolo per il Diario di Bordo di '{patron_name}' in prima persona ('Io') "
+        f"seguendo scrupolosamente le tue istruzioni e il tuo stile."
     )
 
+    full_prompt = f"{chronicler_agent.instruction}\n\n---\n\n{user_prompt}"
+
     try:
-        # Build the model via the shared factory so both Gemini (Vertex/API Key) and DeepSeek work
-        llm = _build_model_instance(COMPACTION_MODEL)
+        # Use chronicler_agent's configured model instance
+        llm = chronicler_agent.model
         request = LlmRequest(
             model=COMPACTION_MODEL,
-            contents=[types.Content(role="user", parts=[types.Part(text=prompt)])],
+            contents=[types.Content(role="user", parts=[types.Part(text=full_prompt)])],
         )
         async for response in llm.generate_content_async(request):
             if response.content and response.content.parts:
@@ -122,7 +118,7 @@ async def generate_chapter_async(patron_name: str, new_messages: list[dict], sta
                 if text_parts:
                     return "\n".join(text_parts).strip()
     except Exception as e:
-        log.error("Errore generazione capitolo diario: %s", e)
+        log.error("Errore generazione capitolo diario con il Cronista: %s", e)
 
     # Fallback if LLM call fails
     return (

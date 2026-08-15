@@ -29,11 +29,11 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory, load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed, update_tavern_diary
-│       ├── diary.py                   # 📜 Diario di Bordo (Captain's Log) incrementale in prima persona
+│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed
+│       ├── diary.py                   # 📜 Diario di Bordo (Captain's Log) incrementale in prima persona (via Chronicler)
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/                     # scummbar.md (world context + regole narrazione)
-│       ├── bots/                      # barnaby, barnacle, isolde, balthazar (agent.py + persona.md)
+│       ├── bots/                      # barnaby, barnacle, isolde, balthazar, chronicler (agent.py + persona.md)
 │       ├── skills/                    # Skills ADK (grog, menu)
 │       ├── telegram/                  # Adapter Telegram (adapter, formatter, runner)
 │       └── streamlit/                 # 🎮 Frontend Web Streamlit (app.py, components.py)
@@ -131,10 +131,11 @@ root_agent  (scummbar_chat)
 │     └── get_time_description()                        ← momento del giorno
 ├── instruction = COORDINATOR_INSTRUCTION
 └── sub_agents:
-    ├── barnaby   → persona.md + tools=[SkillToolset, recall, memorize, update_tavern_diary, write_secret_scroll]
+    ├── barnaby   → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll]
     ├── barnacle  → persona.md + tools=[SkillToolset, recall] (read-only)
     ├── isolde    → persona.md + tools=[recall, draw_tarot_card]
-    └── balthazar → persona.md + tools=[SkillToolset, recall, memorize, update_tavern_diary, write_secret_scroll, fetch_news_feed]
+    ├── balthazar → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll, fetch_news_feed]
+    └── chronicler → persona.md (agente scriba dedicato alla redazione del Diario di Bordo)
 ```
 
 ### Sistema Narratore (`scummbar.md` + `adapter.py`)
@@ -445,7 +446,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Sistema Pi-Agent Skills (`scummbar-*`) | ✅ | Introduzione di skill per progressive disclosure documentale |
 | Unificazione API Immagini | ✅ | Deprecato branch Imagen, architettura unificata su `generate_content` Gemini Nano |
 | Frontend Web Streamlit (Single-Player RPG) | ✅ | `src/scummbar_chat/streamlit/` (`app.py`, `components.py`), routing automatico, recupero storico da DB, WAL mode, segmented control per chat input sticky |
-| Diario di Bordo Narrativo in Prima Persona | ✅ | `src/scummbar_chat/diary.py`: file `data/scummbar_chat/diaries/Diary_NOME.md`, tracciamento `last_saved_index` (idempotente), aggiornamento automatico ogni 10 messaggi + pulsante manuale nel Tab "📜 Diario di Bordo", download `.md`, tool ADK `update_tavern_diary_tool` su Barnaby e Balthazar |
+| Diario di Bordo Narrativo in Prima Persona | ✅ | `src/scummbar_chat/diary.py`: file `data/scummbar_chat/diaries/Diary_NOME.md`, tracciamento `last_saved_index` (idempotente), aggiornamento automatico ogni 10 messaggi + pulsante manuale nel Tab "📜 Diario di Bordo", download `.md`, redazione affidata all'agente dedicato `chronicler` (`bots/chronicler/`) |
 | Fase 2a Streamlit: Sacca del Pirata (Inventario) | 🔲 | Registro persistente nella sidebar per collezionare e riscaricare pergamene, mappe, ricette e carte tarocchi |
 | Fase 2b Streamlit: Ispezione Memoria Avventore | 🔲 | Visualizzatore nella sidebar dei tratti e ricordi registrati su di te da Barnaby (`recall_patron_memory`) |
 | Fase 2c Streamlit: Selettore Modello in UI | 🔲 | Dropdown nella sidebar per switchare il modello attivo (Gemini 3.6 ↔ DeepSeek v4) al volo dall'interfaccia web |
@@ -456,10 +457,10 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 
 ### 💡 Decisioni architetturali
 
-- **Diario di Bordo Narrativo in Prima Persona**: Implementata la funzionalità di cronaca personale in `src/scummbar_chat/diary.py`. Ogni avventore possiede un file Markdown dedicato `data/scummbar_chat/diaries/Diary_NOME_Pirata.md`. Il sistema traccia deterministicamente l'indice dell'ultimo messaggio elaborato (`last_saved_index` nei metadati in testa al file) ed effettua aggiornamenti incrementali sintetizzando in stile romanzato caraibico ("Io") solo i messaggi non ancora registrati. L'aggiornamento scatta sia automaticamente ogni 10 messaggi con notifica toast in Streamlit, sia su richiesta tramite il pulsante "Compila / Aggiorna Diario ORA" nel Tab dedicato "📜 Diario di Bordo", con pulsante di download `.md`.
-  - **Pipeline asincrona dual-provider**: `generate_chapter_async()` usa `_build_model_instance(COMPACTION_MODEL)` + `LlmRequest`/`generate_content_async`, quindi funziona sia con Gemini (API Key/Vertex) sia con DeepSeek, senza dipendere da `genai.Client` (che è solo Gemini).
-  - **Tool ADK robusto**: `update_tavern_diary_tool` recupera gli eventi dal DB usando `tool_context.session.id` reale (non `st_session_` hardcodato, che sarebbe errato su Telegram dove `session_id = chat_id`) e filtra per `user_id` (evita di mescolare messaggi di altri avventori in un gruppo) e per i `thought` parts (esclude il reasoning interno del modello).
-  - **Punti aperti diari**: 1) su Telegram il diario usa gli eventi di sessione del gruppo (potrebbe richiedere un comando dedicato `/diario` per trigger manuale); 2) il trigger automatico ogni 10 messaggi è attualmente solo in Streamlit, non in Telegram.
+- **Diario di Bordo Narrativo in Prima Persona & Agente Cronista**: Implementata la funzionalità di cronaca personale in `src/scummbar_chat/diary.py`. Ogni avventore possiede un file Markdown dedicato `data/scummbar_chat/diaries/Diary_NOME_Pirata.md`. Il sistema traccia deterministicamente l'indice dell'ultimo messaggio elaborato (`last_saved_index` nei metadati in testa al file) ed effettua aggiornamenti incrementali sintetizzando in stile romanzato caraibico ("Io") solo i messaggi non ancora registrati.
+  - **Agente Cronista Dedicato (`bots/chronicler/`)**: La scrittura del diario è stata disaccoppiata dai bot di conversazione (rimosso `update_tavern_diary_tool` da Barnaby e Balthazar per non appesantirne il contesto) ed affidata all'agente dedicato `chronicler_agent` con prompt specializzato in `bots/chronicler/persona.md`.
+  - **Pipeline asincrona dual-provider**: `generate_chapter_async()` usa `chronicler_agent.model` (`COMPACTION_LLM`) + `LlmRequest`/`generate_content_async`, funzionando sia con Gemini (API Key/Vertex) sia con DeepSeek.
+  - **Trigger deterministici**: In Streamlit scatta automaticamente ogni 10 messaggi (con toast) e manualmente con il pulsante "Compila / Aggiorna Diario ORA" con download `.md`. In Telegram la redazione può essere invocata a livello di sistema/runner.
 - **Esperimento Cheshire Cat AI (Concluso)**: Sviluppato in parallelo un plugin nativo `plugins/scummbar/` per sperimentare le primitive di Cheshire Cat AI (`cat.Agent`, `user` store, `Directive`, `@tool`). L'esperimento è stato completato con successo ed è ora archiviato per mantenere il focus del repository sull'applicazione principale Google ADK + Telegram (`src/scummbar_chat/`).
 - **Progressive Disclosure tramite Pi-Agent Skills**: Le istruzioni gravose per l'Agente AI (come l'esplorazione dei manuali o l'aggiornamento strutturato del progetto) sono incapsulate in skill specifiche (`scummbar-docs-analyzer`, `scummbar-memory-updater`). L'indice documentale è stato migrato dentro la skill dell'analyzer. Questo svuota il system prompt base (`AGENTS.md` e `MEMORY.md`), riducendo il consumo di token e migliorando il focus dell'LLM.
 - **Unificazione API Immagini**: Abbiamo deprecato il branch "Imagen" per l'estrazione dei Tarocchi, uniformando tutto al metodo moderno `generate_content` di Gemini 3.1 Flash Image. Questo azzera il debito tecnico legato alle regioni Vertex AI (`IMAGE_LOCATION`) e supporta nativamente l'auth duale (Service Account e API Key).
@@ -844,6 +845,25 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 ---
 
 ## 📋 Log delle Sessioni di Lavoro
+
+### 2026-08-15 — Refactoring Balthazar (Feed Politica IT/USA & Ordinamento Cronologico) e Diario
+
+**Obiettivo**: Riorganizzare il funzionamento dell'agente Balthazar restringendo i feed informativi alle sole notizie di Politica Italiana ed Americana ed introducendo l'ordinamento cronologico rigoroso per data di pubblicazione (`pubDate`).
+
+**Attività svolte**:
+- **Refactoring Tool `fetch_news_feed` (`src/scummbar_chat/tools.py`)**:
+  - Rimosse completamente le categorie e i feed su tecnologia/gadget (HDBlog, ANSA tecnologia).
+  - Ristretto l'ambito a 2 sole categorie: **Politica Italiana** (`https://www.ansa.it/sito/notizie/politica/politica_rss.xml`) e **Politica Americana** (`Google News USA in italiano` con query mirata per politica, Casa Bianca, Trump, governo USA).
+  - **Ordinamento cronologico decrescente**: parsing rigoroso di `<pubDate>` con `email.utils.parsedate_to_datetime`, ordinamento per data decrescente e restituzione delle sole 3 notizie più fresche in assoluto, complete di orario e link sorgente HTML.
+- **Aggiornamento Prompt & Intent Routing**:
+  - Aggiornato `bots/balthazar/persona.md`: eliminati tutti i riferimenti alla tecnologia (Mela d'Oro, gadget, AI) focalizzando la comicità teatrale sui bisticci del *Ducato d'Italia* e del *Grande Impero d'Oltreoceano*.
+  - Aggiornati `_COORDINATOR_INSTRUCTION` in `agent.py` e `_INTENT_MAP` in `telegram/adapter.py` (aggiunte keyword politiche).
+- **Refactoring Diario di Bordo**:
+  - Disaccoppiata la gestione del diario dai bot di conversazione (rimosso `update_tavern_diary_tool`) ed affidata all'agente dedicato `chronicler` (`bots/chronicler/`).
+  - Aggiornato `assets/core_overview_diagram.svg` (C4-PlantUML).
+- **Verifica**: Testati con successo il parsing e l'ordinamento RSS delle notizie live ANSA e Google News USA.
+
+---
 
 ### 2026-08-13 — Skill Kroki per Pi-Agent & Localizzazione SVG (`scummbar-kroki-diagrams`)
 

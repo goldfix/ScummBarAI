@@ -6,7 +6,6 @@ Operations:
 - Translates ledger retrieval results into structured dictionaries for the LLM runner.
 """
 
-import json
 import logging
 import os
 import sqlite3
@@ -125,73 +124,6 @@ async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_
     except sqlite3.Error as e:
         log.error("Database error in memorize_patron_chat: %s", e)
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
-
-
-async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str = "") -> str:
-    """
-    Usa questo strumento per aggiornare o compilare il Diario di Bordo dell'avventore attuale.
-    - patron_name: Il nome del pirata di cui stai aggiornando il diario.
-    """
-    from src.scummbar_chat.diary import update_tavern_diary_async
-
-    # Retrieve patron name from DB if not passed
-    user_id = tool_context.user_id
-    if not patron_name:
-        _ensure_patron_memories_table()
-        db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-        try:
-            with sqlite3.connect(db_path, timeout=10.0) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT patron_name FROM patron_memories WHERE user_id = ?", (user_id,))
-                row = cursor.fetchone()
-                if row and row[0]:
-                    patron_name = row[0]
-        except sqlite3.Error:
-            pass
-
-    if not patron_name:
-        patron_name = f"Avventore_{user_id}"
-
-    # Load the current session events from DB using the real session_id (works in both
-    # Streamlit and Telegram contexts) and filtered by user_id to avoid mixing other patrons.
-    session_id = tool_context.session.id
-    db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-    messages: list[dict] = []
-    try:
-        with sqlite3.connect(db_path, timeout=10.0) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT event_data FROM events WHERE user_id = ? AND session_id = ? ORDER BY id ASC",
-                (user_id, session_id),
-            )
-            for row in cursor.fetchall():
-                try:
-                    ev = json.loads(row[0])
-                    content = ev.get("content", {})
-                    role = content.get("role", "")
-                    parts = content.get("parts", [])
-                    # Only keep plain text parts, skipping internal thought/reasoning parts
-                    text_parts = [p.get("text", "") for p in parts if "text" in p and not p.get("thought", False)]
-                    full_text = "\n".join(text_parts).strip()
-                    if full_text and role in ["user", "model", "assistant"]:
-                        norm_role = "user" if role == "user" else "assistant"
-                        messages.append(
-                            {
-                                "role": norm_role,
-                                "content": full_text,
-                                "bot_name": "barnaby" if norm_role == "assistant" else None,
-                            }
-                        )
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    continue
-    except sqlite3.Error as e:
-        log.warning("Impossibile recuperare gli eventi per il diario via tool: %s", e)
-
-    success, status_msg, _ = await update_tavern_diary_async(patron_name, messages)
-    if success:
-        return f"📜 Diario di bordo aggiornato con successo per {patron_name}! ({status_msg})"
-    else:
-        return f"📜 Il diario di bordo di {patron_name} è già aggiornato. ({status_msg})"
 
 
 async def write_secret_scroll(tool_context: ToolContext, title: str, content: str) -> str:
@@ -356,37 +288,37 @@ async def draw_tarot_card(
 
 async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_italiana") -> dict:
     """
-    Recupera gli ultimi dispacci e notizie reali focalizzati esclusivamente su 3 argomenti:
-    - Politica Italiana ('politica_italiana', 'politica', 'italia', 'governo')
-    - Politica Americana ed Estera ('politica_americana', 'usa', 'america', 'esteri', 'mondo')
-    - Tecnologia ed Alchimie Moderne ('tecnologia', 'tech', 'alchimia', 'scienza', 'gadget')
+    Recupera gli ultimi dispacci e notizie reali focalizzati esclusivamente su 2 argomenti:
+    - Politica Italiana ('politica_italiana', 'politica', 'italia', 'governo', 'senato', 'parlamento')
+    - Politica Americana ('politica_americana', 'usa', 'america', 'stati_uniti', 'washington', 'casa_bianca')
 
-    Usa questo strumento quando un avventore ti chiede notizie sui bisticci dei governanti,
-    sulle dispute dei consigli italiani o americani, o sulle invenzioni e specchi incantati della tecnologia.
+    Usa questo strumento quando un avventore ti chiede notizie sui bisticci dei governanti italiani
+    o sulle contese del Grande Impero d'Oltreoceano (USA).
     """
     import xml.etree.ElementTree as ET
+    from email.utils import parsedate_to_datetime
 
     import httpx
 
     rss_feeds = {
+        # Politica Italiana
         "politica_italiana": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "politica": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "italia": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
         "governo": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
-        "politica_americana": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "usa": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "america": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "esteri": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "mondo": "https://www.ansa.it/sito/notizie/mondo/mondo_rss.xml",
-        "tecnologia": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "tech": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "alchimia": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "scienza": "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",
-        "gadget": "https://www.hdblog.it/feed/",
+        "senato": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
+        "parlamento": "https://www.ansa.it/sito/notizie/politica/politica_rss.xml",
+        # Politica Americana
+        "politica_americana": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "usa": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "america": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "stati_uniti": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "washington": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
+        "casa_bianca": 'https://news.google.com/rss/search?q=politica+USA+or+Trump+or+"Casa+Bianca"+or+"governo+USA"+when:7d&hl=it&gl=IT&ceid=IT:it',
     }
 
     cat_key = category.lower().strip()
-    url = rss_feeds.get(cat_key, "https://www.ansa.it/sito/notizie/politica/politica_rss.xml")
+    url = rss_feeds.get(cat_key, rss_feeds["politica_italiana"])
     headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"}
 
     try:
@@ -395,44 +327,86 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
             resp.raise_for_status()
 
             root = ET.fromstring(resp.content)
-            items = root.findall(".//item")
-            if not items:
-                items = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+            raw_items = root.findall(".//item")
+            if not raw_items:
+                raw_items = root.findall(".//{http://www.w3.org/2005/Atom}entry")
 
-            items = items[:5]
-
-            headlines = []
-            for item in items:
+            parsed_items = []
+            for item in raw_items:
                 title_elem = item.find("title")
                 desc_elem = item.find("description")
                 date_elem = item.find("pubDate")
+                if date_elem is None:
+                    date_elem = item.find("{http://www.w3.org/2005/Atom}updated")
                 link_elem = item.find("link")
                 guid_elem = item.find("guid")
 
                 title = title_elem.text.strip() if title_elem is not None and title_elem.text else "Senza titolo"
                 desc = desc_elem.text.strip() if desc_elem is not None and desc_elem.text else ""
-                date = date_elem.text.strip() if date_elem is not None and date_elem.text else ""
+                date_str = date_elem.text.strip() if date_elem is not None and date_elem.text else ""
+
+                # Robust datetime parsing to sort chronologically
+                dt = None
+                if date_str:
+                    try:
+                        dt = parsedate_to_datetime(date_str)
+                    except Exception:
+                        try:
+                            dt = datetime.fromisoformat(date_str)
+                        except Exception:
+                            dt = None
+
+                if dt is None:
+                    dt = datetime.min.replace(tzinfo=UTC)
 
                 link = ""
                 if link_elem is not None and link_elem.text:
                     link = link_elem.text.strip()
+                elif link_elem is not None and link_elem.attrib.get("href"):
+                    link = link_elem.attrib.get("href", "").strip()
                 elif guid_elem is not None and guid_elem.text and guid_elem.text.startswith("http"):
                     link = guid_elem.text.strip()
 
-                headlines.append({"titolo_originale": title, "sintesi_originale": desc, "ora_dispaccio": date, "link_sorgente": link})
+                formatted_date = dt.strftime("%d/%m/%Y alle ore %H:%M") if dt.year > 1 else "Recente"
+
+                parsed_items.append({
+                    "titolo_originale": title,
+                    "sintesi_originale": desc,
+                    "datetime": dt,
+                    "ora_pubblicazione": formatted_date,
+                    "link_sorgente": link,
+                })
+
+            # Rigorously sort items in descending order so the FRESHEST / MOST RECENT news come first
+            parsed_items.sort(key=lambda x: x["datetime"], reverse=True)
+
+            # Keep only the top 3 freshest dispatches
+            top_headlines = parsed_items[:3]
+
+            cleaned_headlines = [
+                {
+                    "titolo_originale": h["titolo_originale"],
+                    "sintesi_originale": h["sintesi_originale"],
+                    "ora_pubblicazione": h["ora_pubblicazione"],
+                    "link_sorgente": h["link_sorgente"],
+                }
+                for h in top_headlines
+            ]
+
+            category_label = "Politica Americana" if "america" in cat_key or "usa" in cat_key else "Politica Italiana"
 
             return {
                 "status": "success",
-                "categoria_richiesta": cat_key,
-                "numero_dispacci": len(headlines),
-                "dispacci": headlines,
+                "categoria_richiesta": category_label,
+                "numero_dispacci": len(cleaned_headlines),
+                "dispacci": cleaned_headlines,
                 "istruzione_traduzione": (
-                    "Riferisci queste notizie all'avventore con drammatica, pomposa e ridicola solennità teatrale! "
-                    "Trasponi i bisticci politici italiani/americani o i fatti tecnologici nella tua ambientazione "
-                    "fantasy-marittima (es: 'Il Senato dei Senatori Borbottanti', 'La Gilda della Mela d'Oro', "
-                    "'Il Gran Mogol d'Oltreoceano'). "
+                    "Riferisci queste notizie freschissime all'avventore con drammatica, pomposa e ridicola solennità teatrale! "
+                    "Trasponi i bisticci politici italiani o americani nella tua ambientazione "
+                    "fantasy-marittima (es: 'L\\'Arengo dei Senatori Borbottanti', 'Il Primo Visir del Ducato', "
+                    "'Il Gran Mogol d\\'Oltreoceano', 'L\\'Impero delle Cinquanta Province'). "
                     "Includi SEMPRE per ogni notizia il link HTML originale fornito da 'link_sorgente' "
-                    "(es. '<a href=\"LINK\">Srotola il pergamena originale</a>')."
+                    "(es. '<a href=\"LINK\">Srotola la pergamena originale</a>' o '<a href=\"LINK\">Fonte del dispaccio</a>')."
                 ),
             }
 
@@ -447,7 +421,6 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
 # Esportazione degli strumenti ADK
 recall_patron_tool = FunctionTool(recall_patron_memory)
 memorize_patron_tool = FunctionTool(memorize_patron_chat)
-update_tavern_diary_tool = FunctionTool(update_tavern_diary_tool)
 write_secret_scroll_tool = FunctionTool(write_secret_scroll)
 draw_tarot_card_tool = FunctionTool(draw_tarot_card)
 fetch_news_feed_tool = FunctionTool(fetch_news_feed)
