@@ -32,6 +32,7 @@ CONTEXT_CACHE_TTL_SECONDS: int = int(os.getenv("CONTEXT_CACHE_TTL_SECONDS", "600
 CONTEXT_CACHE_INTERVALS: int = int(os.getenv("CONTEXT_CACHE_INTERVALS", "5"))
 
 IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
+IMAGE_THINKING_LEVEL: str = os.getenv("IMAGE_THINKING_LEVEL", "high").strip().lower()
 
 
 def get_gemini_client_kwargs(prefix: str = "") -> dict:

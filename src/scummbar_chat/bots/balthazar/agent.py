@@ -6,6 +6,7 @@ from google.adk.agents import Agent
 from google.adk.tools import skill_toolset
 
 from ...tools import (
+    draw_nautical_map_tool,
     fetch_news_feed_tool,
     memorize_patron_tool,
     recall_patron_tool,
@@ -35,6 +36,7 @@ balthazar_agent = Agent(
         recall_patron_tool,
         memorize_patron_tool,
         write_secret_scroll_tool,
+        draw_nautical_map_tool,
         fetch_news_feed_tool,
     ],
 )

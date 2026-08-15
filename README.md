@@ -90,7 +90,7 @@ The **Scummbar** is a legendary Caribbean pirate tavern. It is a shared multi-ag
 | 🍺 **Barnaby** | Bartender | Tool Calling (read/write memory, text artifacts), Skills Auto-Discovery | Empathetic, quiet, knows every pirate's secret, mixes unforgettable custom grogs |
 | 🐱 **Barnacle** | Tavern Cat | Shared **read-only** memory, Telegram **ephemeral** messages (whispers) | Crotchety, speaks rarely, sleeps on ammo crates |
 | 🔮 **Isolde** | Fortune Teller | Independent multi-auth, multimodal image generation (Gemini Flash Image + PIL fallback) | Cryptic, majestic, sits in the Shadow Corner |
-| 🧭 **Balthazar** | Navigator & Cartographer | Live RSS feeds + comedic translation, text artifacts (portolans & charts), Captain's Log | Eccentric, theatrically solemn, turns real news into maritime lore |
+| 🧭 **Balthazar** | Navigator & Cartographer | Live RSS feeds + comedic translation, vintage nautical map generation (demands grog before drawing), text artifacts (portolans) | Eccentric, theatrically solemn, turns real news into maritime lore |
 
 ---
 
@@ -161,7 +161,7 @@ Each agent lives in `bots/<name>/` with two files: `agent.py` (ADK config) and `
 | 🍺 **barnaby** | `MODEL` | ✅ grog + menu (auto-discovery) | recall, memorize, write_secret_scroll | No |
 | 🐱 **barnacle** | `MODEL` | ✅ grog + menu | recall (smell/read only) | **Yes** — cannot write memory |
 | 🔮 **isolde** | `MODEL` | — (no skills) | recall, draw_tarot_card | No |
-| 🧭 **balthazar** | `MODEL` | ✅ grog + menu | recall, memorize, write_secret_scroll, fetch_news_feed | No |
+| 🧭 **balthazar** | `MODEL` | ✅ grog + menu | recall, memorize, write_secret_scroll, draw_nautical_map, fetch_news_feed | No |
 | 📜 **chronicler** | `COMPACTION_LLM` | — (internal scribe) | — (dedicated diary generator) | **Yes** — writes to Captain's Log `.md` |
 
 **Base agent configuration (Barnaby example):**
@@ -201,7 +201,8 @@ All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They r
 | `recall_patron_memory` | Memory read | Retrieves the patron's traits and summaries from `patron_memories` (SQLite) |
 | `memorize_patron_chat` | Memory write | Updates stable traits (max 10) and chat summary (max 300 chars) |
 | `write_secret_scroll` | Text artifacts | Generates scrolls/recipes/portolans `.txt` via `InMemoryArtifactService` |
-| `draw_tarot_card` | Multimodal images | Generates tarot cards with `gemini-3.1-flash-lite-image` (isolated `IMAGE_*` auth), PIL fallback, PNG/JPEG detection via byte headers |
+| `draw_tarot_card` | Multimodal images | Generates tarot cards with `gemini-3.1-flash-lite-image` (isolated `IMAGE_*` auth, 1:1), PIL fallback, PNG/JPEG detection via byte headers |
+| `draw_nautical_map` | Multimodal images | Generates vintage 17th-century nautical charts and archipelago maps (`gemini-3.1-flash-lite-image`, 4:3), PIL fallback |
 | `fetch_news_feed` | Live RSS feeds | ANSA Politica + Google News USA, 2 categories (IT & US politics), strictly sorted chronologically (freshest first) with HTML links |
 
 ### 4.6 Time Management (Real Atmosphere)

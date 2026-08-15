@@ -29,7 +29,7 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory, load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed
+│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, draw_nautical_map, fetch_news_feed
 │       ├── diary.py                   # 📜 Diario di Bordo (Captain's Log) incrementale in prima persona (via Chronicler)
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/                     # scummbar.md (world context + regole narrazione)
@@ -134,7 +134,7 @@ root_agent  (scummbar_chat)
     ├── barnaby   → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll]
     ├── barnacle  → persona.md + tools=[SkillToolset, recall] (read-only)
     ├── isolde    → persona.md + tools=[recall, draw_tarot_card]
-    ├── balthazar → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll, fetch_news_feed]
+    ├── balthazar → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll, draw_nautical_map, fetch_news_feed]
     └── chronicler → persona.md (agente scriba dedicato alla redazione del Diario di Bordo)
 ```
 
@@ -846,22 +846,28 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ## 📋 Log delle Sessioni di Lavoro
 
-### 2026-08-15 — Refactoring Balthazar (Feed Politica IT/USA & Ordinamento Cronologico) e Diario
+### 2026-08-15 — Mappe Nautiche Multimodali per Balthazar, Isolamento Thinking Immagini & Refactoring Feed
 
-**Obiettivo**: Riorganizzare il funzionamento dell'agente Balthazar restringendo i feed informativi alle sole notizie di Politica Italiana ed Americana ed introducendo l'ordinamento cronologico rigoroso per data di pubblicazione (`pubDate`).
+**Obiettivo**: Dotare l'agente Balthazar ("Il Navigatore") della capacità di generare mappe nautiche vintage di arcipelaghi pirateschi tramite il modello di generazione immagini, isolare la configurazione di thinking per le immagini in `.env` e perfezionare le regole di sistema.
 
 **Attività svolte**:
-- **Refactoring Tool `fetch_news_feed` (`src/scummbar_chat/tools.py`)**:
-  - Rimosse completamente le categorie e i feed su tecnologia/gadget (HDBlog, ANSA tecnologia).
-  - Ristretto l'ambito a 2 sole categorie: **Politica Italiana** (`https://www.ansa.it/sito/notizie/politica/politica_rss.xml`) e **Politica Americana** (`Google News USA in italiano` con query mirata per politica, Casa Bianca, Trump, governo USA).
-  - **Ordinamento cronologico decrescente**: parsing rigoroso di `<pubDate>` con `email.utils.parsedate_to_datetime`, ordinamento per data decrescente e restituzione delle sole 3 notizie più fresche in assoluto, complete di orario e link sorgente HTML.
-- **Aggiornamento Prompt & Intent Routing**:
-  - Aggiornato `bots/balthazar/persona.md`: eliminati tutti i riferimenti alla tecnologia (Mela d'Oro, gadget, AI) focalizzando la comicità teatrale sui bisticci del *Ducato d'Italia* e del *Grande Impero d'Oltreoceano*.
-  - Aggiornati `_COORDINATOR_INSTRUCTION` in `agent.py` e `_INTENT_MAP` in `telegram/adapter.py` (aggiunte keyword politiche).
-- **Refactoring Diario di Bordo**:
-  - Disaccoppiata la gestione del diario dai bot di conversazione (rimosso `update_tavern_diary_tool`) ed affidata all'agente dedicato `chronicler` (`bots/chronicler/`).
-  - Aggiornato `assets/core_overview_diagram.svg` (C4-PlantUML).
-- **Verifica**: Testati con successo il parsing e l'ordinamento RSS delle notizie live ANSA e Google News USA.
+- **Centralizzazione e Isolamento Thinking Immagini (`.env` / `utils.py`)**:
+  - Aggiunta in Sezione 4 di `.env` della variabile dedicata `IMAGE_THINKING_LEVEL=high`, mantenendo `LLM_THINKING_LEVEL=medium` per la sola chat.
+  - Esportata `IMAGE_THINKING_LEVEL` in `utils.py` e integrata nel `types.GenerateContentConfig(thinking_config=...)` delle chiamate di generazione visiva.
+- **File Prompt & Template Dedicato Mappe (`bots/balthazar/map_prompt.md`)**:
+  - Creato file dedicato con i requisiti grafici da mastro cartografo del XVII-XVIII secolo (pergamena brunita/bruciata, incisione vintage a tratteggio, tonalità seppia/oro/carbone e accenti scarlatti per rotte/"X" dei tesori).
+  - Incluso template di prompt per `IMAGE_MODEL` strutturato in 5 sezioni (Cartiglio, Geografia arcipelago, Navigazione/Tesori, Mostri/Pericoli marini, Rosa dei venti/Accessori marginali).
+- **Nuovo Tool `draw_nautical_map` (`src/scummbar_chat/tools.py`)**:
+  - Implementata funzione asincrona `draw_nautical_map(tool_context, archipelago_name, map_details)` collegata a `IMAGE_MODEL` via `get_gemini_client_kwargs(prefix="IMAGE_")` con aspect ratio `4:3` (1200x896) e `IMAGE_THINKING_LEVEL`.
+  - Implementato generatore di fallback in PIL `_draw_nautical_map_fallback` che disegna pergamena, coste/isole, rosa dei venti a 8 punte, rotte tratteggiate rosse e cartiglio.
+  - Registrazione automatica dell'immagine come artifact di sessione (`mappa_{safe_title}.jpg/png`).
+- **Aggiornamento Agente Balthazar & Persona (`bots/balthazar/`)**:
+  - Registrato `draw_nautical_map_tool` nella lista strumenti di `balthazar_agent`.
+  - Aggiunta regola 6 nel system prompt `persona.md` per srotolare e descrivere con epica solennità le mappe su richiesta degli avventori.
+- **Refactoring Feed Notizie Live**:
+  - Ristretto `fetch_news_feed` alle sole categorie **Politica Italiana** (ANSA) e **Politica Americana** (Google News USA in italiano).
+  - Ordinamento cronologico decrescente con parsing RFC 822 / ISO `<pubDate>`.
+- **Verifica**: Testate con successo la generazione sia tramite Gemini Flash Lite Image (JPEG 1200x896 C2PA) sia tramite fallback PIL, e verificata la validità del grafo ADK.
 
 ---
 
