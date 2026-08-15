@@ -35,14 +35,15 @@ scummbar/
 │   ├── agent.py                       # root agent + InstructionProvider temporale
 │   ├── utils.py                       # factory modello, config, load_md, load_all_skills
 │   ├── time_context.py                # real time → tavern atmosphere
-│   ├── tools.py                       # FunctionTool ADK: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed, update_tavern_diary
-│   ├── diary.py                       # Diario di Bordo (Captain's Log) in prima persona
+│   ├── tools.py                       # FunctionTool ADK: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed
+│   ├── diary.py                       # Diario di Bordo (Captain's Log) in prima persona (tramite chronicler_agent)
 │   ├── .env                           # ⚠️ NON committare — contiene token e API key
 │   ├── world/scummbar.md              # world context + regole Narratore (prompt)
 │   ├── bots/barnaby/                  # agente Barnaby
 │   ├── bots/barnacle/                 # agente Barnacle
 │   ├── bots/isolde/                   # agente Isolde
 │   ├── bots/balthazar/                # agente Balthazar
+│   ├── bots/chronicler/               # agente Cronista (compilazione Diario di Bordo)
 │   ├── skills/                        # ADK skills auto-discovery
 │   ├── telegram/                      # adapter Telegram (adapter, formatter, runner)
 │   └── streamlit/                     # 🎮 frontend Web RPG (app.py, components.py)

@@ -158,10 +158,11 @@ Each agent lives in `bots/<name>/` with two files: `agent.py` (ADK config) and `
 
 | Agent | Model | Skills | Tools | Read-Only? |
 |-------|-------|--------|-------|------------|
-| 🍺 **barnaby** | `MODEL` | ✅ grog + menu (auto-discovery) | recall, memorize, write_secret_scroll, **update_tavern_diary_tool** | No |
+| 🍺 **barnaby** | `MODEL` | ✅ grog + menu (auto-discovery) | recall, memorize, write_secret_scroll | No |
 | 🐱 **barnacle** | `MODEL` | ✅ grog + menu | recall (smell/read only) | **Yes** — cannot write memory |
 | 🔮 **isolde** | `MODEL` | — (no skills) | recall, draw_tarot_card | No |
-| 🧭 **balthazar** | `MODEL` | ✅ grog + menu | recall, memorize, write_secret_scroll, fetch_news_feed, **update_tavern_diary_tool** | No |
+| 🧭 **balthazar** | `MODEL` | ✅ grog + menu | recall, memorize, write_secret_scroll, fetch_news_feed | No |
+| 📜 **chronicler** | `COMPACTION_LLM` | — (internal scribe) | — (dedicated diary generator) | **Yes** — writes to Captain's Log `.md` |
 
 **Base agent configuration (Barnaby example):**
 ```python
@@ -170,10 +171,10 @@ barnaby_agent = Agent(
     model=MODEL,
     description="Barnaby, il barista dello Scummbar.",
     instruction=_PERSONA,                        # persona.md
-    generate_content_config=THINKING_CONFIG,     # thinking_level=LOW
+    generate_content_config=THINKING_CONFIG,     # thinking_level=medium
     retry_config=DEFAULT_RETRY_CONFIG,           # retry with backoff
     tools=[_barnaby_toolset, recall_patron_tool, memorize_patron_tool,
-           update_tavern_diary_tool, write_secret_scroll_tool],
+           write_secret_scroll_tool],
 )
 ```
 
@@ -202,7 +203,6 @@ All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They r
 | `write_secret_scroll` | Text artifacts | Generates scrolls/recipes/portolans `.txt` via `InMemoryArtifactService` |
 | `draw_tarot_card` | Multimodal images | Generates tarot cards with `gemini-3.1-flash-lite-image` (isolated `IMAGE_*` auth), PIL fallback, PNG/JPEG detection via byte headers |
 | `fetch_news_feed` | Live RSS feeds | ANSA + HDBlog, 3 categories (IT politics, world, tech), comedic translation with HTML links |
-| `update_tavern_diary_tool` | Captain's Log | Updates the patron's diary using the real `tool_context.session.id` and filtering by `user_id` (avoids mixing patrons in a group) |
 
 ### 4.6 Time Management (Real Atmosphere)
 
@@ -229,7 +229,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
 
 ### 4.8 The Captain's Log (Tavern Journal)
 
-`diary.py` turns the conversation into a **first-person tale** ("I"), as if the patron himself were writing down his deeds.
+`diary.py` turns the conversation into a **first-person tale** ("I"), as if the patron himself were writing down his deeds, powered by a dedicated `chronicler_agent` ("Il Cronista dello Scummbar").
 
 | Aspect | Detail |
 |--------|--------|
@@ -237,12 +237,11 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
 | **Tracking** | HTML comment at the top of the file: `<!-- DIARY_METADATA: {"last_saved_index": N} -->` |
 | **Incremental update** | Reads `last_saved_index`, extracts only new messages (`messages[last_saved_index:]`), generates a chapter, appends it |
 | **Idempotency** | No new messages → returns without consuming tokens |
-| **Style** | Dedicated prompt: first person, Caribbean adventure, discursive, rich in detail |
+| **Chronicler Agent** | Dedicated agent (`bots/chronicler/`) with its own `persona.md` system prompt specialized in first-person pirate prose |
 | **Automatic trigger** | In Streamlit, every 10 total session messages (with confirmation toast) |
 | **Manual trigger** | "🔄 Compila / Aggiorna Diario ORA" button in the Captain's Log tab |
-| **ADK tool** | `update_tavern_diary_tool` (Barnaby and Balthazar can update it in-character) |
 | **Download** | "📥 Scarica Diario (.md)" button |
-| **Dual-provider** | Generation uses `_build_model_instance(COMPACTION_MODEL)` → works with Gemini and DeepSeek |
+| **Dual-provider** | Generation uses `chronicler_agent.model` (`COMPACTION_LLM`) → works seamlessly with Gemini and DeepSeek |
 
 ### 4.9 Model Factory & Dual Authentication
 
@@ -254,7 +253,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
   - **Vertex AI / Service Account**: loads credentials in RAM as a `Credentials` object (without mutating `os.environ`, thread-safe)
   - With the `IMAGE_` prefix it fully isolates image-generation authentication
 
-**Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=LOW` (Gemini) / `reasoning_effort=high` (DeepSeek); `include_thoughts=False` with `thought` part filtering.
+**Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=medium` (Gemini) / `reasoning_effort=high` (DeepSeek); `include_thoughts=False` with `thought` part filtering.
 
 ### 4.10 Sessions, Compaction & Context Caching
 
@@ -470,11 +469,11 @@ scummbar/
 │   ├── agent.py                    # root_agent + temporal InstructionProvider
 │   ├── utils.py                    # config, model factory, dual auth, load_md/load_all_skills
 │   ├── time_context.py             # real clock → tavern atmosphere
-│   ├── tools.py                    # ADK FunctionTool (memory, scrolls, tarot, news, diary)
-│   ├── diary.py                    # 📜 Captain's Log (incremental first-person generation)
+│   ├── tools.py                    # ADK FunctionTool (memory, scrolls, tarot, news)
+│   ├── diary.py                    # 📜 Captain's Log (incremental first-person generation via Chronicler)
 │   ├── .env                        # ⚠️ DO NOT commit — tokens and API keys
 │   ├── world/scummbar.md           # world context + Narratore rules
-│   ├── bots/                       # barnaby, barnacle, isolde, balthazar (agent.py + persona.md)
+│   ├── bots/                       # barnaby, barnacle, isolde, balthazar, chronicler (agent.py + persona.md)
 │   ├── skills/                     # grog/, menu/ (auto-discovery)
 │   ├── telegram/                   # adapter.py, formatter.py, runner.py
 │   └── streamlit/                  # app.py, components.py
@@ -514,7 +513,7 @@ GEMINI_API_KEY=your-api-key-here
 # 💬 SECTION 2: CONVERSATION MODEL
 # ===========================================================================
 LLM_MODEL=gemini-3.6-flash
-LLM_THINKING_LEVEL=LOW
+LLM_THINKING_LEVEL=medium
 # LLM_MODEL=deepseek/deepseek-v4-flash   # DeepSeek alternative
 
 # ===========================================================================

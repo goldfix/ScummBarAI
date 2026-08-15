@@ -18,7 +18,7 @@ load_dotenv(_ENV_PATH, override=True)
 
 # --- Environment Variables ---
 LLM_MODEL: str = os.getenv("LLM_MODEL", "gemini-3.5-flash")
-LLM_THINKING_LEVEL: str = os.getenv("LLM_THINKING_LEVEL", "medium")
+LLM_THINKING_LEVEL: str = os.getenv("LLM_THINKING_LEVEL", "medium").strip().lower()
 DEEPSEEK_REASONING_EFFORT: str = os.getenv("DEEPSEEK_REASONING_EFFORT", "high")
 
 COMPACTION_MODEL: str = os.getenv("COMPACTION_MODEL", "gemini-3.5-flash")

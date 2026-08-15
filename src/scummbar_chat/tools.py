@@ -6,7 +6,6 @@ Operations:
 - Translates ledger retrieval results into structured dictionaries for the LLM runner.
 """
 
-import json
 import logging
 import os
 import sqlite3
@@ -125,73 +124,6 @@ async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_
     except sqlite3.Error as e:
         log.error("Database error in memorize_patron_chat: %s", e)
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
-
-
-async def update_tavern_diary_tool(tool_context: ToolContext, patron_name: str = "") -> str:
-    """
-    Usa questo strumento per aggiornare o compilare il Diario di Bordo dell'avventore attuale.
-    - patron_name: Il nome del pirata di cui stai aggiornando il diario.
-    """
-    from src.scummbar_chat.diary import update_tavern_diary_async
-
-    # Retrieve patron name from DB if not passed
-    user_id = tool_context.user_id
-    if not patron_name:
-        _ensure_patron_memories_table()
-        db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-        try:
-            with sqlite3.connect(db_path, timeout=10.0) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT patron_name FROM patron_memories WHERE user_id = ?", (user_id,))
-                row = cursor.fetchone()
-                if row and row[0]:
-                    patron_name = row[0]
-        except sqlite3.Error:
-            pass
-
-    if not patron_name:
-        patron_name = f"Avventore_{user_id}"
-
-    # Load the current session events from DB using the real session_id (works in both
-    # Streamlit and Telegram contexts) and filtered by user_id to avoid mixing other patrons.
-    session_id = tool_context.session.id
-    db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
-    messages: list[dict] = []
-    try:
-        with sqlite3.connect(db_path, timeout=10.0) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT event_data FROM events WHERE user_id = ? AND session_id = ? ORDER BY id ASC",
-                (user_id, session_id),
-            )
-            for row in cursor.fetchall():
-                try:
-                    ev = json.loads(row[0])
-                    content = ev.get("content", {})
-                    role = content.get("role", "")
-                    parts = content.get("parts", [])
-                    # Only keep plain text parts, skipping internal thought/reasoning parts
-                    text_parts = [p.get("text", "") for p in parts if "text" in p and not p.get("thought", False)]
-                    full_text = "\n".join(text_parts).strip()
-                    if full_text and role in ["user", "model", "assistant"]:
-                        norm_role = "user" if role == "user" else "assistant"
-                        messages.append(
-                            {
-                                "role": norm_role,
-                                "content": full_text,
-                                "bot_name": "barnaby" if norm_role == "assistant" else None,
-                            }
-                        )
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    continue
-    except sqlite3.Error as e:
-        log.warning("Impossibile recuperare gli eventi per il diario via tool: %s", e)
-
-    success, status_msg, _ = await update_tavern_diary_async(patron_name, messages)
-    if success:
-        return f"📜 Diario di bordo aggiornato con successo per {patron_name}! ({status_msg})"
-    else:
-        return f"📜 Il diario di bordo di {patron_name} è già aggiornato. ({status_msg})"
 
 
 async def write_secret_scroll(tool_context: ToolContext, title: str, content: str) -> str:
@@ -447,7 +379,6 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
 # Esportazione degli strumenti ADK
 recall_patron_tool = FunctionTool(recall_patron_memory)
 memorize_patron_tool = FunctionTool(memorize_patron_chat)
-update_tavern_diary_tool = FunctionTool(update_tavern_diary_tool)
 write_secret_scroll_tool = FunctionTool(write_secret_scroll)
 draw_tarot_card_tool = FunctionTool(draw_tarot_card)
 fetch_news_feed_tool = FunctionTool(fetch_news_feed)
