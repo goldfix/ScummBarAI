@@ -13,7 +13,7 @@ The repository is intentionally structured **didactically**: every architectural
 ## 🗺️ Table of Contents
 
 - [🍺 ScummBar AI — A Collaborative Multi-Agent Study Project](#-scummbar-ai--a-collaborative-multi-agent-study-project)
-  - [🗺️ Table of Contents](#-table-of-contents)
+  - [🗺️ Table of Contents](#️-table-of-contents)
   - [🎯 Project Purpose](#-project-purpose)
   - [📖 The Story \& The Characters](#-the-story--the-characters)
   - [🚀 Quick Start (Run First, Learn Later)](#-quick-start-run-first-learn-later)
@@ -21,7 +21,7 @@ The repository is intentionally structured **didactically**: every architectural
     - [2. Installation](#2-installation)
     - [3. `.env` Configuration](#3-env-configuration)
     - [4. Running the Applications](#4-running-the-applications)
-  - [🏗️ The ADK Core: Architecture \& How It Works](#-the-adk-core-architecture--how-it-works)
+  - [🏗️ The ADK Core: Architecture \& How It Works](#️-the-adk-core-architecture--how-it-works)
     - [4.1 Core Overview Diagram](#41-core-overview-diagram)
     - [4.2 Multi-Agent Coordination (Router-Delegate)](#42-multi-agent-coordination-router-delegate)
     - [4.3 Agent Configuration](#43-agent-configuration)
@@ -56,7 +56,7 @@ The repository is intentionally structured **didactically**: every architectural
     - [7.5 scummbar-kroki-diagrams (Kroki Diagram Generator)](#75-scummbar-kroki-diagrams-kroki-diagram-generator)
     - [7.6 How to Use the Autopilot](#76-how-to-use-the-autopilot)
   - [🧭 Project Structure](#-project-structure)
-  - [⚙️ Environment Configuration (.env)](#-environment-configuration-env)
+  - [⚙️ Environment Configuration (.env)](#️-environment-configuration-env)
 
 ---
 
@@ -512,7 +512,7 @@ GEMINI_API_KEY=your-api-key-here
 # ===========================================================================
 # 💬 SECTION 2: CONVERSATION MODEL
 # ===========================================================================
-LLM_MODEL=gemini-3.6-flash
+LLM_MODEL=gemini-3.5-flash-lite
 LLM_THINKING_LEVEL=medium
 # LLM_MODEL=deepseek/deepseek-v4-flash   # DeepSeek alternative
 
