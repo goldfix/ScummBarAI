@@ -126,46 +126,72 @@ def render_sidebar() -> dict:
 
     # 3. Session Controls
     st.sidebar.subheader("🛠️ Gestione Partita")
-    if st.sidebar.button("🧹 Pulisci Cronologia Chat", use_container_width=True):
-        # Artifacts live inside messages[i]["artifacts"], so clearing messages is enough.
-        st.session_state.messages = []
-        st.rerun()
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.sidebar.button("🔄 Ricarica da DB", help="Ricarica l'intera cronologia dal database", use_container_width=True):
+            st.session_state["current_patron_name"] = None
+            st.rerun()
+    with col2:
+        if st.sidebar.button("🧹 Svuota Vista", help="Azzera la vista chat temporanea", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
     return {
         "patron_name": patron_name,
     }
 
 
-def render_artifacts(artifacts: list[dict]) -> None:
+def render_artifacts(artifacts: list) -> None:
     """
     Renders artifacts (secret scrolls, tarot images, portolans) returned by ADK agents.
     - Text files (.txt): Shown in expanders with a download button.
-    - Images (.png/.jpg): Rendered using st.image().
+    - Images (.png/.jpg): Rendered using st.image() (loaded from memory or disk).
     """
     if not artifacts:
         return
 
+    from pathlib import Path
+
+    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+
     for artifact in artifacts:
-        filename = artifact.get("filename", "artefatto.txt")
-        data = artifact.get("bytes", b"")
+        if isinstance(artifact, str):
+            filename = Path(artifact).name
+            data = b""
+        elif isinstance(artifact, dict):
+            filename = artifact.get("filename", "artefatto.txt")
+            data = artifact.get("bytes", b"")
+        else:
+            continue
+
+        # If bytes are empty (e.g. after restoring chat history from DB), load from disk
+        file_on_disk = diaries_assets_dir / filename
+        if not data and filename and file_on_disk.exists():
+            try:
+                data = file_on_disk.read_bytes()
+            except Exception:
+                data = b""
 
         # Handle Images (e.g. Tarot cards or generated artwork)
-        # Note: use_container_width is deprecated in Streamlit >= 1.4x; use width="stretch".
         if filename.lower().endswith((".png", ".jpg", ".jpeg")):
-            st.image(data, caption=f"🖼️ {filename}", width="stretch")
+            if data:
+                st.image(data, caption=f"🖼️ {filename}", use_container_width=True)
+            elif file_on_disk.exists():
+                st.image(str(file_on_disk), caption=f"🖼️ {filename}", use_container_width=True)
         else:
             # Handle Text Artifacts (Scrolls, recipes, portolans)
-            try:
-                text_content = data.decode("utf-8")
-            except UnicodeDecodeError:
-                text_content = "[Contenuto binario non decodificabile]"
+            if data:
+                try:
+                    text_content = data.decode("utf-8")
+                except UnicodeDecodeError:
+                    text_content = "[Contenuto binario non decodificabile]"
 
-            with st.expander(f"📜 Pergamena Ricevuta: {filename}", expanded=True):
-                st.code(text_content, language="markdown")
-                st.download_button(
-                    label=f"💾 Scarica {filename}",
-                    data=data,
-                    file_name=filename,
-                    mime="text/plain",
-                    key=f"dl_{filename}_{hash(data)}",
-                )
+                with st.expander(f"📜 Pergamena Ricevuta: {filename}", expanded=True):
+                    st.code(text_content, language="markdown")
+                    st.download_button(
+                        label=f"💾 Scarica {filename}",
+                        data=data,
+                        file_name=filename,
+                        mime="text/plain",
+                        key=f"dl_{filename}_{hash(data)}",
+                    )

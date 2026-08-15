@@ -57,6 +57,26 @@ _AUGMENT_PREFIX_PATTERN = re.compile(r"^(?:\[[^\]]+\]\s*)+")
 _NARRATOR_NOTE_PATTERN = re.compile(r"\n*\[NOTA DI SISTEMA:[^\]]*\]")
 
 
+def _render_diary_html(diary_markdown: str, assets_dir: Path) -> str:
+    """
+    Converts local relative Markdown image links ![alt](assets/filename)
+    into base64 Data URIs on-the-fly so the browser can display them in st.markdown.
+    """
+    import base64
+
+    def _replace_image(match: re.Match) -> str:
+        alt_text = match.group(1)
+        filename = match.group(2)
+        file_path = assets_dir / filename
+        if file_path.exists():
+            mime = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
+            b64_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
+            return f'<img src="data:{mime};base64,{b64_data}" alt="{alt_text}" style="max-width: 100%; border-radius: 8px; margin: 12px 0; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">'
+        return f"![{alt_text}]({filename})"
+
+    return re.sub(r"!\[(.*?)\]\(assets/([^\)]+)\)", _replace_image, diary_markdown)
+
+
 def _get_user_id(patron_name: str) -> str:
     """Generates a stable numerical user_id hash from patron_name for ADK patron_memories."""
     hash_object = hashlib.sha256(patron_name.strip().lower().encode("utf-8"))
@@ -67,7 +87,8 @@ def _get_user_id(patron_name: str) -> str:
 def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
     """
     Queries SQLite 'events' table for historical dialogue events associated
-    with the given user_id and session_id, restoring full past chat history.
+    with the given user_id and session_id, restoring full past chat history
+    alongside any generated artifacts/images.
     """
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     if not Path(db_path).exists():
@@ -83,16 +104,18 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
             ).fetchall()
 
             messages: list[dict] = []
+            pending_artifacts: list[dict] = []
+
             for r in rows:
                 try:
                     data = json.loads(r["event_data"])
                     content = data.get("content", {})
                     parts = content.get("parts", [])
                     role = content.get("role", "")
+                    author = data.get("author", "barnaby")
 
                     # Extract plain text and artifacts from user or assistant turns
                     text_parts: list[str] = []
-                    event_artifacts: list[str] = []
                     for p in parts:
                         if "function_response" in p:
                             fr = p["function_response"]
@@ -100,7 +123,7 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                             if isinstance(res, dict) and "result" in res and isinstance(res["result"], str):
                                 m = re.search(r"Salvata come ([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg))", res["result"])
                                 if m:
-                                    event_artifacts.append(m.group(1))
+                                    pending_artifacts.append({"filename": m.group(1), "bytes": b""})
                         elif "text" in p and not p.get("thought", False):
                             text = p["text"]
                             # Clean up internal prompt tags if user message
@@ -114,14 +137,23 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                         full_text = "\n".join(text_parts).strip()
                         if full_text and role in ["user", "model", "assistant"]:
                             norm_role = "user" if role == "user" else "assistant"
+                            attached_artifacts = list(pending_artifacts) if norm_role == "assistant" else []
+                            # Fallback scan: check if text itself references any saved artifact filename
+                            if norm_role == "assistant":
+                                for fn in re.findall(r"Salvata come ([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg))", full_text):
+                                    if not any(a.get("filename") == fn for a in attached_artifacts):
+                                        attached_artifacts.append({"filename": fn, "bytes": b""})
+
                             messages.append(
                                 {
                                     "role": norm_role,
                                     "content": full_text,
-                                    "bot_name": "barnaby" if norm_role == "assistant" else None,
-                                    "artifacts": event_artifacts,
+                                    "bot_name": author if norm_role == "assistant" else None,
+                                    "artifacts": attached_artifacts,
                                 }
                             )
+                            if norm_role == "assistant":
+                                pending_artifacts.clear()
                 except (json.JSONDecodeError, KeyError, TypeError):
                     continue
 
@@ -312,12 +344,9 @@ def main() -> None:
                 mime="text/markdown",
             )
             st.markdown("---")
-            # Resolve relative 'assets/' path for Streamlit preview
-            rendered_diary = re.sub(
-                r"!\[(.*?)\]\(assets/([^\)]+)\)",
-                r"![\1](data/scummbar_chat/diaries/assets/\2)",
-                diary_content,
-            )
+            # Resolve relative 'assets/' into base64 Data URIs on-the-fly for instant browser rendering
+            diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+            rendered_diary = _render_diary_html(diary_content, diaries_assets_dir)
             st.markdown(rendered_diary, unsafe_allow_html=True)
         else:
             st.info(
