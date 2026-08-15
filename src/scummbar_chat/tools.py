@@ -140,10 +140,19 @@ async def write_secret_scroll(tool_context: ToolContext, title: str, content: st
     safe_title = "".join(c if c.isalnum() else "_" for c in title.strip().lower())
     filename = f"{safe_title}.txt"
 
+    # Save the text scroll directly to the diaries assets folder for persistence
+    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+    diaries_assets_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        (diaries_assets_dir / filename).write_bytes(file_bytes)
+        log.info("Secret scroll saved to diaries assets: %s", diaries_assets_dir / filename)
+    except Exception as e:
+        log.warning("Impossibile salvare la pergamena in diaries assets: %s", e)
+
     try:
         # InMemoryArtifactService handles storage under the session/user namespace
         version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
-        return f"Pergamena {filename} (versione {version}) scritta e arrotolata con successo! Il cliente la riceverà a breve."
+        return f"Pergamena '{title}' (versione {version}) scritta e arrotolata con successo! (Salvata come {filename})."
     except Exception as e:
         log.error("Errore salvataggio artifact in write_secret_scroll: %s", e)
         return "La penna si è rotta e l'inchiostro si è sparso! Non sono riuscito a scrivere la pergamena."
