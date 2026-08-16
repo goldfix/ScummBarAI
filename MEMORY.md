@@ -39,6 +39,10 @@ scummbar/
 │       └── streamlit/                 # 🎮 Frontend Web Streamlit (app.py, components.py)
 ├── data/                              # Dati e log persistenti
 │   └── scummbar_chat/                 # Dati ADK / Telegram / Streamlit (sessions.db + diaries/ + logs/)
+│       ├── sessions.db                # Database sessioni SQLite (ADK)
+│       ├── diaries/                   # 📜 Diari di bordo (Diary_Nome.md)
+│       │   └── assets/                #    Assets generati (mappe, tarocchi, pergamene .txt)
+│       └── logs/                      # bot.log + errors.log (rotativi)
 ├── start.sh                           # avvio ADK web con persistenza SQLite
 ├── start_streamlit.sh                 # avvio frontend Streamlit Web RPG Single-Player
 ├── py_env.sh                          # setup ambiente Python (venv + uv)
@@ -872,12 +876,14 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 - **Refactoring Feed Notizie Live**:
   - Ristretto `fetch_news_feed` alle sole categorie **Politica Italiana** (ANSA) e **Politica Americana** (Google News USA in italiano).
   - Ordinamento cronologico decrescente con parsing RFC 822 / ISO `<pubDate>`.
-- **Diario di Bordo Illustrato con Mappe e Tarocchi (`diaries/assets/`)**:
-  - `draw_tarot_card` e `draw_nautical_map` (`tools.py`) salvano automaticamente le immagini generate sia come artifact di sessione sia come file su disco in `data/scummbar_chat/diaries/assets/<filename>`.
-  - `_build_transcript` in `diary.py` annota le illustrazioni svelate (`[ILLUSTRAZIONE SVELATA: assets/<filename>]`).
-  - `chronicler_agent` (`bots/chronicler/persona.md`, Regola 5) include direttamente l'immagine Markdown `![Descrizione](assets/nome_file)` nel testo del capitolo nel momento della narrazione, commentandone i dettagli in prima persona.
-  - Streamlit (`app.py`) riscrive trasparentemente i percorsi relativi `assets/` in `data/scummbar_chat/diaries/assets/` per il rendering a video, preservando il file `.md` pulito e portabile per il download.
-- **Verifica**: Testate con successo l'orchestrazione collaborativa multi-agente, la generazione JPEG 1200x896 C2PA, il salvataggio degli asset illustrati e la composizione automatica del capitolo con immagini.
+- **Architettura Unificata Assets su Disco & Link Leggeri (`data/scummbar_chat/diaries/assets/`)**:
+  - `write_secret_scroll`, `draw_tarot_card` e `draw_nautical_map` (`tools.py`) salvano automaticamente tutti i file generati (immagini `.jpg`/`.png` e pergamene/ricette `.txt`) direttamente su disco in `ASSETS_DIR` (`data/scummbar_chat/diaries/assets/<filename>`).
+  - `load_session_chat_history` (`app.py`) ripristina la cronologia associando i descrittori leggeri `{filename, type, path, url}` ai messaggi dell'assistente, caricando i file fisici da disco all'avvio.
+  - `render_artifacts` (`components.py`) mostra l'anteprima responsive delle immagini (`st.image`) e le pergamene in expander (`st.expander` + `st.code`) con relativi pulsanti di download.
+  - `_build_transcript` in `diary.py` annota i riferimenti leggeri (`[ILLUSTRAZIONE: assets/<filename>]` o `[PERGAMENA: assets/<filename>]`), eliminando ogni payload binario o spreco di token.
+  - `chronicler_agent` (`bots/chronicler/persona.md`, Regole 5 e 6) include i link Markdown relativi nel racconto (`![...](assets/filename)` o `[📜 ...](assets/filename.txt)`), commentandoli in prima persona.
+  - Streamlit (`app.py`) converte al volo i link delle immagini in Data URI Base64 e formatta i link dei file `.txt` per la visualizzazione nel browser, mantenendo il file `.md` scaricabile pulito e portabile.
+- **Verifica**: Testati con successo l'orchestrazione collaborativa multi-agente, la generazione JPEG 1200x896 C2PA, il salvataggio unificato degli asset (immagini + pergamene), il ripristino post-riavvio della chat e la redazione del capitolo illustrato.
 
 ---
 

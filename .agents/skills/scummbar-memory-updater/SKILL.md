@@ -37,6 +37,7 @@ Modificalo **SOLO** se il cambiamento interessa l'utente finale:
 - Nuove dipendenze o istruzioni d'uso.
 - Cambiamenti nel file `.env` (variabili aggiunte/rimosse).
 - Modifiche ai pattern di esecuzione.
+- Fai particolare attenzione ai diagrammi. Se necessario aggiornali usando l'apposita skill "scummbar-kroki-diagrams" (se disponibile).
 
 ## Checklist dell'Aggiornamento
 Esegui questo script bash (tramite tool `bash`) prima di completare il lavoro per garantire l'integrità dei markdown:

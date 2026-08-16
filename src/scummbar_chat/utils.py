@@ -167,6 +167,10 @@ _DB_PATH = CHAT_DIR.parent.parent / "data" / "scummbar_chat" / "sessions.db"
 _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 SESSION_DB_URI: str = f"sqlite+aiosqlite:///{_DB_PATH}"
 
+# --- Asset Storage Directory (Single source of truth for generated images & text scrolls) ---
+ASSETS_DIR = CHAT_DIR.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+
 # --- Context Compaction configuration ---
 # COMPACTION_MODEL, COMPACTION_INTERVAL, COMPACTION_OVERLAP already defined above.
 # COMPACTION_LLM defaults to Gemini (requires ADC). Can be set to deepseek/...

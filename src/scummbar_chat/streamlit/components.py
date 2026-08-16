@@ -143,55 +143,62 @@ def render_sidebar() -> dict:
 
 def render_artifacts(artifacts: list) -> None:
     """
-    Renders artifacts (secret scrolls, tarot images, portolans) returned by ADK agents.
-    - Text files (.txt): Shown in expanders with a download button.
-    - Images (.png/.jpg): Rendered using st.image() (loaded from memory or disk).
+    Renders generated assets (images, text scrolls) directly from the disk storage
+    (data/scummbar_chat/diaries/assets/<filename>).
+    - Images (.png/.jpg/.jpeg): Rendered using st.image with responsive container width.
+    - Text files (.txt): Rendered in an expander with formatted code block and download button.
     """
     if not artifacts:
         return
 
     from pathlib import Path
 
-    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+    from ..utils import ASSETS_DIR
 
     for artifact in artifacts:
+        # Extract filename from string or dictionary descriptor
         if isinstance(artifact, str):
             filename = Path(artifact).name
-            data = b""
         elif isinstance(artifact, dict):
-            filename = artifact.get("filename", "artefatto.txt")
-            data = artifact.get("bytes", b"")
+            filename = artifact.get("filename", "")
         else:
             continue
 
-        # If bytes are empty (e.g. after restoring chat history from DB), load from disk
-        file_on_disk = diaries_assets_dir / filename
-        if not data and filename and file_on_disk.exists():
-            try:
-                data = file_on_disk.read_bytes()
-            except Exception:
-                data = b""
+        if not filename:
+            continue
 
-        # Handle Images (e.g. Tarot cards or generated artwork)
+        file_path = ASSETS_DIR / filename
+        if not file_path.exists():
+            continue
+
+        # 1. Image Artifacts (Mappe nautiche, Carte dei Tarocchi)
         if filename.lower().endswith((".png", ".jpg", ".jpeg")):
-            if data:
-                st.image(data, caption=f"🖼️ {filename}", use_container_width=True)
-            elif file_on_disk.exists():
-                st.image(str(file_on_disk), caption=f"🖼️ {filename}", use_container_width=True)
-        else:
-            # Handle Text Artifacts (Scrolls, recipes, portolans)
-            if data:
-                try:
-                    text_content = data.decode("utf-8")
-                except UnicodeDecodeError:
-                    text_content = "[Contenuto binario non decodificabile]"
+            try:
+                img_bytes = file_path.read_bytes()
+                st.image(img_bytes, caption=f"🖼️ {filename}", width="stretch")
+                st.download_button(
+                    label=f"💾 Scarica {filename}",
+                    data=img_bytes,
+                    file_name=filename,
+                    mime="image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png",
+                    key=f"dl_img_{filename}_{file_path.stat().st_mtime}",
+                )
+            except Exception as e:
+                st.warning(f"Impossibile visualizzare l'immagine {filename}: {e}")
 
+        # 2. Text Artifacts (Pergamene, Ricette di Grog, Portolani .txt)
+        else:
+            try:
+                text_bytes = file_path.read_bytes()
+                text_content = text_bytes.decode("utf-8", errors="replace")
                 with st.expander(f"📜 Pergamena Ricevuta: {filename}", expanded=True):
                     st.code(text_content, language="markdown")
                     st.download_button(
                         label=f"💾 Scarica {filename}",
-                        data=data,
+                        data=text_bytes,
                         file_name=filename,
                         mime="text/plain",
-                        key=f"dl_{filename}_{hash(data)}",
+                        key=f"dl_txt_{filename}_{file_path.stat().st_mtime}",
                     )
+            except Exception as e:
+                st.warning(f"Impossibile leggere la pergamena {filename}: {e}")

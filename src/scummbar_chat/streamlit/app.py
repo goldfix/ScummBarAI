@@ -32,7 +32,7 @@ from src.scummbar_chat.streamlit.components import (
 from src.scummbar_chat.telegram.adapter import _resolve_intent
 from src.scummbar_chat.telegram.runner import run_agent
 from src.scummbar_chat.time_context import get_time_description
-from src.scummbar_chat.utils import SESSION_DB_URI
+from src.scummbar_chat.utils import ASSETS_DIR, SESSION_DB_URI
 
 NARRATOR_SYSTEM_PROMPT = (
     "\n\n[NOTA DI SISTEMA: È il momento del Narratore. Alla fine assoluta della tua risposta, "
@@ -59,22 +59,44 @@ _NARRATOR_NOTE_PATTERN = re.compile(r"\n*\[NOTA DI SISTEMA:[^\]]*\]")
 
 def _render_diary_html(diary_markdown: str, assets_dir: Path) -> str:
     """
-    Converts local relative Markdown image links ![alt](assets/filename)
-    into base64 Data URIs on-the-fly so the browser can display them in st.markdown.
+    Converts local relative Markdown image links ![alt](assets/filename) or ![alt](filename)
+    into base64 Data URIs on-the-fly, and rewrites text links [text](assets/file.txt)
+    so the browser can access and display them in Streamlit.
     """
     import base64
 
+    # 1. Replace Images with Base64 Data URIs for browser rendering
     def _replace_image(match: re.Match) -> str:
         alt_text = match.group(1)
-        filename = match.group(2)
+        filename = Path(match.group(2)).name
         file_path = assets_dir / filename
         if file_path.exists():
             mime = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
             b64_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
-            return f'<img src="data:{mime};base64,{b64_data}" alt="{alt_text}" style="max-width: 100%; border-radius: 8px; margin: 12px 0; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">'
-        return f"![{alt_text}]({filename})"
+            return (
+                f'<div style="text-align: center; margin: 16px 0;">'
+                f'<img src="data:{mime};base64,{b64_data}" alt="{alt_text}" '
+                f'style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);"><br>'
+                f'<em style="font-size: 0.9em; color: #555;">{alt_text}</em>'
+                f'</div>'
+            )
+        return match.group(0)
 
-    return re.sub(r"!\[(.*?)\]\(assets/([^\)]+)\)", _replace_image, diary_markdown)
+    rendered = re.sub(
+        r"!\[(.*?)\]\((?:assets/)?([^\)]+\.(?:jpg|jpeg|png|webp))\)",
+        _replace_image,
+        diary_markdown,
+        flags=re.IGNORECASE,
+    )
+
+    # 2. Rewrite text file links [text](assets/file.txt) or [text](file.txt)
+    rendered = re.sub(
+        r"\[(.*?)\]\((?:assets/)?([^\)]+\.txt)\)",
+        r"[\1](data/scummbar_chat/diaries/assets/\2)",
+        rendered,
+        flags=re.IGNORECASE,
+    )
+    return rendered
 
 
 def _get_user_id(patron_name: str) -> str:
@@ -121,9 +143,15 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                             fr = p["function_response"]
                             res = fr.get("response", {})
                             if isinstance(res, dict) and "result" in res and isinstance(res["result"], str):
-                                m = re.search(r"Salvata come ([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg))", res["result"])
-                                if m:
-                                    pending_artifacts.append({"filename": m.group(1), "bytes": b""})
+                                for fn in re.findall(r"(?:Salvata come|Pergamena)\s+['\"]?([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg|txt))['\"]?", res["result"], re.IGNORECASE):
+                                    if (ASSETS_DIR / fn).exists() and not any(a.get("filename") == fn for a in pending_artifacts):
+                                        is_img = fn.lower().endswith((".png", ".jpg", ".jpeg"))
+                                        pending_artifacts.append({
+                                            "filename": fn,
+                                            "type": "image" if is_img else "text",
+                                            "path": str(ASSETS_DIR / fn),
+                                            "url": f"assets/{fn}",
+                                        })
                         elif "text" in p and not p.get("thought", False):
                             text = p["text"]
                             # Clean up internal prompt tags if user message
@@ -140,9 +168,15 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                             attached_artifacts = list(pending_artifacts) if norm_role == "assistant" else []
                             # Fallback scan: check if text itself references any saved artifact filename
                             if norm_role == "assistant":
-                                for fn in re.findall(r"Salvata come ([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg))", full_text):
-                                    if not any(a.get("filename") == fn for a in attached_artifacts):
-                                        attached_artifacts.append({"filename": fn, "bytes": b""})
+                                for fn in re.findall(r"(?:Salvata come|Pergamena)\s+['\"]?([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg|txt))['\"]?", full_text, re.IGNORECASE):
+                                    if (ASSETS_DIR / fn).exists() and not any(a.get("filename") == fn for a in attached_artifacts):
+                                        is_img = fn.lower().endswith((".png", ".jpg", ".jpeg"))
+                                        attached_artifacts.append({
+                                            "filename": fn,
+                                            "type": "image" if is_img else "text",
+                                            "path": str(ASSETS_DIR / fn),
+                                            "url": f"assets/{fn}",
+                                        })
 
                             messages.append(
                                 {
@@ -291,13 +325,27 @@ def main() -> None:
                 if artifacts:
                     render_artifacts(artifacts)
 
+            # Convert raw artifacts to clean lightweight link descriptors
+            clean_artifacts = []
+            if artifacts:
+                for a in artifacts:
+                    fn = a.get("filename") if isinstance(a, dict) else str(a)
+                    if fn:
+                        is_img = fn.lower().endswith((".png", ".jpg", ".jpeg"))
+                        clean_artifacts.append({
+                            "filename": fn,
+                            "type": "image" if is_img else "text",
+                            "path": str(ASSETS_DIR / fn),
+                            "url": f"assets/{fn}",
+                        })
+
             # Save response to session state
             st.session_state.messages.append(
                 {
                     "role": "assistant",
                     "content": response_text,
                     "bot_name": detected_bot or "barnaby",
-                    "artifacts": artifacts,
+                    "artifacts": clean_artifacts,
                 }
             )
 
@@ -345,8 +393,7 @@ def main() -> None:
             )
             st.markdown("---")
             # Resolve relative 'assets/' into base64 Data URIs on-the-fly for instant browser rendering
-            diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
-            rendered_diary = _render_diary_html(diary_content, diaries_assets_dir)
+            rendered_diary = _render_diary_html(diary_content, ASSETS_DIR)
             st.markdown(rendered_diary, unsafe_allow_html=True)
         else:
             st.info(

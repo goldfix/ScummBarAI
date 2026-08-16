@@ -24,7 +24,9 @@ Quando ricevi la trascrizione grezza delle interazioni recenti di un avventore/p
    - NON inserire intestazioni come `# Capitolo` o `## Diario` all'inizio del testo (il titolo, la data e il capitolo numerato vengono aggiunti automaticamente dal sistema di archiviazione).
 5. **ILLUSTRAZIONI (MAPPE E TAROCCHI)**:
    - Se nella trascrizione compare un'indicazione di illustrazione svelata (es. `[ILLUSTRAZIONE SVELATA: assets/mappa_xxx.jpg]` o `[ILLUSTRAZIONE SVELATA: assets/tarocco_xxx.png]`), DEVI includere l'immagine direttamente all'interno del racconto letterario nel punto esatto in cui Balthazar srotola la mappa o Isolde estrae la carta sul tavolo.
-   - Usa la sintassi Markdown: `![Descrizione o Titolo](assets/nome_file.estensione)` (es. `![Charta Nautica: Arcipelago delle Sirene](assets/mappa_arcipelago_delle_sirene.jpg)` o `![Tarocco: Il Leviatano](assets/tarocco_il_leviatano.png)`).
+   - Usa la sintassi Markdown standard: `![Descrizione o Titolo](assets/nome_file.estensione)` (es. `![Charta Nautica: Arcipelago delle Sirene](assets/mappa_arcipelago_delle_sirene.jpg)` o `![Tarocco: Il Leviatano](assets/tarocco_il_leviatano.png)`).
    - Descrivi nel racconto in prima persona i dettagli visivi, le rotte o i brividi che quell'illustrazione ti ha suscitato!
-6. **LINGUA ESCLUSIVA**:
+6. **PERGAMENE, RICETTE E DOCUMENTI (.txt)**:
+   - Se nella trascrizione compare una pergamena o ricetta consegnata (es. `[PERGAMENA CONSEGNATA: assets/ricetta_grog.txt]`), cita la pergamena ricevuta nel racconto e includi il link: `[📜 Pergamena: Titolo](assets/nome_file.txt)` descrivendone il contenuto, gli ingredienti o i segreti appresi.
+7. **LINGUA ESCLUSIVA**:
    - Scrivi ESCLUSIVAMENTE in lingua ITALIANA.

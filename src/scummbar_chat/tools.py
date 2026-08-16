@@ -15,7 +15,7 @@ import google.genai.types as types
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 
-from .utils import IMAGE_MODEL, IMAGE_THINKING_LEVEL, SESSION_DB_URI, get_gemini_client_kwargs
+from .utils import ASSETS_DIR, IMAGE_MODEL, IMAGE_THINKING_LEVEL, SESSION_DB_URI, get_gemini_client_kwargs
 
 log = logging.getLogger(__name__)
 
@@ -141,11 +141,9 @@ async def write_secret_scroll(tool_context: ToolContext, title: str, content: st
     filename = f"{safe_title}.txt"
 
     # Save the text scroll directly to the diaries assets folder for persistence
-    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
-    diaries_assets_dir.mkdir(parents=True, exist_ok=True)
     try:
-        (diaries_assets_dir / filename).write_bytes(file_bytes)
-        log.info("Secret scroll saved to diaries assets: %s", diaries_assets_dir / filename)
+        (ASSETS_DIR / filename).write_bytes(file_bytes)
+        log.info("Secret scroll saved to diaries assets: %s", ASSETS_DIR / filename)
     except Exception as e:
         log.warning("Impossibile salvare la pergamena in diaries assets: %s", e)
 
@@ -293,11 +291,9 @@ async def draw_tarot_card(
     filename = f"tarocco_{safe_title}.{file_ext}"
 
     # Save the image directly to the diaries assets folder for the Captain's Log
-    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
-    diaries_assets_dir.mkdir(parents=True, exist_ok=True)
     try:
-        (diaries_assets_dir / filename).write_bytes(img_bytes)
-        log.info("Tarot card saved to diaries assets: %s", diaries_assets_dir / filename)
+        (ASSETS_DIR / filename).write_bytes(img_bytes)
+        log.info("Tarot card saved to diaries assets: %s", ASSETS_DIR / filename)
     except Exception as e:
         log.warning("Impossibile salvare il tarocco in diaries assets: %s", e)
 
@@ -464,11 +460,9 @@ async def draw_nautical_map(
     filename = f"mappa_{safe_title}.{file_ext}"
 
     # Save the image directly to the diaries assets folder for the Captain's Log
-    diaries_assets_dir = Path(__file__).parent.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
-    diaries_assets_dir.mkdir(parents=True, exist_ok=True)
     try:
-        (diaries_assets_dir / filename).write_bytes(img_bytes)
-        log.info("Nautical map saved to diaries assets: %s", diaries_assets_dir / filename)
+        (ASSETS_DIR / filename).write_bytes(img_bytes)
+        log.info("Nautical map saved to diaries assets: %s", ASSETS_DIR / filename)
     except Exception as e:
         log.warning("Impossibile salvare la mappa in diaries assets: %s", e)
 

@@ -93,8 +93,8 @@ def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int
             if fn and fn not in artifact_filenames:
                 artifact_filenames.append(fn)
 
-        # Also search for image filenames in content as fallback
-        found_files = re.findall(r"(?:tarocco|mappa)_[a-zA-Z0-9_]+\.(?:png|jpg|jpeg)", content, re.IGNORECASE)
+        # Also search for filenames in content as fallback
+        found_files = re.findall(r"(?:tarocco|mappa|[a-zA-Z0-9_]+)_[a-zA-Z0-9_]+\.(?:png|jpg|jpeg|txt)", content, re.IGNORECASE)
         for fn in found_files:
             if fn not in artifact_filenames:
                 artifact_filenames.append(fn)
@@ -109,7 +109,10 @@ def _build_transcript(patron_name: str, new_messages: list[dict], start_idx: int
         line = f"- [Msg #{idx} - {speaker}]: {content}"
         if artifact_filenames:
             for fn in artifact_filenames:
-                line += f"\n  [ILLUSTRAZIONE SVELATA: assets/{fn}]"
+                if fn.lower().endswith((".png", ".jpg", ".jpeg")):
+                    line += f"\n  [ILLUSTRAZIONE SVELATA: assets/{fn}]"
+                else:
+                    line += f"\n  [PERGAMENA CONSEGNATA: assets/{fn}]"
 
         transcript_lines.append(line)
 
