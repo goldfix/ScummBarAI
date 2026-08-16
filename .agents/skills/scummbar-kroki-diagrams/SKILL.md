@@ -32,6 +32,8 @@ L'integrazione si basa sull'interfaccia HTTP `GET` con codifica del contenuto tr
    - Compressione **deflate a livello 9** (massima).
    - **Base64 URL-safe** (`+` → `-`, `/` → `_`).
    - Opzioni aggiuntive passabili come **query parameter** (`?key=value`, es. `?theme=dark`).
+4. **Stile Linee Ortogonali (Angoli Retti)**:
+   Nei diagrammi `c4plantuml` e `plantuml`, includere sempre `skinparam linetype ortho` per generare connessioni pulite a 90° (linee ortogonali spezzate ad angoli retti) anziché linee curve/splines.
 
 ---
 

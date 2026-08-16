@@ -59,11 +59,11 @@ _NARRATOR_NOTE_PATTERN = re.compile(r"\n*\[NOTA DI SISTEMA:[^\]]*\]")
 
 def _render_diary_html(diary_markdown: str, assets_dir: Path) -> str:
     """
-    Converts local relative Markdown image links ![alt](assets/filename) or ![alt](filename)
-    into base64 Data URIs on-the-fly, and rewrites text links [text](assets/file.txt)
-    so the browser can access and display them in Streamlit.
+    Converts local relative Markdown image links and text scroll links into
+    browser-renderable HTML elements (Base64 Data URIs, inline preview cards, and download buttons).
     """
     import base64
+    import html
 
     # 1. Replace Images with Base64 Data URIs for browser rendering
     def _replace_image(match: re.Match) -> str:
@@ -82,6 +82,30 @@ def _render_diary_html(diary_markdown: str, assets_dir: Path) -> str:
             )
         return match.group(0)
 
+    # 2. Replace Text Scrolls (.txt) with styled preview cards and instant download links
+    def _replace_text_file(match: re.Match) -> str:
+        link_title = match.group(1)
+        filename = Path(match.group(2)).name
+        file_path = assets_dir / filename
+        if file_path.exists():
+            text_bytes = file_path.read_bytes()
+            b64_data = base64.b64encode(text_bytes).decode("utf-8")
+            data_uri = f"data:text/plain;charset=utf-8;base64,{b64_data}"
+            escaped_content = html.escape(text_bytes.decode("utf-8", errors="replace"))
+            return (
+                f'<div style="background-color: #f8f9fa; border: 1px solid #ced4da; border-left: 4px solid #f39c12; '
+                f'border-radius: 6px; padding: 12px 16px; margin: 14px 0; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">'
+                f'<strong style="color: #2c3e50; font-size: 1em;">{link_title}</strong>'
+                f'<a href="{data_uri}" download="{filename}" style="background-color: #34495e; color: #ffffff !important; '
+                f'text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">💾 Scarica {filename}</a>'
+                f'</div>'
+                f'<pre style="background-color: #ffffff; border: 1px solid #e9ecef; color: #212529; padding: 10px; border-radius: 4px; '
+                f'font-size: 0.88em; white-space: pre-wrap; font-family: monospace; margin: 0; max-height: 250px; overflow-y: auto;">{escaped_content}</pre>'
+                f'</div>'
+            )
+        return match.group(0)
+
     rendered = re.sub(
         r"!\[(.*?)\]\((?:assets/)?([^\)]+\.(?:jpg|jpeg|png|webp))\)",
         _replace_image,
@@ -89,10 +113,9 @@ def _render_diary_html(diary_markdown: str, assets_dir: Path) -> str:
         flags=re.IGNORECASE,
     )
 
-    # 2. Rewrite text file links [text](assets/file.txt) or [text](file.txt)
     rendered = re.sub(
         r"\[(.*?)\]\((?:assets/)?([^\)]+\.txt)\)",
-        r"[\1](data/scummbar_chat/diaries/assets/\2)",
+        _replace_text_file,
         rendered,
         flags=re.IGNORECASE,
     )
