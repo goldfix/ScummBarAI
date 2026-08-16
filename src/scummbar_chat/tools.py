@@ -7,7 +7,6 @@ Operations:
 """
 
 import logging
-import os
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,7 +15,7 @@ import google.genai.types as types
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 
-from .utils import SESSION_DB_URI, get_gemini_client_kwargs
+from .utils import ASSETS_DIR, IMAGE_MODEL, IMAGE_THINKING_LEVEL, SESSION_DB_URI, get_gemini_client_kwargs
 
 log = logging.getLogger(__name__)
 
@@ -141,10 +140,17 @@ async def write_secret_scroll(tool_context: ToolContext, title: str, content: st
     safe_title = "".join(c if c.isalnum() else "_" for c in title.strip().lower())
     filename = f"{safe_title}.txt"
 
+    # Save the text scroll directly to the diaries assets folder for persistence
+    try:
+        (ASSETS_DIR / filename).write_bytes(file_bytes)
+        log.info("Secret scroll saved to diaries assets: %s", ASSETS_DIR / filename)
+    except Exception as e:
+        log.warning("Impossibile salvare la pergamena in diaries assets: %s", e)
+
     try:
         # InMemoryArtifactService handles storage under the session/user namespace
         version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
-        return f"Pergamena {filename} (versione {version}) scritta e arrotolata con successo! Il cliente la riceverà a breve."
+        return f"Pergamena '{title}' (versione {version}) scritta e arrotolata con successo! (Salvata come {filename})."
     except Exception as e:
         log.error("Errore salvataggio artifact in write_secret_scroll: %s", e)
         return "La penna si è rotta e l'inchiostro si è sparso! Non sono riuscito a scrivere la pergamena."
@@ -170,7 +176,7 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     for sx, sy in [(25, 25), (width - 35, 25), (25, height - 35), (width - 35, height - 35)]:
         draw.text((sx, sy), "*", fill="#c5a059", font=font)
 
-    # Glifo mistico al centro
+    # Mystic glyph at the center
     cx, cy = width // 2, height // 2 - 20
     r = 80
     for i in range(8):
@@ -183,11 +189,11 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
 
     draw.ellipse([(cx - r // 2, cy - r // 2), (cx + r // 2, cy + r // 2)], outline="#c5a059", width=2)
 
-    # Onde marittime stilizzate all'interno del glifo centrale
+    # Stylized maritime waves inside the central glyph
     draw.arc([(cx - r // 3, cy + r // 8), (cx, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
     draw.arc([(cx, cy + r // 8), (cx + r // 3, cy + r // 2)], start=0, end=180, fill="#7d6c54", width=1)
 
-    # Luna crescente stilizzata in alto a sinistra del glifo
+    # Stylized crescent moon at the top-left of the glyph
     draw.arc([(cx - r // 2, cy - r // 2), (cx - r // 4, cy - r // 4)], start=90, end=270, fill="#c5a059", width=1)
 
     draw.ellipse([(cx - 10, cy - 10), (cx + 10, cy + 10)], fill="#c5a059")
@@ -224,7 +230,7 @@ async def draw_tarot_card(
     from google import genai
 
     # Retrieve the configured image model
-    image_model = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
+    image_model = IMAGE_MODEL
 
     log.info("Isolde draws tarot card: %s (%s)", card_name, scene_description)
 
@@ -240,7 +246,7 @@ async def draw_tarot_card(
             "Hand-drawn 2d pirate cartoon style, esoteric gold borders, dark parchment paper texture."
         )
 
-        # Use the modern Gemini 3.1 Flash Image API to generate native images
+        # Use the modern Gemini 3.1 Flash Image API to generate native images with configured thinking level
         response = client.models.generate_content(
             model=image_model,
             contents=tarot_prompt,
@@ -249,6 +255,10 @@ async def draw_tarot_card(
                 image_config=types.ImageConfig(
                     aspect_ratio="1:1",
                     image_size="1K",
+                ),
+                thinking_config=types.ThinkingConfig(
+                    thinking_level=IMAGE_THINKING_LEVEL,
+                    include_thoughts=False,
                 ),
             ),
         )
@@ -280,10 +290,188 @@ async def draw_tarot_card(
     safe_title = "".join(c if c.isalnum() else "_" for c in card_name.strip().lower())
     filename = f"tarocco_{safe_title}.{file_ext}"
 
+    # Save the image directly to the diaries assets folder for the Captain's Log
+    try:
+        (ASSETS_DIR / filename).write_bytes(img_bytes)
+        log.info("Tarot card saved to diaries assets: %s", ASSETS_DIR / filename)
+    except Exception as e:
+        log.warning("Impossibile salvare il tarocco in diaries assets: %s", e)
+
     # Save the artifact to the current ADK session
     version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
 
     return f"La carta '{card_name}' è stata svelata sul tavolo! L'immagine è ora visibile all'avventore (Salvata come {filename}, v{version})."
+
+
+def _draw_nautical_map_fallback(archipelago_name: str, map_details: str = "") -> bytes:
+    """Generates a stylized in-character nautical map PNG using PIL (4:3 aspect ratio)."""
+    import io
+    import math
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    width, height = 800, 600
+    img = Image.new("RGB", (width, height), color="#e8dcbf")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+
+    # Vintage parchment double border
+    draw.rectangle([(15, 15), (width - 15, height - 15)], outline="#4a3b2c", width=3)
+    draw.rectangle([(22, 22), (width - 22, height - 22)], outline="#8a735c", width=1)
+
+    # Decorative corner markers
+    for cx, cy in [(30, 30), (width - 30, 30), (25, height - 30), (width - 30, height - 30)]:
+        draw.text((cx, cy), "+", fill="#4a3b2c", font=font)
+
+    # Landmasses / Islands (organic shapes)
+    islands = [
+        [(150, 180), (240, 140), (320, 200), (290, 320), (200, 340), (140, 260)],  # Main island
+        [(420, 280), (480, 250), (510, 300), (460, 340)],  # Eastern island
+        [(280, 420), (340, 390), (360, 450), (300, 470)],  # Southern isle
+        [(520, 160), (560, 140), (580, 180), (540, 200)],  # Northeast atoll
+    ]
+    for isl in islands:
+        draw.polygon(isl, fill="#cfbe9b", outline="#5c4a38")
+
+    # Mountains on main island
+    for mx, my in [(200, 220), (230, 200), (260, 240), (220, 270)]:
+        draw.polygon([(mx, my - 15), (mx - 12, my + 10), (mx + 12, my + 10)], outline="#4a3b2c", fill="#bda884")
+
+    # Sea Waves (hatching)
+    for wx, wy in [(80, 100), (380, 120), (620, 280), (120, 480), (600, 460)]:
+        draw.arc([(wx, wy), (wx + 30, wy + 10)], start=0, end=180, fill="#9e8c74", width=1)
+        draw.arc([(wx + 25, wy), (wx + 55, wy + 10)], start=0, end=180, fill="#9e8c74", width=1)
+
+    # Compass Rose at bottom-right
+    rx, ry, r = 680, 480, 45
+    for i in range(8):
+        angle_rad = i * (math.pi / 4)
+        x1 = rx + int(r * math.cos(angle_rad))
+        y1 = ry + int(r * math.sin(angle_rad))
+        col = "#8c2d19" if i % 2 == 0 else "#5a4530"
+        draw.line([(rx, ry), (x1, y1)], fill=col, width=2)
+    draw.ellipse([(rx - 6, ry - 6), (rx + 6, ry + 6)], fill="#4a3b2c")
+    draw.text((rx - 3, ry - r - 12), "N", fill="#8c2d19", font=font)
+    draw.text((rx + r + 5, ry - 4), "E", fill="#5a4530", font=font)
+    draw.text((rx - 3, ry + r + 3), "S", fill="#5a4530", font=font)
+    draw.text((rx - r - 12, ry - 4), "W", fill="#5a4530", font=font)
+
+    # Red dashed navigation route & Treasure Xs
+    route_points = [(80, 280), (160, 250), (270, 280), (380, 360), (450, 310), (550, 180)]
+    for i in range(len(route_points) - 1):
+        p1, p2 = route_points[i], route_points[i + 1]
+        draw.line([p1, p2], fill="#b32d20", width=2)
+
+    # Treasure X marks
+    for tx, ty, label in [(270, 280, "Cripta del Re"), (550, 180, "Tesoro Perduto")]:
+        draw.text((tx - 4, ty - 6), "X", fill="#b32d20", font=font)
+        draw.text((tx + 8, ty - 4), label, fill="#8c2d19", font=font)
+
+    # Sea Monster & Danger zones
+    draw.text((460, 420), "~ KRAKEN TRENCH ~", fill="#6e5b47", font=font)
+    draw.text((100, 400), "! MAELSTROM !", fill="#8c2d19", font=font)
+
+    # Title Cartouche banner at top-left
+    title = f"CHARTA NAUTICA: {archipelago_name.upper()}"
+    draw.rectangle([(40, 35), (420, 75)], outline="#4a3b2c", width=2, fill="#ded0b2")
+    draw.text((55, 48), title, fill="#3b2c1e", font=font)
+
+    # Subtitle at bottom
+    sub = "REGISTRATA DALL'ASTROLABIO DI BALTHAZAR - SCUMMBAR"
+    draw.text((45, height - 38), sub, fill="#7a6652", font=font)
+
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
+
+
+async def draw_nautical_map(
+    tool_context: ToolContext,
+    archipelago_name: str,
+    map_details: str = "",
+) -> str:
+    """
+    Usa questo strumento ESCLUSIVAMENTE per srotolare e illustrare una mappa nautica cartografica di un arcipelago o isola per l'avventore.
+    - archipelago_name: Nome dell'arcipelago, isola o regione marina (es. 'Arcipelago dei Denti di Drago', 'Isole della Nebbia', 'Isola del Teschio').
+    - map_details: Dettagli facoltativi su rotte, pericoli o cripte/tesori specifici richiesti dall'avventore o descritti da Balthazar.
+    """
+    from google import genai
+
+    image_model = IMAGE_MODEL
+    log.info("Balthazar draws nautical map: %s (details: %s)", archipelago_name, map_details)
+
+    img_bytes = None
+
+    try:
+        # Initialize Google GenAI Client with dedicated image credentials
+        client = genai.Client(**get_gemini_client_kwargs(prefix="IMAGE_"))
+
+        map_prompt = (
+            f"Antique pirate treasure map and celestial nautical chart of {archipelago_name}, drafted by the master navigator Balthazar, "
+            "highly detailed hand-drawn ink engraving on heavily aged, stained, and burnt tattered parchment paper. "
+            "Multi-island archipelago layout with jagged coastlines, shaded mountains, and dense jungles. "
+            "Fine astronomical charting symbols, celestial constellations, brass astrolabe sketches, and engraved rhumb lines. "
+            "Red dashed navigation route winding through dangerous waters, marked with distinct red 'X' spots for buried vaults. "
+            "Filled with vintage nautical illustrations: a giant kraken attacking a Spanish galleon, sea serpents, sirens, "
+            "swirling whirlpools, and pirate raid warning markers. Features an ornate compass rose with gold accents, "
+            "oriental-baroque cartouche calligraphy, water stains, rum spots, and historical maritime symbols, "
+            f"masterwork line art, 8k, authentic 17th-century aesthetic. {map_details}".strip()
+        )
+
+        # Use the modern Gemini Flash Image API with 4:3 aspect ratio and configured thinking level
+        response = client.models.generate_content(
+            model=image_model,
+            contents=map_prompt,
+            config=types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+                image_config=types.ImageConfig(
+                    aspect_ratio="4:3",
+                    image_size="1K",
+                ),
+                thinking_config=types.ThinkingConfig(
+                    thinking_level=IMAGE_THINKING_LEVEL,
+                    include_thoughts=False,
+                ),
+            ),
+        )
+        for part in response.candidates[0].content.parts:
+            if part.inline_data and part.inline_data.data:
+                img_bytes = part.inline_data.data
+                log.info("Nautical map generated successfully via Gemini multimodal generate_content.")
+                break
+
+    except Exception as e:
+        log.warning("Errore generazione mappa nautica AI: %s. Attivazione fallback PIL.", e)
+        img_bytes = _draw_nautical_map_fallback(archipelago_name, map_details)
+
+    if img_bytes.startswith(b"\x89PNG"):
+        file_ext = "png"
+        mime_type = "image/png"
+    elif img_bytes.startswith(b"\xff\xd8"):
+        file_ext = "jpg"
+        mime_type = "image/jpeg"
+    else:
+        file_ext = "png"
+        mime_type = "image/png"
+
+    artifact_part = types.Part.from_bytes(data=img_bytes, mime_type=mime_type)
+
+    safe_title = "".join(c if c.isalnum() else "_" for c in archipelago_name.strip().lower())
+    filename = f"mappa_{safe_title}.{file_ext}"
+
+    # Save the image directly to the diaries assets folder for the Captain's Log
+    try:
+        (ASSETS_DIR / filename).write_bytes(img_bytes)
+        log.info("Nautical map saved to diaries assets: %s", ASSETS_DIR / filename)
+    except Exception as e:
+        log.warning("Impossibile salvare la mappa in diaries assets: %s", e)
+
+    version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
+
+    return (
+        f"La mappa nautica di '{archipelago_name}' è stata srotolata e incisa sul tavolo da carteggio! "
+        f"L'illustrazione è ora visibile all'avventore (Salvata come {filename}, v{version})."
+    )
 
 
 async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_italiana") -> dict:
@@ -418,9 +606,10 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
         }
 
 
-# Esportazione degli strumenti ADK
+# Export ADK tools
 recall_patron_tool = FunctionTool(recall_patron_memory)
 memorize_patron_tool = FunctionTool(memorize_patron_chat)
 write_secret_scroll_tool = FunctionTool(write_secret_scroll)
 draw_tarot_card_tool = FunctionTool(draw_tarot_card)
+draw_nautical_map_tool = FunctionTool(draw_nautical_map)
 fetch_news_feed_tool = FunctionTool(fetch_news_feed)

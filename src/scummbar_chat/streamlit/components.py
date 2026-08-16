@@ -126,46 +126,79 @@ def render_sidebar() -> dict:
 
     # 3. Session Controls
     st.sidebar.subheader("🛠️ Gestione Partita")
-    if st.sidebar.button("🧹 Pulisci Cronologia Chat", use_container_width=True):
-        # Artifacts live inside messages[i]["artifacts"], so clearing messages is enough.
-        st.session_state.messages = []
-        st.rerun()
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.sidebar.button("🔄 Ricarica da DB", help="Ricarica l'intera cronologia dal database", use_container_width=True):
+            st.session_state["current_patron_name"] = None
+            st.rerun()
+    with col2:
+        if st.sidebar.button("🧹 Svuota Vista", help="Azzera la vista chat temporanea", use_container_width=True):
+            st.session_state.messages = []
+            st.rerun()
 
     return {
         "patron_name": patron_name,
     }
 
 
-def render_artifacts(artifacts: list[dict]) -> None:
+def render_artifacts(artifacts: list) -> None:
     """
-    Renders artifacts (secret scrolls, tarot images, portolans) returned by ADK agents.
-    - Text files (.txt): Shown in expanders with a download button.
-    - Images (.png/.jpg): Rendered using st.image().
+    Renders generated assets (images, text scrolls) directly from the disk storage
+    (data/scummbar_chat/diaries/assets/<filename>).
+    - Images (.png/.jpg/.jpeg): Rendered using st.image with responsive container width.
+    - Text files (.txt): Rendered in an expander with formatted code block and download button.
     """
     if not artifacts:
         return
 
+    from pathlib import Path
+
+    from ..utils import ASSETS_DIR
+
     for artifact in artifacts:
-        filename = artifact.get("filename", "artefatto.txt")
-        data = artifact.get("bytes", b"")
-
-        # Handle Images (e.g. Tarot cards or generated artwork)
-        # Note: use_container_width is deprecated in Streamlit >= 1.4x; use width="stretch".
-        if filename.lower().endswith((".png", ".jpg", ".jpeg")):
-            st.image(data, caption=f"🖼️ {filename}", width="stretch")
+        # Extract filename from string or dictionary descriptor
+        if isinstance(artifact, str):
+            filename = Path(artifact).name
+        elif isinstance(artifact, dict):
+            filename = artifact.get("filename", "")
         else:
-            # Handle Text Artifacts (Scrolls, recipes, portolans)
-            try:
-                text_content = data.decode("utf-8")
-            except UnicodeDecodeError:
-                text_content = "[Contenuto binario non decodificabile]"
+            continue
 
-            with st.expander(f"📜 Pergamena Ricevuta: {filename}", expanded=True):
-                st.code(text_content, language="markdown")
+        if not filename:
+            continue
+
+        file_path = ASSETS_DIR / filename
+        if not file_path.exists():
+            continue
+
+        # 1. Image Artifacts (Mappe nautiche, Carte dei Tarocchi)
+        if filename.lower().endswith((".png", ".jpg", ".jpeg")):
+            try:
+                img_bytes = file_path.read_bytes()
+                st.image(img_bytes, caption=f"🖼️ {filename}", width="stretch")
                 st.download_button(
                     label=f"💾 Scarica {filename}",
-                    data=data,
+                    data=img_bytes,
                     file_name=filename,
-                    mime="text/plain",
-                    key=f"dl_{filename}_{hash(data)}",
+                    mime="image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png",
+                    key=f"dl_img_{filename}_{file_path.stat().st_mtime}",
                 )
+            except Exception as e:
+                st.warning(f"Impossibile visualizzare l'immagine {filename}: {e}")
+
+        # 2. Text Artifacts (Pergamene, Ricette di Grog, Portolani .txt)
+        else:
+            try:
+                text_bytes = file_path.read_bytes()
+                text_content = text_bytes.decode("utf-8", errors="replace")
+                with st.expander(f"📜 Pergamena Ricevuta: {filename}", expanded=True):
+                    st.code(text_content, language="markdown")
+                    st.download_button(
+                        label=f"💾 Scarica {filename}",
+                        data=text_bytes,
+                        file_name=filename,
+                        mime="text/plain",
+                        key=f"dl_txt_{filename}_{file_path.stat().st_mtime}",
+                    )
+            except Exception as e:
+                st.warning(f"Impossibile leggere la pergamena {filename}: {e}")

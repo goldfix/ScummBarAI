@@ -32,6 +32,7 @@ CONTEXT_CACHE_TTL_SECONDS: int = int(os.getenv("CONTEXT_CACHE_TTL_SECONDS", "600
 CONTEXT_CACHE_INTERVALS: int = int(os.getenv("CONTEXT_CACHE_INTERVALS", "5"))
 
 IMAGE_MODEL: str = os.getenv("IMAGE_MODEL", "gemini-3.1-flash-lite-image")
+IMAGE_THINKING_LEVEL: str = os.getenv("IMAGE_THINKING_LEVEL", "high").strip().lower()
 
 
 def get_gemini_client_kwargs(prefix: str = "") -> dict:
@@ -165,6 +166,10 @@ BOTS_DIR = CHAT_DIR / "bots"
 _DB_PATH = CHAT_DIR.parent.parent / "data" / "scummbar_chat" / "sessions.db"
 _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 SESSION_DB_URI: str = f"sqlite+aiosqlite:///{_DB_PATH}"
+
+# --- Asset Storage Directory (Single source of truth for generated images & text scrolls) ---
+ASSETS_DIR = CHAT_DIR.parent.parent / "data" / "scummbar_chat" / "diaries" / "assets"
+ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- Context Compaction configuration ---
 # COMPACTION_MODEL, COMPACTION_INTERVAL, COMPACTION_OVERLAP already defined above.

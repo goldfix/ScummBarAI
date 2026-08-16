@@ -29,7 +29,7 @@ scummbar/
 │       ├── agent.py                   # root agent + InstructionProvider temporale
 │       ├── utils.py                   # config condivisa, model factory, load_md(), load_all_skills()
 │       ├── time_context.py            # mappatura orario reale → momento del giorno
-│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, fetch_news_feed
+│       ├── tools.py                   # FunctionTool: recall, memorize, write_secret_scroll, draw_tarot_card, draw_nautical_map, fetch_news_feed
 │       ├── diary.py                   # 📜 Diario di Bordo (Captain's Log) incrementale in prima persona (via Chronicler)
 │       ├── .env                       # config ambiente (NON committare)
 │       ├── world/                     # scummbar.md (world context + regole narrazione)
@@ -39,6 +39,10 @@ scummbar/
 │       └── streamlit/                 # 🎮 Frontend Web Streamlit (app.py, components.py)
 ├── data/                              # Dati e log persistenti
 │   └── scummbar_chat/                 # Dati ADK / Telegram / Streamlit (sessions.db + diaries/ + logs/)
+│       ├── sessions.db                # Database sessioni SQLite (ADK)
+│       ├── diaries/                   # 📜 Diari di bordo (Diary_Nome.md)
+│       │   └── assets/                #    Assets generati (mappe, tarocchi, pergamene .txt)
+│       └── logs/                      # bot.log + errors.log (rotativi)
 ├── start.sh                           # avvio ADK web con persistenza SQLite
 ├── start_streamlit.sh                 # avvio frontend Streamlit Web RPG Single-Player
 ├── py_env.sh                          # setup ambiente Python (venv + uv)
@@ -134,7 +138,7 @@ root_agent  (scummbar_chat)
     ├── barnaby   → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll]
     ├── barnacle  → persona.md + tools=[SkillToolset, recall] (read-only)
     ├── isolde    → persona.md + tools=[recall, draw_tarot_card]
-    ├── balthazar → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll, fetch_news_feed]
+    ├── balthazar → persona.md + tools=[SkillToolset, recall, memorize, write_secret_scroll, draw_nautical_map, consult_barnaby (AgentTool), consult_barnacle (AgentTool), fetch_news_feed]
     └── chronicler → persona.md (agente scriba dedicato alla redazione del Diario di Bordo)
 ```
 
@@ -439,7 +443,7 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Logging verboso + error export | ✅ | `--debug`, `bot.log`, `errors.log`, `_dump_exception()` |
 | Generatore Diagrammi Kroki (`scummbar-kroki-diagrams`) | ✅ | Skill Pi-Agent in `.agents/skills/scummbar-kroki-diagrams/` con script `kroki_generator.py` (C4-PlantUML default, zlib+Base64 URL-safe) per la generazione di diagrammi per documentazione e README |
 | Webhook Telegram (vs long polling) | 🔲 | Per deployment su server pubblico |
-| Importazione Documentazione (Pydantic, FastAPI, HTTPX, DeepSeek, ADK, Streamlit, Kroki, UV, Ruff) | ✅ | docs/ indicizzati nel RAG (897 documenti, 14.881 chunk in `.md`, `.adoc`, `.yaml`, ecc.) |
+| Importazione Documentazione (Pydantic, FastAPI, HTTPX, DeepSeek, ADK, Streamlit, Kroki, UV, Ruff) | ✅ | docs/ indicizzati nel RAG (908 documenti, 15.430 chunk in `.md`, `.adoc`, `.yaml`, ecc.) |
 | Supporto duale autenticazione (Service Account ↔ API Key) | ✅ | Permettere al bot di funzionare in modo flessibile sia con Service Account GCP che con classica GEMINI_API_KEY per tutti i modelli (conversazione, compaction, tools) |
 | Autenticazione Gemini via Service Account | ✅ | `.env` + `GOOGLE_APPLICATION_CREDENTIALS`; pre-flight check in `telegram_bot.py` |
 | Reorganizzazione docs AI (`AGENTS.md` + `MEMORY.md`) | ✅ | `CLAUDE.md` sostituito; memoria e istruzioni separate |
@@ -846,22 +850,40 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ## 📋 Log delle Sessioni di Lavoro
 
-### 2026-08-15 — Refactoring Balthazar (Feed Politica IT/USA & Ordinamento Cronologico) e Diario
+### 2026-08-15 — Mappe Nautiche Multimodali per Balthazar, Collaborazione Infra-Agent (AgentTool) & Isolamento Thinking
 
-**Obiettivo**: Riorganizzare il funzionamento dell'agente Balthazar restringendo i feed informativi alle sole notizie di Politica Italiana ed Americana ed introducendo l'ordinamento cronologico rigoroso per data di pubblicazione (`pubDate`).
+**Obiettivo**: Dotare l'agente Balthazar ("Il Navigatore") della capacità di generare mappe nautiche vintage di arcipelaghi pirateschi tramite il modello di generazione immagini, implementare la collaborazione infra-agent (AgentTool) con Barnaby e Barnacle per arricchire le mappe prima del disegno, isolare la configurazione di thinking per le immagini in `.env` e perfezionare le regole di sistema.
 
 **Attività svolte**:
-- **Refactoring Tool `fetch_news_feed` (`src/scummbar_chat/tools.py`)**:
-  - Rimosse completamente le categorie e i feed su tecnologia/gadget (HDBlog, ANSA tecnologia).
-  - Ristretto l'ambito a 2 sole categorie: **Politica Italiana** (`https://www.ansa.it/sito/notizie/politica/politica_rss.xml`) e **Politica Americana** (`Google News USA in italiano` con query mirata per politica, Casa Bianca, Trump, governo USA).
-  - **Ordinamento cronologico decrescente**: parsing rigoroso di `<pubDate>` con `email.utils.parsedate_to_datetime`, ordinamento per data decrescente e restituzione delle sole 3 notizie più fresche in assoluto, complete di orario e link sorgente HTML.
-- **Aggiornamento Prompt & Intent Routing**:
-  - Aggiornato `bots/balthazar/persona.md`: eliminati tutti i riferimenti alla tecnologia (Mela d'Oro, gadget, AI) focalizzando la comicità teatrale sui bisticci del *Ducato d'Italia* e del *Grande Impero d'Oltreoceano*.
-  - Aggiornati `_COORDINATOR_INSTRUCTION` in `agent.py` e `_INTENT_MAP` in `telegram/adapter.py` (aggiunte keyword politiche).
-- **Refactoring Diario di Bordo**:
-  - Disaccoppiata la gestione del diario dai bot di conversazione (rimosso `update_tavern_diary_tool`) ed affidata all'agente dedicato `chronicler` (`bots/chronicler/`).
-  - Aggiornato `assets/core_overview_diagram.svg` (C4-PlantUML).
-- **Verifica**: Testati con successo il parsing e l'ordinamento RSS delle notizie live ANSA e Google News USA.
+- **Collaborazione Infra-Agent (`AgentTool`) (`bots/balthazar/agent.py`)**:
+  - Implementati due consulenti single-turn incapsulati con `AgentTool`:
+    - `consult_barnaby`: interpella Barnaby per ottenere dicerie da bancone, covi di contrabbandieri e leggende di pirati.
+    - `consult_barnacle`: interpella il gatto Barnacle per ottenere istinti felini, soffi di allerta e indicazioni su scogli o banchi di pesci.
+  - Vincolo single-turn anti-loop: Balthazar può consultare ciascun compagno al massimo 1 volta per richiesta, raccogliere i suggerimenti, citarli esplicitamente nella chat con l'avventore in modo colloquiale/epico e integrarli nel parametro `map_details` di `draw_nautical_map`.
+- **Centralizzazione e Isolamento Thinking Immagini (`.env` / `utils.py`)**:
+  - Aggiunta in Sezione 4 di `.env` della variabile dedicata `IMAGE_THINKING_LEVEL=high`, mantenendo `LLM_THINKING_LEVEL=medium` per la sola chat.
+  - Esportata `IMAGE_THINKING_LEVEL` in `utils.py` e integrata nel `types.GenerateContentConfig(thinking_config=...)` delle chiamate di generazione visiva.
+- **File Prompt & Template Dedicato Mappe (`bots/balthazar/map_prompt.md`)**:
+  - Creato file dedicato con i requisiti grafici da mastro cartografo del XVII-XVIII secolo (pergamena brunita/bruciata, incisione vintage a tratteggio, tonalità seppia/oro/carbone e accenti scarlatti per rotte/"X" dei tesori).
+  - Incluso template di prompt per `IMAGE_MODEL` strutturato in 5 sezioni (Cartiglio, Geografia arcipelago, Navigazione/Tesori, Mostri/Pericoli marini, Rosa dei venti/Accessori marginali).
+- **Nuovo Tool `draw_nautical_map` (`src/scummbar_chat/tools.py`)**:
+  - Implementata funzione asincrona `draw_nautical_map(tool_context, archipelago_name, map_details)` collegata a `IMAGE_MODEL` via `get_gemini_client_kwargs(prefix="IMAGE_")` con aspect ratio `4:3` (1200x896) e `IMAGE_THINKING_LEVEL`.
+  - Implementato generatore di fallback in PIL `_draw_nautical_map_fallback` che disegna pergamena, coste/isole, rosa dei venti a 8 punte, rotte tratteggiate rosse e cartiglio.
+  - Registrazione automatica dell'immagine come artifact di sessione (`mappa_{safe_title}.jpg/png`).
+- **Aggiornamento Agente Balthazar & Persona (`bots/balthazar/`)**:
+  - Registrati `draw_nautical_map_tool`, `consult_barnaby_tool` e `consult_barnacle_tool` nella lista strumenti di `balthazar_agent`.
+  - Aggiunta regola 6 nel system prompt `persona.md` che impone il compenso in grog e la narrazione dei consigli ricevuti dai compagni.
+- **Refactoring Feed Notizie Live**:
+  - Ristretto `fetch_news_feed` alle sole categorie **Politica Italiana** (ANSA) e **Politica Americana** (Google News USA in italiano).
+  - Ordinamento cronologico decrescente con parsing RFC 822 / ISO `<pubDate>`.
+- **Architettura Unificata Assets su Disco & Link Leggeri (`data/scummbar_chat/diaries/assets/`)**:
+  - `write_secret_scroll`, `draw_tarot_card` e `draw_nautical_map` (`tools.py`) salvano automaticamente tutti i file generati (immagini `.jpg`/`.png` e pergamene/ricette `.txt`) direttamente su disco in `ASSETS_DIR` (`data/scummbar_chat/diaries/assets/<filename>`).
+  - `load_session_chat_history` (`app.py`) ripristina la cronologia associando i descrittori leggeri `{filename, type, path, url}` ai messaggi dell'assistente, caricando i file fisici da disco all'avvio.
+  - `render_artifacts` (`components.py`) mostra l'anteprima responsive delle immagini (`st.image`) e le pergamene in expander (`st.expander` + `st.code`) con relativi pulsanti di download.
+  - `_build_transcript` in `diary.py` annota i riferimenti leggeri (`[ILLUSTRAZIONE: assets/<filename>]` o `[PERGAMENA: assets/<filename>]`), eliminando ogni payload binario o spreco di token.
+  - `chronicler_agent` (`bots/chronicler/persona.md`, Regole 5 e 6) include i link Markdown relativi nel racconto (`![...](assets/filename)` o `[📜 ...](assets/filename.txt)`), commentandoli in prima persona.
+  - Streamlit (`app.py`) converte al volo i link delle immagini in Data URI Base64 e formatta i link dei file `.txt` per la visualizzazione nel browser, mantenendo il file `.md` scaricabile pulito e portabile.
+- **Verifica**: Testati con successo l'orchestrazione collaborativa multi-agente, la generazione JPEG 1200x896 C2PA, il salvataggio unificato degli asset (immagini + pergamene), il ripristino post-riavvio della chat e la redazione del capitolo illustrato.
 
 ---
 
@@ -870,7 +892,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 **Obiettivo**: Creare una nuova skill Pi-Agent `.agents/skills/scummbar-kroki-diagrams/` per generare diagrammi ed infografiche vettoriali a supporto della documentazione e del README tramite Kroki.io (C4-PlantUML di default, zlib deflate + Base64 URL-safe), con supporto al salvataggio locale ed alla localizzazione automatica dei file SVG.
 
 **Attività svolte**:
-- **Estensione RAG per file `.adoc` e codice**: Aggiornato `rag/chunker.py` per riconoscere intestazioni AsciiDoc (`= Title`) e `rag/indexer.py` per indicizzare 37 file in `docs/kroki/` (totale RAG: 897 documenti, 14.881 chunk).
+- **Estensione RAG per file `.adoc` e codice**: Aggiornato `rag/chunker.py` per riconoscere intestazioni AsciiDoc (`= Title`) e `rag/indexer.py` per indicizzare 37 file in `docs/kroki/` (totale RAG: 908 documenti, 15.430 chunk).
 - **Nuova Skill Pi-Agent (`.agents/skills/scummbar-kroki-diagrams/`)**:
   - `SKILL.md`: Documentazione della skill per Pi-Agent, tipi di diagramma supportati, e regole di default (C4-PlantUML).
   - `scripts/kroki_generator.py`: Script CLI Python con codifica `zlib.compress(text, 9)` + `base64.urlsafe_b64encode`. Supporta flag `--type`, `--format`, `--output`, `--markdown`, `--html`, e la modalità `--localize` per scaricare automaticamente tutti gli SVG da un file Markdown e riscrivere i link con percorsi locali relativi.

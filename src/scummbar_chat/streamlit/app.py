@@ -32,7 +32,7 @@ from src.scummbar_chat.streamlit.components import (
 from src.scummbar_chat.telegram.adapter import _resolve_intent
 from src.scummbar_chat.telegram.runner import run_agent
 from src.scummbar_chat.time_context import get_time_description
-from src.scummbar_chat.utils import SESSION_DB_URI
+from src.scummbar_chat.utils import ASSETS_DIR, SESSION_DB_URI
 
 NARRATOR_SYSTEM_PROMPT = (
     "\n\n[NOTA DI SISTEMA: È il momento del Narratore. Alla fine assoluta della tua risposta, "
@@ -57,6 +57,71 @@ _AUGMENT_PREFIX_PATTERN = re.compile(r"^(?:\[[^\]]+\]\s*)+")
 _NARRATOR_NOTE_PATTERN = re.compile(r"\n*\[NOTA DI SISTEMA:[^\]]*\]")
 
 
+def _render_diary_html(diary_markdown: str, assets_dir: Path) -> str:
+    """
+    Converts local relative Markdown image links and text scroll links into
+    browser-renderable HTML elements (Base64 Data URIs, inline preview cards, and download buttons).
+    """
+    import base64
+    import html
+
+    # 1. Replace Images with Base64 Data URIs for browser rendering
+    def _replace_image(match: re.Match) -> str:
+        alt_text = match.group(1)
+        filename = Path(match.group(2)).name
+        file_path = assets_dir / filename
+        if file_path.exists():
+            mime = "image/jpeg" if filename.lower().endswith((".jpg", ".jpeg")) else "image/png"
+            b64_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
+            return (
+                f'<div style="text-align: center; margin: 16px 0;">'
+                f'<img src="data:{mime};base64,{b64_data}" alt="{alt_text}" '
+                f'style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);"><br>'
+                f'<em style="font-size: 0.9em; color: #555;">{alt_text}</em>'
+                f'</div>'
+            )
+        return match.group(0)
+
+    # 2. Replace Text Scrolls (.txt) with styled preview cards and instant download links
+    def _replace_text_file(match: re.Match) -> str:
+        link_title = match.group(1)
+        filename = Path(match.group(2)).name
+        file_path = assets_dir / filename
+        if file_path.exists():
+            text_bytes = file_path.read_bytes()
+            b64_data = base64.b64encode(text_bytes).decode("utf-8")
+            data_uri = f"data:text/plain;charset=utf-8;base64,{b64_data}"
+            escaped_content = html.escape(text_bytes.decode("utf-8", errors="replace"))
+            return (
+                f'<div style="background-color: #f8f9fa; border: 1px solid #ced4da; border-left: 4px solid #f39c12; '
+                f'border-radius: 6px; padding: 12px 16px; margin: 14px 0; box-shadow: 0 2px 6px rgba(0,0,0,0.08);">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">'
+                f'<strong style="color: #2c3e50; font-size: 1em;">{link_title}</strong>'
+                f'<a href="{data_uri}" download="{filename}" style="background-color: #34495e; color: #ffffff !important; '
+                f'text-decoration: none; padding: 4px 10px; border-radius: 4px; font-size: 0.85em; font-weight: bold;">💾 Scarica {filename}</a>'
+                f'</div>'
+                f'<pre style="background-color: #ffffff; border: 1px solid #e9ecef; color: #212529; padding: 10px; border-radius: 4px; '
+                f'font-size: 0.88em; white-space: pre-wrap; font-family: monospace; margin: 0; max-height: 250px; overflow-y: auto;">{escaped_content}</pre>'
+                f'</div>'
+            )
+        return match.group(0)
+
+    rendered = re.sub(
+        r"!\[(.*?)\]\((?:assets/)?([^\)]+\.(?:jpg|jpeg|png|webp))\)",
+        _replace_image,
+        diary_markdown,
+        flags=re.IGNORECASE,
+    )
+
+    rendered = re.sub(
+        r"\[(.*?)\]\((?:assets/)?([^\)]+\.txt)\)",
+        _replace_text_file,
+        rendered,
+        flags=re.IGNORECASE,
+    )
+    return rendered
+
+
 def _get_user_id(patron_name: str) -> str:
     """Generates a stable numerical user_id hash from patron_name for ADK patron_memories."""
     hash_object = hashlib.sha256(patron_name.strip().lower().encode("utf-8"))
@@ -67,7 +132,8 @@ def _get_user_id(patron_name: str) -> str:
 def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
     """
     Queries SQLite 'events' table for historical dialogue events associated
-    with the given user_id and session_id, restoring full past chat history.
+    with the given user_id and session_id, restoring full past chat history
+    alongside any generated artifacts/images.
     """
     db_path = SESSION_DB_URI.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     if not Path(db_path).exists():
@@ -83,17 +149,33 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
             ).fetchall()
 
             messages: list[dict] = []
+            pending_artifacts: list[dict] = []
+
             for r in rows:
                 try:
                     data = json.loads(r["event_data"])
                     content = data.get("content", {})
                     parts = content.get("parts", [])
                     role = content.get("role", "")
+                    author = data.get("author", "barnaby")
 
-                    # Extract plain text from user or assistant turns
+                    # Extract plain text and artifacts from user or assistant turns
                     text_parts: list[str] = []
                     for p in parts:
-                        if "text" in p and not p.get("thought", False):
+                        if "function_response" in p:
+                            fr = p["function_response"]
+                            res = fr.get("response", {})
+                            if isinstance(res, dict) and "result" in res and isinstance(res["result"], str):
+                                for fn in re.findall(r"(?:Salvata come|Pergamena)\s+['\"]?([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg|txt))['\"]?", res["result"], re.IGNORECASE):
+                                    if (ASSETS_DIR / fn).exists() and not any(a.get("filename") == fn for a in pending_artifacts):
+                                        is_img = fn.lower().endswith((".png", ".jpg", ".jpeg"))
+                                        pending_artifacts.append({
+                                            "filename": fn,
+                                            "type": "image" if is_img else "text",
+                                            "path": str(ASSETS_DIR / fn),
+                                            "url": f"assets/{fn}",
+                                        })
+                        elif "text" in p and not p.get("thought", False):
                             text = p["text"]
                             # Clean up internal prompt tags if user message
                             if role == "user" and "[avventore:" in text:
@@ -106,14 +188,29 @@ def load_session_chat_history(user_id: str, session_id: str) -> list[dict]:
                         full_text = "\n".join(text_parts).strip()
                         if full_text and role in ["user", "model", "assistant"]:
                             norm_role = "user" if role == "user" else "assistant"
+                            attached_artifacts = list(pending_artifacts) if norm_role == "assistant" else []
+                            # Fallback scan: check if text itself references any saved artifact filename
+                            if norm_role == "assistant":
+                                for fn in re.findall(r"(?:Salvata come|Pergamena)\s+['\"]?([a-zA-Z0-9_\.]+\.(?:png|jpg|jpeg|txt))['\"]?", full_text, re.IGNORECASE):
+                                    if (ASSETS_DIR / fn).exists() and not any(a.get("filename") == fn for a in attached_artifacts):
+                                        is_img = fn.lower().endswith((".png", ".jpg", ".jpeg"))
+                                        attached_artifacts.append({
+                                            "filename": fn,
+                                            "type": "image" if is_img else "text",
+                                            "path": str(ASSETS_DIR / fn),
+                                            "url": f"assets/{fn}",
+                                        })
+
                             messages.append(
                                 {
                                     "role": norm_role,
                                     "content": full_text,
-                                    "bot_name": "barnaby" if norm_role == "assistant" else None,
-                                    "artifacts": [],
+                                    "bot_name": author if norm_role == "assistant" else None,
+                                    "artifacts": attached_artifacts,
                                 }
                             )
+                            if norm_role == "assistant":
+                                pending_artifacts.clear()
                 except (json.JSONDecodeError, KeyError, TypeError):
                     continue
 
@@ -175,7 +272,7 @@ def main() -> None:
                 }
             ]
 
-    # 4. Main Interface Views: Chat vs Diario di Bordo
+    # 4. Main Interface Views: Chat vs Captain's Log
     # NOTE: st.chat_input must NOT be placed inside st.tabs/st.container/st.expander
     # or it loses its sticky bottom anchoring. We use a segmented control for
     # navigation and render the chat input at top-level so it stays pinned.
@@ -251,13 +348,27 @@ def main() -> None:
                 if artifacts:
                     render_artifacts(artifacts)
 
+            # Convert raw artifacts to clean lightweight link descriptors
+            clean_artifacts = []
+            if artifacts:
+                for a in artifacts:
+                    fn = a.get("filename") if isinstance(a, dict) else str(a)
+                    if fn:
+                        is_img = fn.lower().endswith((".png", ".jpg", ".jpeg"))
+                        clean_artifacts.append({
+                            "filename": fn,
+                            "type": "image" if is_img else "text",
+                            "path": str(ASSETS_DIR / fn),
+                            "url": f"assets/{fn}",
+                        })
+
             # Save response to session state
             st.session_state.messages.append(
                 {
                     "role": "assistant",
                     "content": response_text,
                     "bot_name": detected_bot or "barnaby",
-                    "artifacts": artifacts,
+                    "artifacts": clean_artifacts,
                 }
             )
 
@@ -271,7 +382,7 @@ def main() -> None:
                     st.toast("📜 Il tuo Diario di Bordo si è arricchito di un nuovo capitolo!", icon="📜")
 
     else:
-        # Diario di Bordo view
+        # Captain's Log view
         st.subheader(f"📜 Il Diario di Bordo di {patron_name}")
 
         file_path = get_diary_file_path(patron_name)
@@ -304,7 +415,9 @@ def main() -> None:
                 mime="text/markdown",
             )
             st.markdown("---")
-            st.markdown(diary_content)
+            # Resolve relative 'assets/' into base64 Data URIs on-the-fly for instant browser rendering
+            rendered_diary = _render_diary_html(diary_content, ASSETS_DIR)
+            st.markdown(rendered_diary, unsafe_allow_html=True)
         else:
             st.info(
                 "📜 *Il tuo diario di bordo è ancora intonso.* "
