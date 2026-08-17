@@ -48,13 +48,20 @@ The repository is intentionally structured **didactically**: every architectural
       - [F. Segmented Control Navigation](#f-segmented-control-navigation)
       - [G. Multi-Process Concurrency \& WAL](#g-multi-process-concurrency--wal)
     - [6.3 Narrative \& Action Styling (3 Tiers)](#63-narrative--action-styling-3-tiers)
+  - [🔬 Observability: Logging, Metrics \& Tracing](#-observability-logging-metrics--tracing)
+    - [7.1 Telemetry Architecture Overview](#71-telemetry-architecture-overview)
+    - [7.2 Logging — Structured Lifecycle Logs](#72-logging--structured-lifecycle-logs)
+    - [7.3 Metrics — Performance \& Latency](#73-metrics--performance--latency)
+    - [7.4 Tracing — OpenTelemetry Waterfall Spans](#74-tracing--opentelemetry-waterfall-spans)
+    - [7.5 The Streamlit Observability Cockpit](#75-the-streamlit-observability-cockpit)
+    - [7.6 Telemetry Data Storage](#76-telemetry-data-storage)
   - [🤖 Pi-Agent: AI-Assisted Development \& System Skills](#-pi-agent-ai-assisted-development--system-skills)
-    - [7.1 What is a Pi-Agent Skill (Progressive Disclosure)](#71-what-is-a-pi-agent-skill-progressive-disclosure)
-    - [7.2 scummbar-docs-analyzer (Hybrid RAG)](#72-scummbar-docs-analyzer-hybrid-rag)
-    - [7.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)](#73-scummbar-memory-updater-memoryreadmeagents-management)
-    - [7.4 scummbar-web-to-markdown (Docs Import)](#74-scummbar-web-to-markdown-docs-import)
-    - [7.5 scummbar-kroki-diagrams (Kroki Diagram Generator)](#75-scummbar-kroki-diagrams-kroki-diagram-generator)
-    - [7.6 How to Use the Autopilot](#76-how-to-use-the-autopilot)
+    - [8.1 What is a Pi-Agent Skill (Progressive Disclosure)](#81-what-is-a-pi-agent-skill-progressive-disclosure)
+    - [8.2 scummbar-docs-analyzer (Hybrid RAG)](#82-scummbar-docs-analyzer-hybrid-rag)
+    - [8.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)](#83-scummbar-memory-updater-memoryreadmeagents-management)
+    - [8.4 scummbar-web-to-markdown (Docs Import)](#84-scummbar-web-to-markdown-docs-import)
+    - [8.5 scummbar-kroki-diagrams (Kroki Diagram Generator)](#85-scummbar-kroki-diagrams-kroki-diagram-generator)
+    - [8.6 How to Use the Autopilot](#86-how-to-use-the-autopilot)
   - [🧭 Project Structure](#-project-structure)
   - [⚙️ Environment Configuration (.env)](#️-environment-configuration-env)
 
@@ -77,6 +84,7 @@ The main goals are:
 | **Multi-Frontend** | Same shared ADK core, two frontends: **Telegram** (multi-player group) and **Streamlit** (single-player RPG) |
 | **Persistence & Compaction** | Shared SQLite WAL + automatic LLM compaction of long sessions |
 | **Persistent Storytelling** | The **Captain's Log** turns the chat into a first-person tale, updated incrementally |
+| **Observability** | Local-first **Logging, Metrics & Tracing** (SQLite + OpenTelemetry) with a Streamlit cockpit |
 | **AI-Assisted Development** | A **Pi-Agent Skills** system with a local hybrid RAG engine for autonomous documentation |
 
 ---
@@ -366,19 +374,126 @@ Telegram and Streamlit share the same `sessions.db`. To avoid `database is locke
 
 ---
 
+## 🔬 Observability: Logging, Metrics & Tracing
+
+Scummbar ships with a **complete, local-first observability stack** built on the three pillars of telemetry: **Logging** (what happened), **Metrics** (how long did it take), and **Tracing** (how the operations relate hierarchically in time). Everything is stored locally in a dedicated SQLite database and visualized inside the Streamlit UI — **no external servers** (Jaeger, Prometheus, Datadog, ...) are required.
+
+![Core Overview Diagram](assets/core_overview_diagram.svg)
+
+### 7.1 Telemetry Architecture Overview
+
+All telemetry code lives in the **`src/scummbar_chat/telemetry/`** package:
+
+```
+src/scummbar_chat/telemetry/
+├── __init__.py      # Public API (setup, recorders, queries, renderers)
+├── context.py       # contextvars correlation (channel, session, user, agent, turn)
+├── logging.py       # rotating file handlers + console + HTML log viewer
+├── db.py            # observability.db schema & connection management (WAL)
+├── metrics.py       # recorders + @measure_tool decorator
+├── queries.py       # analytical SQL aggregations for the dashboard
+├── tracing.py       # OpenTelemetry init, per-turn span isolation, SQLite flush
+└── viewer.py        # HTML/CSS waterfall (Gantt) renderer
+```
+
+Every log line, metric row, and trace span is **correlated with the same context variables** — `channel` (`telegram`/`streamlit`), `session_id`, `user_id`, `agent_name`, and `turn_id` — injected automatically via Python's `contextvars` (PEP 567). This makes it trivial to reconstruct exactly what happened during any single user turn, in any frontend.
+
+### 7.2 Logging — Structured Lifecycle Logs
+
+**Purpose**: a detailed, correlated narrative of *who did what, when, and what went wrong*.
+
+| Aspect | Detail |
+|--------|--------|
+| **Files** | `data/scummbar_chat/logs/app.log` (all levels, 10 MB × 5 rotating) and `errors.log` (WARNING+, 5 MB × 3 rotating) |
+| **Console** | same formatted output on stdout/stderr for live debugging |
+| **Context prefix** | e.g. `[tg:balthazar:u:123:t:45]` or `[st:barnaby:u:8741:t:7]` — injected automatically by a `ContextualFilter` |
+| **Levels** | `DEBUG` (full prompts, raw params), `INFO` (lifecycle: routing, tool execution, artifacts, delivery), `WARNING`/`ERROR` (fallbacks, timeouts, exceptions with full tracebacks) |
+| **API** | `setup_logging(debug=..., force=...)`, `log_context(channel=..., session_id=..., ...)` in `src/scummbar_chat/telemetry/logging.py` and `context.py` |
+
+**Streamlit viewer**: the **`🪵 Log di Sistema`** view renders the raw log files as a syntax-highlighted dark terminal with:
+- file selector (`app.log` / `errors.log`), level filter (`DEBUG` → `CRITICAL`), line count selector (50–1000);
+- instant text search (e.g. `balthazar`, `draw_nautical_map`, `error`);
+- semantic colors per severity (`DEBUG` blue, `INFO` green, `WARNING` amber, `ERROR`/`CRITICAL` red).
+
+### 7.3 Metrics — Performance & Latency
+
+**Purpose**: aggregated quantitative answers to *how often* and *how fast* things happen, per iteration, per agent, and per tool.
+
+Stored in **`data/scummbar_chat/observability.db`** (SQLite WAL, dedicated from `sessions.db`):
+
+| Table | Records | Key columns |
+|-------|---------|-------------|
+| `turn_metrics` | end-to-end user turns | `turn_id`, `channel`, `target_agent`, `total_duration_ms`, `prompt_length`, `response_length`, `artifacts_count`, `workflow_steps`, `is_error`, `input/output/total_tokens` |
+| `tool_metrics` | individual FunctionTool calls | `tool_name`, `duration_ms`, `success`, `error_type`, `artifact_filename`, `metadata_json` |
+| `agent_metrics` | granular agent/coordinator/chronicler times | `agent_name`, `duration_ms`, `model_name`, `status` |
+
+Instrumentation is automatic and low-friction:
+- **`@measure_tool(tool_name)`** decorator wraps every tool in `tools.py` (memory recall, scroll writing, tarot cards, nautical maps, RSS feeds) — it measures latency, detects generated artifacts, and records success/errors.
+- **Turn duration & token usage** are captured in `telegram/adapter.py` and `streamlit/app.py` after every `run_agent()` call (tokens come from ADK `event.usage_metadata`).
+- **Chronicler timings** are recorded in `diary.py` when the Captain's Log chapter is generated.
+
+### 7.4 Tracing — OpenTelemetry Waterfall Spans
+
+**Purpose**: a hierarchical, time-ordered *waterfall* of a single request as it travels through agents, tools, and models — showing exactly where the time was spent.
+
+Built on **OpenTelemetry GenAI Semantic Conventions** (fully supported by Google ADK):
+
+```
+invoke_agent:root_agent ─────────────────────────────── 5200 ms
+└── invoke_agent:balthazar ──────────────────────────── 5150 ms
+    ├── generate_content (gemini-3.5-flash-lite) ───────  650 ms
+    ├── execute_tool:consult_barnaby ───────────────────  820 ms
+    │   └── generate_content (gemini-3.5-flash-lite) ───  800 ms
+    ├── execute_tool:draw_nautical_map ──────────────── 3100 ms
+    │   └── generate_content (gemini-3.1-flash-lite-image) 3050 ms
+    └── generate_content (final response) ─────────────   580 ms
+```
+
+| Aspect | Detail |
+|--------|--------|
+| **Engine** | `google.adk.telemetry.setup.maybe_set_otel_providers()` with a fan-out `InMemorySpanExporter` |
+| **Per-turn isolation** | `turn_tracing()` (in `tracing.py`) starts an anchoring root span; only the spans sharing its `trace_id` are persisted — concurrent turns (different Telegram bots or parallel Streamlit sessions) never steal each other's spans |
+| **Flush** | at turn end (`finally` in `runner.py`) all spans are bulk-inserted into the `trace_spans` table |
+| **Schema** | `span_id`, `trace_id`, `parent_span_id`, `turn_id`, `name`, `start_time_ns/end_time_ns`, `duration_ms`, `status_code`, `attributes_json`, `events_json` |
+| **Semantics** | spans include standard attributes such as `gen_ai.agent.name`, `gen_ai.tool.name`, `gen_ai.request.model`, `gen_ai.usage.input_tokens/output_tokens` |
+| **Zero-server** | no OTLP collector required; spans are persisted locally. Standard `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` env vars remain supported if you later want Jaeger/Tempo/GCP |
+
+### 7.5 The Streamlit Observability Cockpit
+
+The **`📊 Metriche & Performance`** view provides:
+- **KPI cards**: average turn latency (min/max), total turns, tool executions with success rate %, artifacts produced;
+- **Charts**: average latency per agent (bar chart + table), tool performance with success rate;
+- **Trend**: line chart of the last 50 turn latencies;
+- **Turn log**: expandable per-turn details with prompt/response sizes, workflow steps, token usage, and the exact tools executed with their durations and generated files.
+
+The **`🔍 Traces & Waterfall`** view provides:
+- a turn selector (channel, agent, patron, duration, span count);
+- a summary card with `trace_id`, total duration, and span count;
+- an interactive **waterfall Gantt chart** with proportional bars and semantic colors (🟣 agents, 🟠 tools, 🔵 LLM text, 🟢 image generation, 🔴 errors);
+- a per-span **inspector** with timestamps, status, and the full JSON of OpenTelemetry GenAI attributes.
+
+### 7.6 Telemetry Data Storage
+
+| Artifact | Path |
+|----------|------|
+| Rotating logs | `data/scummbar_chat/logs/app.log`, `errors.log` |
+| Metrics & trace database | `data/scummbar_chat/observability.db` (tables `turn_metrics`, `tool_metrics`, `agent_metrics`, `trace_spans`) |
+
+---
+
 ## 🤖 Pi-Agent: AI-Assisted Development & System Skills
 
 This repository is designed to be developed, refactored, and maintained **in collaboration with an AI assistant (Pi-Agent)**. To this end, an autonomous **Agent Skills** system is configured directly in the codebase.
 
 ![Pi-Agent Skills Architecture (C4-PlantUML)](assets/pi_agent_skills_architecture.svg)
 
-### 7.1 What is a Pi-Agent Skill (Progressive Disclosure)
+### 8.1 What is a Pi-Agent Skill (Progressive Disclosure)
 
 A Pi-Agent skill is a self-contained package in `.agents/skills/`, consisting of `SKILL.md` (full instructions) + optional Python scripts. Pi-Agent scans this folder at startup and learns the capabilities from the **description**; the full instructions are loaded **on-demand** when the skill is invoked.
 
 This implements **Progressive Disclosure**: it keeps the AI's context window clean, saving tokens and improving reasoning focus.
 
-### 7.2 scummbar-docs-analyzer (Hybrid RAG)
+### 8.2 scummbar-docs-analyzer (Hybrid RAG)
 
 | Aspect | Detail |
 |--------|--------|
@@ -399,7 +514,7 @@ PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
   .agents/skills/scummbar-docs-analyzer/rag/indexer.py
 ```
 
-### 7.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)
+### 8.3 scummbar-memory-updater (MEMORY/README/AGENTS Management)
 
 | Aspect | Detail |
 |--------|--------|
@@ -408,7 +523,7 @@ PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
 | **Validator** | Automatic Python script that verifies no Markdown code block is left open (balanced fence markers) |
 | **Key rule** | Pure documentation additions (docs imports) do **not** auto-update `MEMORY.md` |
 
-### 7.4 scummbar-web-to-markdown (Docs Import)
+### 8.4 scummbar-web-to-markdown (Docs Import)
 
 | Aspect | Detail |
 |--------|--------|
@@ -417,7 +532,7 @@ PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
 | **Extras** | Automatic updates, relative→absolute link resolution, UTF-8 emoji preservation, overwrite protection |
 | **Post-conversion** | Automatic trigger of the RAG indexer to update the vector database |
 
-### 7.5 scummbar-kroki-diagrams (Kroki Diagram Generator)
+### 8.5 scummbar-kroki-diagrams (Kroki Diagram Generator)
 
 | Aspect | Detail |
 |--------|--------|
@@ -429,7 +544,7 @@ PYTHONPATH=.agents/skills/scummbar-docs-analyzer python3 \
 | **SVG Localization** | `--localize` downloads remote Kroki SVGs into `assets/` and rewrites Markdown links to local files (offline-ready) |
 | **Target** | Used by Pi-Agent for documentation & README diagrams (not in runtime ADK app) |
 
-### 7.6 How to Use the Autopilot
+### 8.6 How to Use the Autopilot
 
 ```bash
 # 1. Search the documentation (hybrid RAG FTS5 + Cosine)
@@ -466,15 +581,17 @@ scummbar/
 ├── data/
 │   └── scummbar_chat/
 │       ├── sessions.db             # SQLite session database (ADK)
+│       ├── observability.db        # 🔬 Telemetry: turn_metrics, tool_metrics, agent_metrics, trace_spans
 │       ├── diaries/                # 📜 Patron Captain's Logs (Diary_Name.md)
 │       │   └── assets/             #    Generated assets (maps, tarot cards, scrolls .txt)
-│       └── logs/                   # bot.log + errors.log (rotating)
+│       └── logs/                   # app.log + errors.log (rotating)
 ├── src/scummbar_chat/              # 🤖 Main application (Google ADK)
 │   ├── agent.py                    # root_agent + temporal InstructionProvider
 │   ├── utils.py                    # config, model factory, dual auth, load_md/load_all_skills
 │   ├── time_context.py             # real clock → tavern atmosphere
 │   ├── tools.py                    # ADK FunctionTool (memory, scrolls, tarot, maps, news)
 │   ├── diary.py                    # 📜 Captain's Log (incremental first-person generation via Chronicler)
+│   ├── telemetry/                  # 🔬 Observability: context, logging, db, metrics, queries, tracing, viewer
 │   ├── .env                        # ⚠️ DO NOT commit — tokens and API keys
 │   ├── world/scummbar.md           # world context + Narratore rules
 │   ├── bots/                       # barnaby, barnacle, isolde, balthazar, chronicler (agent.py + persona.md)

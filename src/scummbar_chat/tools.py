@@ -15,6 +15,7 @@ import google.genai.types as types
 from google.adk.tools import FunctionTool
 from google.adk.tools.tool_context import ToolContext
 
+from .telemetry import measure_tool
 from .utils import ASSETS_DIR, IMAGE_MODEL, IMAGE_THINKING_LEVEL, SESSION_DB_URI, get_gemini_client_kwargs
 
 log = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ def _ensure_patron_memories_table() -> None:
         conn.commit()
 
 
+@measure_tool("recall_patron_memory")
 async def recall_patron_memory(tool_context: ToolContext) -> dict:
     """
     Recupera la memoria narrativa di uno specifico avventore della taverna Scummbar.
@@ -59,8 +61,10 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
             cursor.execute("SELECT patron_name, core_traits, last_chat_summary FROM patron_memories WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
             if row:
+                log.info("Recalled memories for patron '%s' (user_id=%s)", row["patron_name"], user_id)
                 return dict(row)
 
+            log.info("No existing memories found for user_id=%s (unknown patron)", user_id)
             # Contextual prompt inject for new pirates
             return {
                 "status": "unknown_patron",
@@ -71,6 +75,7 @@ async def recall_patron_memory(tool_context: ToolContext) -> dict:
         return {"status": "error", "message": "I tuoi ricordi sono confusi al momento. Saluta normalmente."}
 
 
+@measure_tool("memorize_patron_chat")
 async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_traits_learned: str, chat_summary: str) -> str:
     """
     Aggiorna o crea la memoria a lungo termine di un avventore nel registro dello Scummbar.
@@ -119,12 +124,14 @@ async def memorize_patron_chat(tool_context: ToolContext, patron_name: str, new_
                     (user_id, patron_name, new_traits_learned, chat_summary, now_str),
                 )
             conn.commit()
+            log.info("Memorized chat details for patron '%s' (user_id=%s)", patron_name, user_id)
             return "Registro della taverna aggiornato con successo."
     except sqlite3.Error as e:
         log.error("Database error in memorize_patron_chat: %s", e)
         return "L'inchiostro si è rovesciato! Impossibile aggiornare il registro."
 
 
+@measure_tool("write_secret_scroll")
 async def write_secret_scroll(tool_context: ToolContext, title: str, content: str) -> str:
     """
     Usa questo strumento per scrivere fisicamente una pergamena, una ricetta segreta o una
@@ -143,16 +150,16 @@ async def write_secret_scroll(tool_context: ToolContext, title: str, content: st
     # Save the text scroll directly to the diaries assets folder for persistence
     try:
         (ASSETS_DIR / filename).write_bytes(file_bytes)
-        log.info("Secret scroll saved to diaries assets: %s", ASSETS_DIR / filename)
+        log.info("Secret scroll '%s' saved to diaries assets (%d bytes)", filename, len(file_bytes))
     except Exception as e:
-        log.warning("Impossibile salvare la pergamena in diaries assets: %s", e)
+        log.warning("Failed to save secret scroll to diaries assets: %s", e)
 
     try:
         # InMemoryArtifactService handles storage under the session/user namespace
         version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
         return f"Pergamena '{title}' (versione {version}) scritta e arrotolata con successo! (Salvata come {filename})."
     except Exception as e:
-        log.error("Errore salvataggio artifact in write_secret_scroll: %s", e)
+        log.error("Error saving artifact in write_secret_scroll: %s", e)
         return "La penna si è rotta e l'inchiostro si è sparso! Non sono riuscito a scrivere la pergamena."
 
 
@@ -216,6 +223,7 @@ def _draw_tarot_card_fallback(card_name: str, description: str) -> bytes:
     return out.getvalue()
 
 
+@measure_tool("draw_tarot_card")
 async def draw_tarot_card(
     tool_context: ToolContext,
     card_name: str,
@@ -266,11 +274,11 @@ async def draw_tarot_card(
         for part in response.candidates[0].content.parts:
             if part.inline_data and part.inline_data.data:
                 img_bytes = part.inline_data.data
-                log.info("Tarot card generated successfully via Gemini multimodal generate_content.")
+                log.info("Tarot card '%s' generated successfully via Gemini multimodal API (%d bytes)", card_name, len(img_bytes))
                 break
 
     except Exception as e:
-        log.warning("Errore generazione immagine AI: %s. Attivazione fallback PIL.", e)
+        log.warning("AI image generation failed for tarot card '%s': %s. Activating PIL fallback.", card_name, e)
         img_bytes = _draw_tarot_card_fallback(card_name, scene_description)
 
     # 2. Register the image as an Artifact in ADK
@@ -293,9 +301,9 @@ async def draw_tarot_card(
     # Save the image directly to the diaries assets folder for the Captain's Log
     try:
         (ASSETS_DIR / filename).write_bytes(img_bytes)
-        log.info("Tarot card saved to diaries assets: %s", ASSETS_DIR / filename)
+        log.info("Tarot card saved to diaries assets: %s", filename)
     except Exception as e:
-        log.warning("Impossibile salvare il tarocco in diaries assets: %s", e)
+        log.warning("Failed to save tarot card to diaries assets: %s", e)
 
     # Save the artifact to the current ADK session
     version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
@@ -385,6 +393,7 @@ def _draw_nautical_map_fallback(archipelago_name: str, map_details: str = "") ->
     return out.getvalue()
 
 
+@measure_tool("draw_nautical_map")
 async def draw_nautical_map(
     tool_context: ToolContext,
     archipelago_name: str,
@@ -441,7 +450,7 @@ async def draw_nautical_map(
                 break
 
     except Exception as e:
-        log.warning("Errore generazione mappa nautica AI: %s. Attivazione fallback PIL.", e)
+        log.warning("AI image generation failed for nautical map '%s': %s. Activating PIL fallback.", archipelago_name, e)
         img_bytes = _draw_nautical_map_fallback(archipelago_name, map_details)
 
     if img_bytes.startswith(b"\x89PNG"):
@@ -462,9 +471,9 @@ async def draw_nautical_map(
     # Save the image directly to the diaries assets folder for the Captain's Log
     try:
         (ASSETS_DIR / filename).write_bytes(img_bytes)
-        log.info("Nautical map saved to diaries assets: %s", ASSETS_DIR / filename)
+        log.info("Nautical map saved to diaries assets: %s", filename)
     except Exception as e:
-        log.warning("Impossibile salvare la mappa in diaries assets: %s", e)
+        log.warning("Failed to save nautical map to diaries assets: %s", e)
 
     version = await tool_context.save_artifact(filename=filename, artifact=artifact_part)
 
@@ -474,6 +483,7 @@ async def draw_nautical_map(
     )
 
 
+@measure_tool("fetch_news_feed")
 async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_italiana") -> dict:
     """
     Recupera gli ultimi dispacci e notizie reali focalizzati esclusivamente su 2 argomenti:
@@ -599,7 +609,7 @@ async def fetch_news_feed(tool_context: ToolContext, category: str = "politica_i
             }
 
     except Exception as e:
-        log.error("Errore nel recupero feed RSS (%s): %s", url, e)
+        log.error("Failed to fetch RSS news feed (%s): %s", url, e)
         return {
             "status": "error",
             "message": "I venti si sono placati e le gagliotte delle staffette non sono giunte al porto. Nessun dispaccio disponibile al momento.",
