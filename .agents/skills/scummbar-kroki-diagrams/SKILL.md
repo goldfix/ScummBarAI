@@ -32,8 +32,38 @@ L'integrazione si basa sull'interfaccia HTTP `GET` con codifica del contenuto tr
    - Compressione **deflate a livello 9** (massima).
    - **Base64 URL-safe** (`+` → `-`, `/` → `_`).
    - Opzioni aggiuntive passabili come **query parameter** (`?key=value`, es. `?theme=dark`).
-4. **Stile Linee Ortogonali (Angoli Retti)**:
-   Nei diagrammi `c4plantuml` e `plantuml`, includere sempre `skinparam linetype ortho` per generare connessioni pulite a 90° (linee ortogonali spezzate ad angoli retti) anziché linee curve/splines.
+4. **Stile Linee Ortogonali & Pattern Standard Diagrammi Scummbar**:
+   Nei diagrammi `c4plantuml` e `plantuml`, adottare sempre il seguente **standard pattern strutturale e visivo**:
+   ```plantuml
+   @startuml <diagram_name>
+   !include <C4/C4_Container>
+
+   ' === SCUMMBAR STANDARD DIAGRAM PATTERN ===
+   skinparam linetype ortho
+   skinparam nodesep 50
+   skinparam ranksep 45
+   skinparam rectangleFontSize 12
+   skinparam arrowFontSize 10
+   skinparam defaultTextAlignment center
+   skinparam wrapWidth 180
+
+   title Scummbar — Titolo del Diagramma
+
+   ' Elementi compatti con descrizioni sintetiche su 2-3 righe
+   Container(id, "Titolo", "Tech", "Descrizione concisa\ne formattata su 2-3 righe")
+
+   ' Connessioni direzionali esplicite per evitare incroci e sovrapposizioni
+   Rel_D(a, b, "Invoca")
+   Rel_R(b, c, "Invia dati")
+   Rel_U(c, b, "Ritorna")
+   @enduml
+   ```
+   **Regole di layout e tipografia**:
+   - **Dimensioni naturali**: Non forzare scale o ingrandimenti artificiali. La dimensione ideale è quella naturale determinata dai componenti (~700-1200px di larghezza).
+   - **Box compatti e uniformi**: Descrizioni brevi con interruzioni di riga esplicite (`\n`). Evitare testi chilometrici che allargano i blocchi a dismisura.
+   - **Spaziature generose**: `nodesep 50` per la separazione orizzontale e `ranksep 45` per la separazione verticale tra livelli.
+   - **Linee ortogonali squadrate**: `skinparam linetype ortho` per connessioni pulite a 90°.
+   - **Nessuna sovrapposizione**: Etichette delle frecce corte e concise (1-2 parole: es. *"Invia"*, *"Delega"*, *"Memorizza"*, *"Routing"*). Frecce direzionali esplicite (`Rel_D`, `Rel_R`, `Rel_L`, `Rel_U`).
 
 ---
 
