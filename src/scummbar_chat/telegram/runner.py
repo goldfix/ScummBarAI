@@ -10,6 +10,7 @@ Operations:
 import asyncio
 import logging
 import sqlite3
+import time
 from datetime import UTC, datetime, timedelta
 
 from google.adk.apps.app import App, EventsCompactionConfig
@@ -124,13 +125,17 @@ async def run_agent(
     user_id: str,
     session_id: str,
     text: str,
-) -> tuple[str, list[dict]]:
+) -> tuple[str, list[dict], dict]:
     """
     Dispatches augmented textual updates through the ADK coordinator.
-    Returns a tuple: (text_response, list_of_artifacts)
+    Returns a tuple: (text_response, list_of_artifacts, usage_summary)
+    where usage_summary contains input/output/total tokens and workflow step count.
     """
+    t0 = time.perf_counter()
     runner = _get_runner()
     await _ensure_session(user_id, session_id)
+
+    log.debug("Dispatching turn to ADK coordinator (text_len=%d)", len(text))
 
     user_message = types.Content(
         role="user",
@@ -139,6 +144,8 @@ async def run_agent(
 
     response_parts: list[str] = []
     generated_files: list[dict] = []
+    input_tokens = output_tokens = total_tokens = None
+    workflow_steps = 0
 
     # Async stream loop consuming real-time tokens and events
     async for event in runner.run_async(
@@ -146,19 +153,60 @@ async def run_agent(
         session_id=session_id,
         new_message=user_message,
     ):
-        # 1. Extract Artifacts if Barnaby generated any
+        # 1. Extract Artifacts if Barnaby/Balthazar/Isolde generated any
         if event.actions and event.actions.artifact_delta:
             for filename, version in event.actions.artifact_delta.items():
                 # Load the bytes from the in-memory service
-                part = await _artifact_service.load_artifact(app_name=APP_NAME, user_id=user_id, session_id=session_id, filename=filename, version=version)
+                part = await _artifact_service.load_artifact(
+                    app_name=APP_NAME,
+                    user_id=user_id,
+                    session_id=session_id,
+                    filename=filename,
+                    version=version,
+                )
                 if part and part.inline_data:
                     generated_files.append({"filename": filename, "bytes": part.inline_data.data})
+                    log.info("Loaded generated artifact: '%s' (%d bytes)", filename, len(part.inline_data.data))
 
-        # 2. Extract final textual dialogue
+        # 2. Count workflow steps: one per model-generated response event (reasoning loop)
+        if event.author == "model" and event.content and event.content.parts:
+            workflow_steps += 1
+
+        # 3. Collect token usage metadata (when provided by the model)
+        usage = event.usage_metadata
+        if usage is not None:
+            if getattr(usage, "prompt_token_count", None) is not None:
+                input_tokens = usage.prompt_token_count
+            if getattr(usage, "candidates_token_count", None) is not None:
+                output_tokens = usage.candidates_token_count
+            if getattr(usage, "total_token_count", None) is not None:
+                total_tokens = usage.total_token_count
+
+        # 4. Extract final textual dialogue
         if event.is_final_response() and event.content and event.content.parts:
             for part in event.content.parts:
                 # Discard internal thoughts to preserve standard dialogue formatting
                 if part.text and not getattr(part, "thought", False):
                     response_parts.append(part.text)
 
-    return "".join(response_parts).strip(), generated_files
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+    final_text = "".join(response_parts).strip()
+    log.debug(
+        "ADK turn completed in %.1f ms (response_len=%d, artifacts=%d, steps=%d, tokens=%s/%s/%s)",
+        elapsed_ms,
+        len(final_text),
+        len(generated_files),
+        workflow_steps,
+        input_tokens,
+        output_tokens,
+        total_tokens,
+    )
+
+    usage_summary = {
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "workflow_steps": workflow_steps,
+    }
+
+    return final_text, generated_files, usage_summary

@@ -12,11 +12,13 @@ Operations:
 import asyncio
 import logging
 import os
+import time
 from pathlib import Path
 
 import aiohttp
 from dotenv import load_dotenv
 
+from ..telemetry import log_context, record_turn_metric
 from .formatter import format_response
 from .runner import purge_old_sessions, run_agent
 
@@ -300,53 +302,113 @@ async def _handle_update_inner(http: aiohttp.ClientSession, update: dict) -> Non
         return
 
     try:
-        await _send_typing(http, chat_id)
         session_id = str(chat_id)
+        # Globally unique turn id (Telegram update_id is unique per bot, prefix keeps
+        # it disjoint from Streamlit turn ids in the shared turn_metrics table).
+        turn_id = f"tg:{update.get('update_id', '')}"
 
-        # Increment message count. On every 3rd message, inject the Narrator prompt.
-        _message_counters[session_id] = _message_counters.get(session_id, 0) + 1
-        augmented = _augment_text(text, bot_name, user_id)
+        # Scope the whole turn (LLM call, artifact delivery, ...) with telemetry context.
+        # The inner try/except logs errors WHILE the context vars are still set, so
+        # exception records stay correlated with channel/session/user/agent/turn.
+        t0_turn = time.perf_counter()
+        with log_context(channel="telegram", session_id=session_id, user_id=user_id, agent_name=bot_name, turn_id=turn_id):
+            try:
+                log.info("Incoming Telegram message routed to [%s] from %s: '%s'", bot_name, from_user.get("username", user_id), text[:60])
+                await _send_typing(http, chat_id)
 
-        if _message_counters[session_id] % 3 == 0:
-            _message_counters[session_id] = 0
-            augmented += (
-                "\n\n[NOTA DI SISTEMA: È il momento del Narratore. Alla fine assoluta della tua risposta, "
-                "DEVI aggiungere una riga vuota e poi una singola descrizione d'ambiente in corsivo, "
-                "racchiusa ESATTAMENTE tra due trattini bassi, seguendo le regole del file scummbar.md.]"
-            )
+                # Increment message count. On every 3rd message, inject the Narrator prompt.
+                _message_counters[session_id] = _message_counters.get(session_id, 0) + 1
+                augmented = _augment_text(text, bot_name, user_id)
 
-        response, files = await run_agent(
-            user_id=user_id,
-            session_id=session_id,
-            text=augmented,
-        )
+                if _message_counters[session_id] % 3 == 0:
+                    _message_counters[session_id] = 0
+                    augmented += (
+                        "\n\n[NOTA DI SISTEMA: È il momento del Narratore. Alla fine assoluta della tua risposta, "
+                        "DEVI aggiungere una riga vuota e poi una singola descrizione d'ambiente in corsivo, "
+                        "racchiusa ESATTAMENTE tra due trattini bassi, seguendo le regole del file scummbar.md.]"
+                    )
 
-        if not response:
-            log.warning("[%s] empty response from agent", bot_name)
-            return
+                response, files, usage = await run_agent(
+                    user_id=user_id,
+                    session_id=session_id,
+                    text=augmented,
+                )
 
-        log.info("[%s] %s: %s", bot_name, from_user.get("username", user_id), text[:60])
-        formatted = format_response(response)
+                elapsed_turn_ms = (time.perf_counter() - t0_turn) * 1000.0
 
-        # Barnacle answers ephemerally (visible only to target), Barnaby/Isolde answer publicly
-        if bot_name == "barnacle":
-            sent = await _send_message(http, chat_id, formatted, receiver_user_id=int(user_id))
-            if not sent:
-                fallback = formatted + "\n\n<i>🐱 (whisper — just for you)</i>"
-                await _send_message(http, chat_id, fallback)
-            for f in files:
-                if f["filename"].endswith(".png") or f["filename"].endswith(".jpg"):
-                    await _send_photo(http, chat_id, f["filename"], f["bytes"], receiver_user_id=int(user_id))
+                if not response:
+                    log.warning("Empty response from agent")
+                    record_turn_metric(
+                        turn_id=turn_id,
+                        channel="telegram",
+                        session_id=session_id,
+                        user_id=user_id,
+                        patron_name=from_user.get("username", user_id),
+                        target_agent=bot_name,
+                        total_duration_ms=elapsed_turn_ms,
+                        prompt_length=len(text),
+                        is_error=True,
+                        error_message="Empty agent response",
+                    )
+                    return
+
+                # Record successful turn metrics (with token usage + workflow steps)
+                record_turn_metric(
+                    turn_id=turn_id,
+                    channel="telegram",
+                    session_id=session_id,
+                    user_id=user_id,
+                    patron_name=from_user.get("username", user_id),
+                    target_agent=bot_name,
+                    total_duration_ms=elapsed_turn_ms,
+                    prompt_length=len(text),
+                    response_length=len(response),
+                    artifacts_count=len(files),
+                    workflow_steps=usage.get("workflow_steps", 0),
+                    input_tokens=usage.get("input_tokens"),
+                    output_tokens=usage.get("output_tokens"),
+                    total_tokens=usage.get("total_tokens"),
+                    is_error=False,
+                )
+
+                log.info("Agent replied with %d characters and %d artifact(s)", len(response), len(files))
+                formatted = format_response(response)
+
+                # Barnacle answers ephemerally (visible only to target), Barnaby/Isolde answer publicly
+                if bot_name == "barnacle":
+                    sent = await _send_message(http, chat_id, formatted, receiver_user_id=int(user_id))
+                    if not sent:
+                        fallback = formatted + "\n\n<i>🐱 (whisper — just for you)</i>"
+                        await _send_message(http, chat_id, fallback)
+                    for f in files:
+                        if f["filename"].endswith(".png") or f["filename"].endswith(".jpg"):
+                            await _send_photo(http, chat_id, f["filename"], f["bytes"], receiver_user_id=int(user_id))
+                        else:
+                            await _send_document(http, chat_id, f["filename"], f["bytes"], receiver_user_id=int(user_id))
                 else:
-                    await _send_document(http, chat_id, f["filename"], f["bytes"], receiver_user_id=int(user_id))
-        else:
-            await _send_message(http, chat_id, formatted)
-            for f in files:
-                if f["filename"].endswith(".png") or f["filename"].endswith(".jpg"):
-                    await _send_photo(http, chat_id, f["filename"], f["bytes"])
-                else:
-                    await _send_document(http, chat_id, f["filename"], f["bytes"])
-
+                    await _send_message(http, chat_id, formatted)
+                    for f in files:
+                        if f["filename"].endswith(".png") or f["filename"].endswith(".jpg"):
+                            await _send_photo(http, chat_id, f["filename"], f["bytes"])
+                        else:
+                            await _send_document(http, chat_id, f["filename"], f["bytes"])
+            except Exception as exc:
+                elapsed_turn_ms = (time.perf_counter() - t0_turn) * 1000.0
+                record_turn_metric(
+                    turn_id=turn_id,
+                    channel="telegram",
+                    session_id=session_id,
+                    user_id=user_id,
+                    patron_name=from_user.get("username", user_id),
+                    target_agent=bot_name,
+                    total_duration_ms=elapsed_turn_ms,
+                    prompt_length=len(text),
+                    is_error=True,
+                    error_message=str(exc),
+                )
+                # Log with full telemetry context before re-raising to the outer handler.
+                log.exception("Error during turn processing (turn_id=%s): %s", turn_id, exc)
+                raise
     finally:
         # Guarantee lock release even if generation or communication fails, only if acquired
         if lock_acquired:

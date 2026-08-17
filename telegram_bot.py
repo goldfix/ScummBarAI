@@ -13,53 +13,24 @@ import logging
 import sys
 import traceback
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Paths
+# Paths & Telemetry
 # ---------------------------------------------------------------------------
 ROOT_DIR = Path(__file__).parent
-LOG_DIR = ROOT_DIR / "data" / "scummbar_chat" / "logs"
-LOG_FILE = LOG_DIR / "bot.log"
-ERR_FILE = LOG_DIR / "errors.log"
-
 sys.path.insert(0, str(ROOT_DIR / "src"))
 
+from scummbar_chat.telemetry import APP_LOG_FILE, DEFAULT_LOG_DIR, ERRORS_LOG_FILE, setup_logging  # noqa: E402  (needs sys.path above)
+
+LOG_DIR = DEFAULT_LOG_DIR
+LOG_FILE = APP_LOG_FILE
+ERR_FILE = ERRORS_LOG_FILE
+
 
 # ---------------------------------------------------------------------------
-# Logging setup
+# Crash dump helper
 # ---------------------------------------------------------------------------
-
-
-def _setup_logging(debug: bool = False) -> None:
-    """Configure console + rotating file handlers."""
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-    level = logging.DEBUG if debug else logging.INFO
-    fmt = "%(asctime)s [%(levelname)-8s] %(name)s: %(message)s"
-    datefmt = "%Y-%m-%d %H:%M:%S"
-
-    root = logging.getLogger()
-    root.setLevel(logging.DEBUG)  # capture everything; handlers filter by level
-
-    # Console handler
-    console = logging.StreamHandler(sys.stdout)
-    console.setLevel(level)
-    console.setFormatter(logging.Formatter(fmt, datefmt))
-    root.addHandler(console)
-
-    # Rotating file handler — all levels, 5 MB × 3 files
-    file_handler = RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(logging.Formatter(fmt, datefmt))
-    root.addHandler(file_handler)
-
-    # Dedicated error file handler — WARNING and above only
-    err_handler = RotatingFileHandler(ERR_FILE, maxBytes=2 * 1024 * 1024, backupCount=2, encoding="utf-8")
-    err_handler.setLevel(logging.WARNING)
-    err_handler.setFormatter(logging.Formatter(fmt, datefmt))
-    root.addHandler(err_handler)
 
 
 def _dump_exception(exc: BaseException) -> None:
@@ -173,7 +144,7 @@ def main() -> None:
     parser.add_argument("--debug", action="store_true", help="Enable DEBUG log level (very verbose)")
     args = parser.parse_args()
 
-    _setup_logging(debug=args.debug)
+    setup_logging(debug=args.debug)
     log = logging.getLogger("main")
 
     log.info("🍺  Scummbar — starting up (debug=%s)", args.debug)

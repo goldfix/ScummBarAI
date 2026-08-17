@@ -10,12 +10,14 @@ import asyncio
 import json
 import logging
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 
 from google.adk.models import LlmRequest
 from google.genai import types
 
+from src.scummbar_chat.telemetry import record_agent_metric
 from src.scummbar_chat.utils import COMPACTION_MODEL
 
 log = logging.getLogger("scummbar.diary")
@@ -53,7 +55,7 @@ def read_diary_metadata(file_path: Path) -> dict:
         if match:
             return json.loads(match.group(1))
     except Exception as e:
-        log.warning("Impossibile leggere i metadati dal diario %s: %s", file_path, e)
+        log.warning("Failed to read metadata from diary %s: %s", file_path, e)
 
     return {"last_saved_index": 0}
 
@@ -138,6 +140,9 @@ async def generate_chapter_async(patron_name: str, new_messages: list[dict], sta
 
     full_prompt = f"{chronicler_agent.instruction}\n\n---\n\n{user_prompt}"
 
+    t0 = time.perf_counter()
+    status = "success"
+
     try:
         # Use chronicler_agent's configured model instance
         llm = chronicler_agent.model
@@ -149,9 +154,26 @@ async def generate_chapter_async(patron_name: str, new_messages: list[dict], sta
             if response.content and response.content.parts:
                 text_parts = [p.text for p in response.content.parts if getattr(p, "text", None)]
                 if text_parts:
+                    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                    record_agent_metric(
+                        agent_name="chronicler",
+                        duration_ms=elapsed_ms,
+                        model_name=COMPACTION_MODEL,
+                        status="success",
+                    )
                     return "\n".join(text_parts).strip()
     except Exception as e:
-        log.error("Errore generazione capitolo diario con il Cronista: %s", e)
+        status = "error"
+        log.error("Failed to generate diary chapter with Chronicler agent: %s", e)
+    finally:
+        if status == "error":
+            elapsed_ms = (time.perf_counter() - t0) * 1000.0
+            record_agent_metric(
+                agent_name="chronicler",
+                duration_ms=elapsed_ms,
+                model_name=COMPACTION_MODEL,
+                status="error",
+            )
 
     # Fallback if LLM call fails
     return (
@@ -189,7 +211,7 @@ def _write_chapter_to_file(
         content = header_block + first_chapter_block
 
     file_path.write_text(content, encoding="utf-8")
-    log.info("Diario aggiornato per %s: %s messaggi registrati.", patron_name, total_messages)
+    log.info("Captain's log updated for patron '%s': %d total messages recorded.", patron_name, total_messages)
 
     return (
         True,

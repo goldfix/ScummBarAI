@@ -451,6 +451,12 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 | Unificazione API Immagini | ✅ | Deprecato branch Imagen, architettura unificata su `generate_content` Gemini Nano |
 | Frontend Web Streamlit (Single-Player RPG) | ✅ | `src/scummbar_chat/streamlit/` (`app.py`, `components.py`), routing automatico, recupero storico da DB, WAL mode, segmented control per chat input sticky |
 | Diario di Bordo Narrativo in Prima Persona | ✅ | `src/scummbar_chat/diary.py`: file `data/scummbar_chat/diaries/Diary_NOME.md`, tracciamento `last_saved_index` (idempotente), aggiornamento automatico ogni 10 messaggi + pulsante manuale nel Tab "📜 Diario di Bordo", download `.md`, redazione affidata all'agente dedicato `chronicler` (`bots/chronicler/`) |
+| **Sistema di Osservabilità (Logging, Metrics, Tracing)** | 🟡 | **Progettazione modulare a 5 step**: Logging strutturato con context, metriche/tempi su SQLite locale + OTel, waterfall tracing con spans GenAI e dashboard visuale Streamlit/CLI |
+| ↳ *Step 1: Logging Strutturato Unificato & Streamlit Log Viewer* | ✅ | Modulo centralizzato `telemetry/context.py` e `telemetry/logging.py` con `ContextVar` (`session_id`, `user_id`, `channel`, `agent`, `turn_id`), rotazione file `app.log` (10MBx5) + `errors.log` (5MBx3), integrazione in Telegram, Runner, Tools e viewer interattivo in Streamlit con terminale dark e filtri |
+| ↳ *Step 2: Engine Metriche & Cockpit Performance Streamlit* | ✅ | Database dedicato `data/scummbar_chat/observability.db` (tabelle `turn_metrics`, `tool_metrics`, `agent_metrics`), decoratore `@measure_tool`, tracciamento latenze end-to-end e cockpit visivo interattivo in Streamlit (*📊 Metriche & Performance*) con KPI cards, bar charts, trend temporale e log dettagliato dei turni con drilldown sui tool |
+| ↳ *Step 3: OpenTelemetry Tracing & Local Spans* | 🔲 | Integrazione nativa ADK `google.adk.telemetry`, local span exporter in SQLite (`trace_spans`) + compatibilità OTLP/GCP |
+| ↳ *Step 4: Cockpit Tracing Waterfall in Streamlit* | 🔲 | Visualizzatore ad albero interattivo a cascata (waterfall) degli span dell'ultimo turno selezionato |
+| ↳ *Step 5: CLI Inspector & Validazione E2E* | 🔲 | Tool riga di comando `python -m scummbar_chat.telemetry.inspect` per visualizzazione rapida da terminale e test suite E2E |
 | Fase 2a Streamlit: Sacca del Pirata (Inventario) | 🔲 | Registro persistente nella sidebar per collezionare e riscaricare pergamene, mappe, ricette e carte tarocchi |
 | Fase 2b Streamlit: Ispezione Memoria Avventore | 🔲 | Visualizzatore nella sidebar dei tratti e ricordi registrati su di te da Barnaby (`recall_patron_memory`) |
 | Fase 2c Streamlit: Selettore Modello in UI | 🔲 | Dropdown nella sidebar per switchare il modello attivo (Gemini 3.6 ↔ DeepSeek v4) al volo dall'interfaccia web |
@@ -461,6 +467,13 @@ _runner = Runner(app=scummbar_app, session_service=_session_service)
 
 ### 💡 Decisioni architetturali
 
+- **Architettura di Osservabilità (Logging, Metrics, Tracing)**:
+  - **Tre Pilastri Distinti**:
+    1. *Logging*: cronistoria narrativa e diagnostica di "chi fa cosa e quando", arricchita con context variables (`channel`, `session_id`, `user_id`, `agent_name`, `turn_id`).
+    2. *Metrics*: aggregati quantitativi e tempi di esecuzione esatti per iterazione, agente e singolo tool (latenze end-to-end, tempo LLM, tempo generazione immagini, tempi peer consult).
+    3. *Tracing*: gerarchia ad albero a cascata (waterfall) basata su standard OpenTelemetry GenAI Semantic Conventions (`invoke_agent` -> `invoke_workflow` -> `execute_tool` -> `generate_content`).
+  - **Local-First Zero-Server Storage**: Memorizzazione persistente in SQLite locale (`data/scummbar_chat/observability.db`), consentendo consultazione immediata offline, query analitiche e visualizzazione senza obbligo di infrastrutture esterne (Prometheus, Jaeger, ecc.), pur mantenendo pieno supporto standard OTLP verso collector esterni configurabili da `.env`.
+  - **Pannello di Visualizzazione Integrato**: Visualizzazione delle metriche e waterfall dei trace integrata direttamente come tab nel frontend Streamlit (*📊 Sala Macchine & Osservabilità*) e tramite CLI Inspector per il monitoraggio rapido da terminale.
 - **Diario di Bordo Narrativo in Prima Persona & Agente Cronista**: Implementata la funzionalità di cronaca personale in `src/scummbar_chat/diary.py`. Ogni avventore possiede un file Markdown dedicato `data/scummbar_chat/diaries/Diary_NOME_Pirata.md`. Il sistema traccia deterministicamente l'indice dell'ultimo messaggio elaborato (`last_saved_index` nei metadati in testa al file) ed effettua aggiornamenti incrementali sintetizzando in stile romanzato caraibico ("Io") solo i messaggi non ancora registrati.
   - **Agente Cronista Dedicato (`bots/chronicler/`)**: La scrittura del diario è stata disaccoppiata dai bot di conversazione (rimosso `update_tavern_diary_tool` da Barnaby e Balthazar per non appesantirne il contesto) ed affidata all'agente dedicato `chronicler_agent` con prompt specializzato in `bots/chronicler/persona.md`.
   - **Pipeline asincrona dual-provider**: `generate_chapter_async()` usa `chronicler_agent.model` (`COMPACTION_LLM`) + `LlmRequest`/`generate_content_async`, funzionando sia con Gemini (API Key/Vertex) sia con DeepSeek.
@@ -1067,6 +1080,60 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 - **Sezione Skills**: Aggiunta la documentazione della skill `scummbar-web-to-markdown` con esempi di invocazione.
 - **Percorsi e Strutture**: Corretto il percorso del DB SQLite (`data/scummbar_chat/sessions.db`) e l'albero delle directory di Cheshire Cat AI (`data/scummbar_cat/`).
 - **Refusi**: Corretto typo "Criptic" -> "Cryptic" nella tabella dei personaggi e verificato il bilanciamento dei marcatori code block.
+
+---
+
+### 2026-07-26 — Progettazione Sistema di Osservabilità (Logging, Metrics, Tracing) & Standard Diagrammi
+
+**Obiettivo**: Definire il pattern standard visivo dei diagrammi di architettura e pianificare la progettazione modulare a 5 step per l'infrastruttura di Osservabilità (Logging, Metrics, Tracing).
+
+**Attività svolte**:
+1. **Standard Pattern Diagrammi C4-PlantUML & Rigenerazione Completa**:
+   - Codificato il pattern standard ufficiale (`skinparam linetype ortho`, `nodesep 50-80`, `ranksep 45-75`, `rectangleFontSize 12`, `arrowFontSize 10`, `wrapWidth 180`).
+   - Riorganizzato e spaziato il diagramma principale `assets/core_overview_diagram.svg` in 4 sub-boundaries distinte (*Core Orchestration & Context Engine*, *Tavern Sub-Agents*, *Persistent Storage & Assets*, *Scribe & Captain's Log*) con spaziatura ariosa.
+   - Rigenerati e sincronizzati tutti i 5 file SVG in `assets/` e aggiornato `.agents/skills/scummbar-kroki-diagrams/SKILL.md`.
+
+2. **Pianificazione & Implementazione Step 1 Sistema di Osservabilità (Logging)**:
+   - Scaricata e indicizzata nel RAG la documentazione ufficiale Python 3.12 di `contextvars` (`docs/python_lib/3_12_library_contextvars_html.md`).
+   - Creato il package `src/scummbar_chat/telemetry/`:
+     - `context.py`: gestione asincrona context variables (`channel`, `session_id`, `user_id`, `agent_name`, `turn_id`) tramite `contextvars.ContextVar` e context manager `log_context()`.
+     - `logging.py`: configurazione unificata con `ContextualFilter`, `RotatingFileHandler` per `app.log` (10MB x 5) ed `errors.log` (5MB x 3), e helper per il viewer HTML con evidenziazione semantica (`DEBUG`, `INFO`, `WARNING`, `ERROR`).
+   - Integrato il logging contestuale in `telegram_bot.py`, `telegram/adapter.py`, `telegram/runner.py`, `tools.py` e `diary.py`.
+   - Aggiunta la vista **`🪵 Log di Sistema`** in Streamlit (`streamlit/app.py`) con selettore file, filtro per livello di log, selettore numero di righe (50-1000), barra di ricerca testo rapida e visualizzazione terminale dark monospace.
+
+3. **Revisione Completa Integrazione Logging (allineamento a `contextvars` docs)**:
+   - Verificato l'allineamento con la documentazione ufficiale Python 3.12 `contextvars` (variabili a livello di modulo, token `set()`/`reset()`, supporto nativo `asyncio`, nessun oggetto `Context` per evitare strong references).
+   - **Bugfix `channel` abbreviazione**: mappato esplicitamente `telegram → tg`, `streamlit → st` (`_CHANNEL_ABBR` in `context.py`); prima `"telegram"[:2]` produceva `te`.
+   - **Bugfix correlazione eccezioni**: in `telegram/adapter.py` il `log.exception` è ora eseguito DENTRO lo scope `log_context`, così gli errori conservano `channel/session/user/agent/turn` nel log.
+   - **`turn_id` Streamlit**: aggiunto contatore monotono dei turni (`turn_counter`) passato a `log_context` per correlazione.
+   - **Semplificazione `setup_logging`**: rimossi i guard `any()` (ridondanti con `_logging_initialized` e ingannabili dagli handler preesistenti di Streamlit); `force=True` rimuove e ri-crea.
+   - **Ottimizzazione `read_log_tail`**: lettura solo della coda dei file grandi (ultimi 2MB) invece dell'intero file a ogni refresh Streamlit.
+   - **Traduzione log residui**: completata la conversione a inglese di 2 log in `tools.py` (fallback mappa nautica, salvataggio assets).
+   - Aggiunto `# noqa: E402` per l'import telemetry in `telegram_bot.py` (necessario dopo `sys.path.insert`).
+
+4. **Implementazione Step 2: Engine Metriche & Cockpit Performance Streamlit**:
+   - Creato `src/scummbar_chat/telemetry/db.py`: schema SQLite WAL per `turn_metrics`, `tool_metrics`, `agent_metrics` in `data/scummbar_chat/observability.db`.
+   - Creato `src/scummbar_chat/telemetry/metrics.py`: funzioni di registrazione (`record_turn_metric`, `record_tool_metric`, `record_agent_metric`) e decoratore `@measure_tool` con tracciamento temporale millisecondi, rilevamento artefatti e gestione errori.
+   - Creato `src/scummbar_chat/telemetry/queries.py`: query analitiche parametriche e aggregate (`get_kpi_summary`, `get_agent_breakdown`, `get_tool_breakdown`, `get_recent_turns`, `get_time_series_data`).
+   - Integrato `@measure_tool` su tutti i 6 tool in `tools.py` e tracciamento latenza in `telegram/adapter.py`, `diary.py` (per `chronicler_agent`) e `streamlit/app.py`.
+   - Creata la vista **`📊 Metriche & Performance`** in Streamlit con KPI cards, grafici comparativi latenze per agente e tool, trend temporale e log dettagliato dei turni con drilldown dei singoli tool eseguiti.
+
+5. **Revisione Completa Step 2 (allineamento a docs ADK observability_metrics)**:
+   - Verificato il mappaggio concettuale con le metriche OTel GenAI Semantic Conventions:
+     - `gen_ai.agent.invocation.duration` → `turn_metrics.total_duration_ms`
+     - `gen_ai.tool.execution.duration` → `tool_metrics.duration_ms`
+     - `gen_ai.agent.request.size` → `turn_metrics.prompt_length`
+     - `gen_ai.agent.response.size` → `turn_metrics.response_length`
+     - `gen_ai.agent.workflow.steps` → colonna `workflow_steps` (aggiunta)
+     - Token consumption → colonne `input/output/total_tokens` (ora popolate)
+   - **Bugfix critico turn_id collision**: `INSERT OR REPLACE` con chiave primaria `turn_id` — i turn_id numerici di Streamlit (`turn_counter` per sessione) collidevano tra sessioni/patron e con Telegram, sovrascrivendo i record. Fix: turn_id globalmente univoci `st:{session_id}:{turn_counter}` e `tg:{update_id}`.
+   - **Bugfix leak connessioni SQLite**: il pattern `with get_connection() as conn:` NON chiude la connessione (sqlite3 context manager gestisce solo transazioni). Fix: context manager dedicato `connection()` in `db.py` con `conn.close()` nel `finally`.
+   - **Gap colmato — token usage**: estrazione di `event.usage_metadata` (prompt/candidates/total token) dagli eventi ADK in `runner.py`; `run_agent` ora ritorna una 3-tupla `(text, files, usage_summary)` e i valori vengono persistiti in `turn_metrics`.
+   - **Gap colmato — workflow steps**: conteggio degli eventi di risposta del modello (`event.author == "model"`) per tracciare i loop di ragionamento; aggiunta colonna `workflow_steps` con migrazione leggera `_ensure_column` (ALTER TABLE per DB esistenti).
+   - **Correlazione chronicler**: le chiamate al diario (auto/manuale) in Streamlit ora avvengono dentro `log_context` dedicato, così la metrica del `chronicler` risulta correlata al turno.
+   - Verificata compatibilità `FunctionTool` + decorator `@measure_tool` (firme preservate via `functools.wraps`).
+
+**File modificati**: `MEMORY.md`, `src/scummbar_chat/telemetry/`, `src/scummbar_chat/streamlit/app.py`, `src/scummbar_chat/telegram/adapter.py`, `src/scummbar_chat/telegram/runner.py`, `src/scummbar_chat/tools.py`, `src/scummbar_chat/diary.py`
 
 ---
 
