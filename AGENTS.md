@@ -37,6 +37,7 @@ scummbar/
 │   ├── time_context.py                # real time → tavern atmosphere
 │   ├── tools.py                       # FunctionTool ADK: recall, memorize, write_secret_scroll, draw_tarot_card, draw_nautical_map, fetch_news_feed
 │   ├── diary.py                       # Diario di Bordo (Captain's Log) in prima persona (tramite chronicler_agent)
+│   ├── telemetry/                     # 🔬 Osservabilità: context, logging, db, metrics, queries, tracing, viewer
 │   ├── .env                           # ⚠️ NON committare — contiene token e API key
 │   ├── world/scummbar.md              # world context + regole Narratore (prompt)
 │   ├── bots/barnaby/                  # agente Barnaby
@@ -55,8 +56,9 @@ scummbar/
 ├── data/                              # Dati e log persistenti dell'applicazione
 │   └── scummbar_chat/                 # Dati ADK / Telegram / Streamlit
 │       ├── sessions.db                # Database sessioni SQLite (auto-creato)
+│       ├── observability.db           # 🔬 Metriche & trace (turn_metrics, tool_metrics, agent_metrics, trace_spans)
 │       ├── diaries/                   # 📜 Diari di bordo (Diary_Nome.md)
-│       └── logs/                      # Log rotativi bot.log ed errors.log
+│       └── logs/                      # Log rotativi app.log ed errors.log
 └── docs/                              # documentazione ADK, DeepSeek, Telegram, Streamlit, ecc.
 ```
 
@@ -158,6 +160,39 @@ LLM_MODEL=deepseek/deepseek-v4-pro   # DeepSeek Pro
 
 ---
 
+## 📡 Direttive Osservabilità (Logging, Metrics, Tracing)
+
+> Il progetto dispone di un'infrastruttura di osservabilità completa e local-first in `src/scummbar_chat/telemetry/`
+> (vedi sezione 7 del README). **In OGNI futura iterazione, le nuove funzionalità DEVONO essere strumentate** con
+> le primitive seguenti, senza eccezioni. Tutti i messaggi di log e i return dei tool restano in italiano/inglese
+> secondo le regole della sezione Lingua; i commenti Python in inglese.
+
+### Come strumentare il codice
+
+| Situazione | Da usare | Esempio |
+|-----------|----------|---------|
+| Avvolgere un turno/operazione con contesto correlato | `log_context` (da `telemetry.context`) | `with log_context(channel="streamlit", session_id=..., user_id=..., agent_name=..., turn_id=...):` — imposta `session/user/agent/turn` automaticamente su ogni log emesso dentro il blocco |
+| Loggare eventi di vita dell'app | `logging.getLogger(__name__)` | `log.info("...")`, `log.warning(...)`, `log.exception(...)` — il prefisso `[tg:bot:u:id:t:turn]` è iniettato dal `ContextualFilter` |
+| Misurare un FunctionTool (latenza + successo + artefatti) | decoratore `@measure_tool` (da `telemetry.metrics`) | `@measure_tool("draw_nautical_map")` sopra la funzione async del tool |
+| Registrare la durata di un turno utente | `record_turn_metric(...)` (da `telemetry.metrics`) | chiamare dopo `run_agent()` con `total_duration_ms`, `prompt_length`, `response_length`, `artifacts_count`, `workflow_steps`, `input/output/total_tokens` |
+| Registrare un tempo di agente/coordinatore/cronista | `record_agent_metric(...)` | es. per `chronicler_agent` in `diary.py` |
+| Generare uno span applicativo custom | `trace_span("nome", attributes={...})` (da `telemetry.tracing`) | per operazioni fuori dallo stream ADK (es. fetch RSS, salvataggio file) |
+| Avvolgere un run ADK con tracing automatico | `turn_tracing()` (da `telemetry.tracing`) | già integrato in `telegram/runner.py` — NON duplicare il flush manuale |
+
+### Regole d'oro
+
+1. **turn_id univoco globale**: formati `tg:{update_id}` (Telegram) e `st:{session_id}:{counter}` (Streamlit).
+   MAI turn_id numerici nudi (collidono tra sessioni e canali).
+2. **Contesto sempre attivo**: usare `log_context` appena si entra in una richiesta/operazione; non loggare a mano `session_id` nel messaggio.
+3. **Errori dentro il contesto**: i `log.exception`/`record_*` per gli errori vanno eseguiti DENTRO lo scope `log_context`, non dopo (il contesto verrebbe già resettato).
+4. **Niente byte in DB/LLM**: nei metadati salvare SOLO riferimenti puliti (es. `mappa_x.jpg`), mai il binario.
+5. **SQLite**: usare SEMPRE il context manager `telemetry.db.connection()` (chiude la connessione); mai `get_connection()` nudo.
+6. **Trace concorrenti isolati**: gli span OTel sono già isolati per-turno (fan-out + filtro `trace_id`) — non creare altri `InMemorySpanExporter` globali.
+7. **Nuove tabelle**: se servono nuove metriche, aggiungere lo schema in `telemetry/db.py` (con `_ensure_column` per migrazioni leggere) e le query in `telemetry/queries.py`.
+8. **UI**: se la feature produce dati quantitativi o temporali, esporli nel cockpit Streamlit (sezione 7 del README) seguendo i pattern esistenti.
+
+---
+
 ## 🚫 Cosa NON Fare
 
 - **Non aggiungere riferimenti a Telegram** nei file di prompt (`.md`) — i prompt sono canale-agnostici
@@ -182,5 +217,8 @@ Usa la skill **`scummbar-docs-analyzer`** (`/skill:scummbar-docs-analyzer`) per 
 - [ ] Nessuna API key o token hardcoded nel codice
 - [ ] I prompt in `*.md` non contengono riferimenti a Telegram
 - [ ] `user_id` nei tool viene da `ToolContext`, non da parametri LLM
+- [ ] Le nuove funzionalità sono strumentate con `log_context`, `@measure_tool`/`record_*` e `trace_span`/`turn_tracing` (vedi Direttive Osservabilità)
+- [ ] `turn_id` rispetta i formati globali (`tg:...` / `st:{session}:{counter}`)
+- [ ] Le connessioni SQLite telemetry usano `telemetry.db.connection()` (mai `get_connection()` nudo)
 - [ ] `MEMORY.md` aggiornato se sono state prese nuove decisioni architetturali o completate attività
 - [ ] I commenti nel codice Python sono in inglese

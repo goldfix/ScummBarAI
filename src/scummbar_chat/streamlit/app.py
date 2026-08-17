@@ -36,14 +36,17 @@ from src.scummbar_chat.telemetry import (
     get_agent_breakdown,
     get_available_log_files,
     get_kpi_summary,
+    get_recent_trace_turns,
     get_recent_turns,
     get_time_series_data,
     get_tool_breakdown,
+    get_turn_trace_tree,
     log_context,
     read_log_tail,
     record_agent_metric,
     record_turn_metric,
     render_logs_html,
+    render_waterfall_html,
     setup_logging,
 )
 from src.scummbar_chat.time_context import get_time_description
@@ -290,13 +293,19 @@ def main() -> None:
                 }
             ]
 
-    # 4. Main Interface Views: Chat vs Captain's Log vs Metrics vs System Logs
+    # 4. Main Interface Views: Chat vs Captain's Log vs Metrics vs Traces vs Logs
     # NOTE: st.chat_input must NOT be placed inside st.tabs/st.container/st.expander
     # or it loses its sticky bottom anchoring. We use a segmented control for
     # navigation and render the chat input at top-level so it stays pinned.
     view = st.segmented_control(
         "Vista",
-        options=["💬 Chat Taverna", "📜 Diario di Bordo", "📊 Metriche & Performance", "🪵 Log di Sistema"],
+        options=[
+            "💬 Chat Taverna",
+            "📜 Diario di Bordo",
+            "📊 Metriche & Performance",
+            "🔍 Traces & Waterfall",
+            "🪵 Log di Sistema",
+        ],
         default="💬 Chat Taverna",
         key="view_selector",
     )
@@ -652,6 +661,102 @@ def main() -> None:
                             st.caption(f"- {t_icon} `{tool['tool_name']}`: **{tool['duration_ms']:.1f} ms**{art_info}")
         else:
             st.info("Nessun turno registrato.")
+
+    elif view == "🔍 Traces & Waterfall":
+        # Distributed Traces & Waterfall Inspector view
+        st.subheader("🔍 Traces & Waterfall Inspector")
+        st.caption(
+            "Esplora l'albero gerarchico dei trace a cascata (OpenTelemetry GenAI Spans): "
+            "agenti, modelli, tool execution e latenze relative."
+        )
+
+        trace_turns = get_recent_trace_turns(limit=50)
+
+        if not trace_turns:
+            st.info(
+                "Nessun trace OpenTelemetry ancora registrato. "
+                "Invia un messaggio nella Taverna o su Telegram per osservare la cascata di esecuzione!"
+            )
+        else:
+            turn_options = {}
+            for t in trace_turns:
+                badge = "📱 Telegram" if t["channel"] == "telegram" else "💻 Streamlit"
+                agent_name = t["target_agent"]
+                patron = t["patron_name"] or "Avventore"
+                dur = t["total_duration_ms"]
+                ts = t["timestamp"]
+                spans_n = t["span_count"]
+                status = "❌" if t["is_error"] else "✅"
+                turn_options[t["turn_id"]] = (
+                    f"{status} [{ts}] {badge} — {agent_name} ({patron}) — ⏱️ {dur:.0f} ms ({spans_n} spans)"
+                )
+
+            c_pick, c_btn = st.columns([4, 1])
+            with c_pick:
+                selected_turn_id = st.selectbox(
+                    "Seleziona Turno da Ispezionare",
+                    options=list(turn_options.keys()),
+                    format_func=lambda tid: turn_options[tid],
+                    key="trace_turn_selector",
+                )
+            with c_btn:
+                st.write("")
+                st.write("")
+                if st.button("🔄 Aggiorna Trace", key="btn_refresh_trace", use_container_width=True):
+                    st.rerun()
+
+            if selected_turn_id:
+                tree = get_turn_trace_tree(selected_turn_id)
+                spans = tree.get("spans", [])
+
+                # Header Overview Card
+                st.markdown(
+                    f'<div style="background-color: #1e1e2e; border: 1px solid #313244; border-radius: 8px; '
+                    f'padding: 12px 18px; margin-bottom: 14px; font-family: monospace; font-size: 0.88em; color: #cdd6f4;">'
+                    f'🆔 <strong>Trace ID:</strong> <code style="color: #fab387;">{tree.get("trace_id") or "N/D"}</code> | '
+                    f'⏱️ <strong>Durata Totale:</strong> <strong style="color: #a6e3a1;">{tree.get("total_duration_ms"):.1f} ms</strong> | '
+                    f'🌲 <strong>Spans:</strong> <strong style="color: #89b4fa;">{tree.get("span_count")}</strong>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+                # Waterfall Timeline Gantt Chart
+                st.markdown("##### 📊 Timeline a Cascata (Waterfall Gantt)")
+                waterfall_html = render_waterfall_html(tree)
+                st.markdown(waterfall_html, unsafe_allow_html=True)
+
+                st.markdown("---")
+
+                # Detailed Span Inspector
+                st.markdown("##### 🔎 Dettaglio & Metadati degli Span")
+                for s in spans:
+                    status_badge = "❌ ERROR" if s["status_code"] == "ERROR" else "✅ OK"
+                    cat_label = s["category"].upper()
+
+                    expander_label = (
+                        f"{s['icon']} [{cat_label}] {s['name']} — ⏱️ {s['duration_ms']:.1f} ms "
+                        f"(offset: {s['offset_ms']:.1f} ms, {status_badge})"
+                    )
+
+                    with st.expander(expander_label):
+                        c1, c2, c3 = st.columns(3)
+                        with c1:
+                            st.write(f"**Span ID**: `{s['span_id']}`")
+                            st.write(f"**Parent ID**: `{s['parent_span_id'] or 'root'}`")
+                        with c2:
+                            st.write(f"**Inizio**: `{s['start_time_iso']}`")
+                            st.write(f"**Durata**: **{s['duration_ms']:.1f} ms**")
+                        with c3:
+                            st.write(f"**Stato**: `{s['status_code']}`")
+                            st.write(f"**Livello Albero**: `{s['depth']}`")
+
+                        if s.get("attributes"):
+                            st.markdown("**Attributi OpenTelemetry GenAI:**")
+                            st.json(s["attributes"])
+
+                        if s.get("events"):
+                            st.markdown("**Eventi / Eccezioni nello Span:**")
+                            st.json(s["events"])
 
     elif view == "🪵 Log di Sistema":
         # System Log Viewer (Terminal View)

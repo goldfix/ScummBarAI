@@ -113,6 +113,25 @@ def init_observability_db(db_path: Path | None = None) -> None:
             );
         """)
 
+        # 4. Trace Spans: hierarchical OpenTelemetry waterfall spans per turn
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trace_spans (
+                span_id             TEXT PRIMARY KEY,
+                trace_id            TEXT NOT NULL,
+                parent_span_id      TEXT,
+                turn_id             TEXT NOT NULL,
+                name                TEXT NOT NULL,
+                start_time_ns       INTEGER NOT NULL,
+                end_time_ns         INTEGER NOT NULL,
+                start_time_iso      TEXT NOT NULL,
+                duration_ms         REAL NOT NULL,
+                status_code         TEXT DEFAULT 'OK',
+                status_description  TEXT,
+                attributes_json     TEXT,
+                events_json         TEXT
+            );
+        """)
+
         # Lightweight migration for pre-existing databases
         _ensure_column(
             conn,
@@ -129,5 +148,8 @@ def init_observability_db(db_path: Path | None = None) -> None:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_name ON tool_metrics(tool_name);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_turn_id ON agent_metrics(turn_id);")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_name ON agent_metrics(agent_name);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_span_turn_id ON trace_spans(turn_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_span_trace_id ON trace_spans(trace_id);")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_span_parent ON trace_spans(parent_span_id);")
 
         conn.commit()

@@ -16,6 +16,7 @@ from .context import (
 )
 from .db import (
     DEFAULT_OBSERVABILITY_DB,
+    connection,
     get_connection,
     init_observability_db,
 )
@@ -38,10 +39,20 @@ from .metrics import (
 from .queries import (
     get_agent_breakdown,
     get_kpi_summary,
+    get_recent_trace_turns,
     get_recent_turns,
     get_time_series_data,
     get_tool_breakdown,
+    get_turn_trace_tree,
 )
+from .tracing import (
+    flush_spans_to_db,
+    get_tracer,
+    init_tracing,
+    trace_span,
+    turn_tracing,
+)
+from .viewer import render_waterfall_html
 
 __all__ = [
     "APP_LOG_FILE",
@@ -50,6 +61,8 @@ __all__ = [
     "ERRORS_LOG_FILE",
     "agent_name_var",
     "channel_var",
+    "connection",
+    "flush_spans_to_db",
     "format_context_prefix",
     "format_log_line_html",
     "get_agent_breakdown",
@@ -57,10 +70,14 @@ __all__ = [
     "get_connection",
     "get_kpi_summary",
     "get_log_context",
+    "get_recent_trace_turns",
     "get_recent_turns",
     "get_time_series_data",
     "get_tool_breakdown",
+    "get_tracer",
+    "get_turn_trace_tree",
     "init_observability_db",
+    "init_tracing",
     "log_context",
     "measure_tool",
     "read_log_tail",
@@ -68,10 +85,13 @@ __all__ = [
     "record_tool_metric",
     "record_turn_metric",
     "render_logs_html",
+    "render_waterfall_html",
     "reset_log_context",
     "session_id_var",
     "set_log_context",
     "setup_logging",
+    "trace_span",
     "turn_id_var",
+    "turn_tracing",
     "user_id_var",
 ]

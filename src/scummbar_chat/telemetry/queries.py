@@ -238,3 +238,142 @@ def get_time_series_data(limit: int = 50) -> list[dict]:
         rows = [dict(r) for r in cursor.fetchall()]
         rows.reverse()  # Chronological order for plotting
         return rows
+
+
+def get_recent_trace_turns(limit: int = 30) -> list[dict]:
+    """Return turns that have recorded trace spans available."""
+    with connection() as conn:
+        cursor = conn.execute(
+            """
+            SELECT DISTINCT
+                t.turn_id,
+                t.timestamp,
+                t.channel,
+                t.session_id,
+                t.patron_name,
+                t.target_agent,
+                t.total_duration_ms,
+                t.is_error,
+                COUNT(s.span_id) as span_count
+            FROM turn_metrics t
+            JOIN trace_spans s ON t.turn_id = s.turn_id
+            GROUP BY t.turn_id
+            ORDER BY t.timestamp DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        return [dict(r) for r in cursor.fetchall()]
+
+
+def _classify_span(name: str, status_code: str, attr: dict) -> tuple[str, str, str]:
+    """Classify span into category, semantic color, and badge icon.
+
+    Returns:
+        tuple of (category, hex_color, icon)
+    """
+    if status_code == "ERROR":
+        return "error", "#f38ba8", "🔴"
+
+    n_lower = name.lower()
+    if "invoke_agent" in n_lower or "invoke_workflow" in n_lower:
+        return "agent", "#cba6f7", "🟣"
+    if "execute_tool" in n_lower:
+        return "tool", "#fab387", "🟠"
+    if "image" in n_lower or "tarot" in n_lower or "map" in n_lower:
+        return "image", "#a6e3a1", "🟢"
+    if "generate_content" in n_lower or "llm" in n_lower:
+        return "llm", "#89b4fa", "🔵"
+
+    return "generic", "#cdd6f4", "⚪"
+
+
+def get_turn_trace_tree(turn_id: str) -> dict:
+    """Retrieve and compute hierarchical waterfall timeline data for a turn."""
+    import json
+
+    with connection() as conn:
+        cursor = conn.execute(
+            """
+            SELECT
+                span_id, trace_id, parent_span_id, turn_id, name,
+                start_time_ns, end_time_ns, start_time_iso, duration_ms,
+                status_code, status_description, attributes_json, events_json
+            FROM trace_spans
+            WHERE turn_id = ?
+            ORDER BY start_time_ns ASC
+            """,
+            (turn_id,),
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+
+    if not rows:
+        return {
+            "turn_id": turn_id,
+            "trace_id": None,
+            "total_duration_ms": 0,
+            "span_count": 0,
+            "spans": [],
+        }
+
+    trace_id = rows[0]["trace_id"]
+    min_start_ns = min(r["start_time_ns"] for r in rows)
+    max_end_ns = max(r["end_time_ns"] for r in rows)
+    total_duration_ms = round((max_end_ns - min_start_ns) / 1_000_000.0, 2)
+    if total_duration_ms <= 0:
+        total_duration_ms = max(r["duration_ms"] for r in rows) or 1.0
+
+    # Build parent-child mapping to calculate hierarchy depth
+    id_to_row = {r["span_id"]: r for r in rows}
+
+    def _calc_depth(span_id: str, visited: set | None = None) -> int:
+        if visited is None:
+            visited = set()
+        if span_id in visited:
+            return 0
+        visited.add(span_id)
+        parent_id = id_to_row.get(span_id, {}).get("parent_span_id")
+        if not parent_id or parent_id not in id_to_row:
+            return 0
+        return 1 + _calc_depth(parent_id, visited)
+
+    timeline_spans: list[dict] = []
+    for r in rows:
+        offset_ms = round((r["start_time_ns"] - min_start_ns) / 1_000_000.0, 2)
+        offset_pct = max(0.0, min(99.0, (offset_ms / total_duration_ms) * 100))
+        width_pct = max(1.5, min(100.0 - offset_pct, (r["duration_ms"] / total_duration_ms) * 100))
+        depth = _calc_depth(r["span_id"])
+
+        attr = json.loads(r["attributes_json"]) if r["attributes_json"] else {}
+        events = json.loads(r["events_json"]) if r["events_json"] else []
+
+        category, color, icon = _classify_span(r["name"], r["status_code"], attr)
+
+        timeline_spans.append(
+            {
+                "span_id": r["span_id"],
+                "parent_span_id": r["parent_span_id"],
+                "name": r["name"],
+                "duration_ms": r["duration_ms"],
+                "offset_ms": offset_ms,
+                "offset_pct": round(offset_pct, 2),
+                "width_pct": round(width_pct, 2),
+                "depth": depth,
+                "category": category,
+                "color": color,
+                "icon": icon,
+                "status_code": r["status_code"],
+                "status_description": r["status_description"],
+                "start_time_iso": r["start_time_iso"],
+                "attributes": attr,
+                "events": events,
+            }
+        )
+
+    return {
+        "turn_id": turn_id,
+        "trace_id": trace_id,
+        "total_duration_ms": total_duration_ms,
+        "span_count": len(timeline_spans),
+        "spans": timeline_spans,
+    }

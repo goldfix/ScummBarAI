@@ -21,6 +21,7 @@ from google.adk.sessions import DatabaseSessionService
 from google.genai import types
 
 from ..agent import root_agent
+from ..telemetry import init_tracing, turn_tracing
 
 # Utilities imports: pre-built model instances for agents and compaction
 from ..utils import (
@@ -95,6 +96,10 @@ def _get_runner() -> Runner:
             session_service=_session_service,
             artifact_service=_artifact_service,
         )
+
+        # Initialize OpenTelemetry distributed tracing with InMemorySpanExporter
+        init_tracing()
+
         log.info(
             "ADK Runner initialized (Model: %s, Compaction Interval: %d, Overlap: %d, Context Cache: %s)",
             COMPACTION_MODEL,
@@ -147,50 +152,54 @@ async def run_agent(
     input_tokens = output_tokens = total_tokens = None
     workflow_steps = 0
 
-    # Async stream loop consuming real-time tokens and events
-    async for event in runner.run_async(
-        user_id=user_id,
-        session_id=session_id,
-        new_message=user_message,
-    ):
-        # 1. Extract Artifacts if Barnaby/Balthazar/Isolde generated any
-        if event.actions and event.actions.artifact_delta:
-            for filename, version in event.actions.artifact_delta.items():
-                # Load the bytes from the in-memory service
-                part = await _artifact_service.load_artifact(
-                    app_name=APP_NAME,
-                    user_id=user_id,
-                    session_id=session_id,
-                    filename=filename,
-                    version=version,
-                )
-                if part and part.inline_data:
-                    generated_files.append({"filename": filename, "bytes": part.inline_data.data})
-                    log.info("Loaded generated artifact: '%s' (%d bytes)", filename, len(part.inline_data.data))
+    # Scope the whole ADK turn with a dedicated per-turn span exporter.
+    # All spans generated during run_async are flushed to SQLite on exit.
+    with turn_tracing():
+        # Async stream loop consuming real-time tokens and events
+        async for event in runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=user_message,
+        ):
+            # 1. Extract Artifacts if Barnaby/Balthazar/Isolde generated any
+            if event.actions and event.actions.artifact_delta:
+                for filename, version in event.actions.artifact_delta.items():
+                    # Load the bytes from the in-memory service
+                    part = await _artifact_service.load_artifact(
+                        app_name=APP_NAME,
+                        user_id=user_id,
+                        session_id=session_id,
+                        filename=filename,
+                        version=version,
+                    )
+                    if part and part.inline_data:
+                        generated_files.append({"filename": filename, "bytes": part.inline_data.data})
+                        log.info("Loaded generated artifact: '%s' (%d bytes)", filename, len(part.inline_data.data))
 
-        # 2. Count workflow steps: one per model-generated response event (reasoning loop)
-        if event.author == "model" and event.content and event.content.parts:
-            workflow_steps += 1
+            # 2. Count workflow steps: one per model-generated response event (reasoning loop)
+            if event.author == "model" and event.content and event.content.parts:
+                workflow_steps += 1
 
-        # 3. Collect token usage metadata (when provided by the model)
-        usage = event.usage_metadata
-        if usage is not None:
-            if getattr(usage, "prompt_token_count", None) is not None:
-                input_tokens = usage.prompt_token_count
-            if getattr(usage, "candidates_token_count", None) is not None:
-                output_tokens = usage.candidates_token_count
-            if getattr(usage, "total_token_count", None) is not None:
-                total_tokens = usage.total_token_count
+            # 3. Collect token usage metadata (when provided by the model)
+            usage = event.usage_metadata
+            if usage is not None:
+                if getattr(usage, "prompt_token_count", None) is not None:
+                    input_tokens = usage.prompt_token_count
+                if getattr(usage, "candidates_token_count", None) is not None:
+                    output_tokens = usage.candidates_token_count
+                if getattr(usage, "total_token_count", None) is not None:
+                    total_tokens = usage.total_token_count
 
-        # 4. Extract final textual dialogue
-        if event.is_final_response() and event.content and event.content.parts:
-            for part in event.content.parts:
-                # Discard internal thoughts to preserve standard dialogue formatting
-                if part.text and not getattr(part, "thought", False):
-                    response_parts.append(part.text)
+            # 4. Extract final textual dialogue
+            if event.is_final_response() and event.content and event.content.parts:
+                for part in event.content.parts:
+                    # Discard internal thoughts to preserve standard dialogue formatting
+                    if part.text and not getattr(part, "thought", False):
+                        response_parts.append(part.text)
 
     elapsed_ms = (time.perf_counter() - t0) * 1000.0
     final_text = "".join(response_parts).strip()
+
     log.debug(
         "ADK turn completed in %.1f ms (response_len=%d, artifacts=%d, steps=%d, tokens=%s/%s/%s)",
         elapsed_ms,
