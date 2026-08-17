@@ -1153,7 +1153,12 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
    - Aggiunta al README (inglese) la sezione **`🔬 Observability: Logging, Metrics & Tracing`** (7.1–7.6): architettura del package `telemetry/`, correlazione via `contextvars`, Logging (file rotativi, prefissi `[tg:...]`/`[st:...]`, viewer `🪵 Log di Sistema`), Metrics (tabelle `turn_metrics`/`tool_metrics`/`agent_metrics`, `@measure_tool`, token usage), Tracing (OTel GenAI semconv, `turn_tracing` con isolamento per-turno, schema `trace_spans`), Cockpit Streamlit (`📊 Metriche & Performance` + `🔍 Traces & Waterfall`) e tabella storage. Rinumerata la sezione Pi-Agent da 7.x a 8.x con TOC aggiornato.
    - Aggiunte al AGENTS.md (italiano) le **Direttive Osservabilità**: tabella "Come strumentare il codice" (`log_context`, `@measure_tool`, `record_*`, `trace_span`, `turn_tracing`) e 8 "Regole d'oro" (turn_id globali, contesto sempre attivo, errori dentro il contesto, no byte in DB/LLM, `connection()` per SQLite, isolamento trace, nuove tabelle/queries, esporre in UI). Aggiornata la checklist pre-commit con i punti telemetria.
 
-**File modificati**: `MEMORY.md`, `README.md`, `AGENTS.md`, `src/scummbar_chat/telemetry/`, `src/scummbar_chat/streamlit/app.py`, `src/scummbar_chat/telegram/runner.py`
+9. **Sequence Diagram End-to-End (`assets/end_to_end_sequence.svg`) & Bugfix Rendering Waterfall**:
+   - Risolto bug visualizzazione HTML grezzo nel tab *🔍 Traces & Waterfall* su Streamlit: rimossa l'indentazione di 4+ spazi in `src/scummbar_chat/telemetry/viewer.py` (che CommonMark interpretava come blocco di codice `<pre><code>`) e adottata la primitiva nativa `st.html(waterfall_html)` in `src/scummbar_chat/streamlit/app.py`.
+   - Generato il nuovo **Sequence Diagram PlantUML End-to-End** (`assets/end_to_end_sequence.svg`) tramite Kroki: illustra temporalmente le 5 fasi del turno (Ingress & Routing Context, Root Coordination, Sub-Agent Reasoning & Tools con `@measure_tool`, Consegna & Telemetry Flush, e Scribe del Captain's Log asincrono).
+   - Integrato nel `README.md` nella nuova sottosezione `4.2 End-to-End Execution Sequence` e rimosso il vecchio diagramma di flusso C4 statico `turn_execution_sequence.svg`.
+
+**File modificati**: `MEMORY.md`, `README.md`, `AGENTS.md`, `assets/end_to_end_sequence.svg`, `src/scummbar_chat/telemetry/viewer.py`, `src/scummbar_chat/streamlit/app.py`
 
 ---
 

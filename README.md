@@ -23,15 +23,16 @@ The repository is intentionally structured **didactically**: every architectural
     - [4. Running the Applications](#4-running-the-applications)
   - [🏗️ The ADK Core: Architecture \& How It Works](#️-the-adk-core-architecture--how-it-works)
     - [4.1 Core Overview Diagram](#41-core-overview-diagram)
-    - [4.2 Multi-Agent Coordination (Router-Delegate)](#42-multi-agent-coordination-router-delegate)
-    - [4.3 Agent Configuration](#43-agent-configuration)
-    - [4.4 ADK Skills (Auto-Discovery)](#44-adk-skills-auto-discovery)
-    - [4.5 ADK Function Tools](#45-adk-function-tools)
-    - [4.6 Time Management (Real Atmosphere)](#46-time-management-real-atmosphere)
-    - [4.7 World Context \& Narration Rules](#47-world-context--narration-rules)
-    - [4.8 The Captain's Log (Tavern Journal)](#48-the-captains-log-tavern-journal)
-    - [4.9 Model Factory \& Dual Authentication](#49-model-factory--dual-authentication)
-    - [4.10 Sessions, Compaction \& Context Caching](#410-sessions-compaction--context-caching)
+    - [4.2 End-to-End Execution Sequence](#42-end-to-end-execution-sequence)
+    - [4.3 Multi-Agent Coordination (Router-Delegate)](#43-multi-agent-coordination-router-delegate)
+    - [4.4 Agent Configuration](#44-agent-configuration)
+    - [4.5 ADK Skills (Auto-Discovery)](#45-adk-skills-auto-discovery)
+    - [4.6 ADK Function Tools](#45-adk-function-tools)
+    - [4.7 Time Management (Real Atmosphere)](#47-time-management-real-atmosphere)
+    - [4.8 World Context \& Narration Rules](#48-world-context--narration-rules)
+    - [4.9 The Captain's Log (Tavern Journal)](#49-the-captains-log-tavern-journal)
+    - [4.10 Model Factory \& Dual Authentication](#410-model-factory--dual-authentication)
+    - [4.11 Sessions, Compaction \& Context Caching](#411-sessions-compaction--context-caching)
   - [📡 Telegram Frontend (Multi-Player)](#-telegram-frontend-multi-player)
     - [5.1 Telegram Delivery Architecture](#51-telegram-delivery-architecture)
     - [5.2 Semantic Routing](#52-semantic-routing)
@@ -143,11 +144,13 @@ The heart of the application lives in `src/scummbar_chat/`. Everything else (Tel
 
 ![Core Overview Diagram (C4-PlantUML)](assets/core_overview_diagram.svg)
 
-**Logical flow of a single turn:**
+### 4.2 End-to-End Execution Sequence
 
-![Turn Execution Sequence (C4-PlantUML)](assets/turn_execution_sequence.svg)
+The complete chronological workflow of a single patron turn — from user input, contextual routing, root coordination, and tool execution down to telemetry flush and incremental Captain's Log writing — is illustrated in the PlantUML Sequence diagram below:
 
-### 4.2 Multi-Agent Coordination (Router-Delegate)
+![End-to-End Turn Execution Sequence (PlantUML)](assets/end_to_end_sequence.svg)
+
+### 4.3 Multi-Agent Coordination (Router-Delegate)
 
 Instead of a single monolithic prompt, Scummbar uses the ADK **Hierarchical Router-Delegate** pattern:
 
@@ -160,7 +163,7 @@ Routing happens at two priority levels (see [5.2 Semantic Routing](#52-semantic-
 
 Once resolved, the router prepends `[Risponde NOME]` to the text, which the coordinator interprets to delegate.
 
-### 4.3 Agent Configuration
+### 4.4 Agent Configuration
 
 Each agent lives in `bots/<name>/` with two files: `agent.py` (ADK config) and `persona.md` (Italian, channel-agnostic prompt).
 
@@ -186,7 +189,7 @@ barnaby_agent = Agent(
 )
 ```
 
-### 4.4 ADK Skills (Auto-Discovery)
+### 4.5 ADK Skills (Auto-Discovery)
 
 Skills live in `src/scummbar_chat/skills/` as folders containing `SKILL.md`:
 
@@ -200,7 +203,7 @@ skills/
 
 Skills are **self-contained**: all content (rules, examples, references) lives inside `SKILL.md`, loaded on demand by the model.
 
-### 4.5 ADK Function Tools
+### 4.6 ADK Function Tools
 
 All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They receive the user identity exclusively from `tool_context.user_id` (never from the LLM, for safety).
 
@@ -214,7 +217,7 @@ All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They r
 | `consult_barnaby` / `consult_barnacle` | Infra-Agent `AgentTool` | Single-turn peer consultations: Balthazar asks Barnaby/Barnacle for advice to enrich map details |
 | `fetch_news_feed` | Live RSS feeds | ANSA Politica + Google News USA, 2 categories (IT & US politics), strictly sorted chronologically (freshest first) with HTML links |
 
-### 4.6 Time Management (Real Atmosphere)
+### 4.7 Time Management (Real Atmosphere)
 
 `time_context.py` maps the system clock into **6 Caribbean moments of the day**:
 
@@ -229,7 +232,7 @@ All tools are defined in `tools.py` and wrapped with `FunctionTool(...)`. They r
 
 **How it is used**: `agent.py` exposes `_time_instruction_provider(context)` — an ADK **`InstructionProvider`** bound to `global_instruction`. On **every model turn**, the atmospheric description of the current moment is regenerated and injected into the context. This is cache-friendly for Gemini and guarantees the bots always know whether it is dawn or deep night.
 
-### 4.7 World Context & Narration Rules
+### 4.8 World Context & Narration Rules
 
 `world/scummbar.md` is the tavern's **master prompt**: geography, ambient rules, character relationships, and the **Narratore rules** (environmental description injection every 3 turns).
 
@@ -237,7 +240,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
 
 **Key rule**: all `.md` files are **channel-agnostic** — no references to Telegram or Streamlit. Visual rendering is exclusively the frontends' responsibility.
 
-### 4.8 The Captain's Log (Tavern Journal)
+### 4.9 The Captain's Log (Tavern Journal)
 
 `diary.py` turns the conversation into a **first-person tale** ("I"), as if the patron himself were writing down his deeds, powered by a dedicated `chronicler_agent` ("Il Cronista dello Scummbar").
 
@@ -254,7 +257,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
 | **Download** | "📥 Scarica Diario (.md)" button |
 | **Dual-provider** | Generation uses `chronicler_agent.model` (`COMPACTION_LLM`) → works seamlessly with Gemini and DeepSeek |
 
-### 4.9 Model Factory & Dual Authentication
+### 4.10 Model Factory & Dual Authentication
 
 `utils.py` centralizes model creation:
 
@@ -266,7 +269,7 @@ It is loaded with `load_md()` and passed as `static_instruction` to the `root_ag
 
 **Key rules**: no `temperature`/`top_p`/`top_k` for Gemini 3.x models; `thinking_level=medium` (Gemini chat) / `reasoning_effort=high` (DeepSeek); image generation uses dedicated `IMAGE_MODEL` with independent `IMAGE_*` auth and its own `IMAGE_THINKING_LEVEL=high`; `include_thoughts=False` with `thought` part filtering.
 
-### 4.10 Sessions, Compaction & Context Caching
+### 4.11 Sessions, Compaction & Context Caching
 
 | Mechanism | Configuration | Detail |
 |-----------|---------------|--------|
@@ -377,8 +380,6 @@ Telegram and Streamlit share the same `sessions.db`. To avoid `database is locke
 ## 🔬 Observability: Logging, Metrics & Tracing
 
 Scummbar ships with a **complete, local-first observability stack** built on the three pillars of telemetry: **Logging** (what happened), **Metrics** (how long did it take), and **Tracing** (how the operations relate hierarchically in time). Everything is stored locally in a dedicated SQLite database and visualized inside the Streamlit UI — **no external servers** (Jaeger, Prometheus, Datadog, ...) are required.
-
-![Core Overview Diagram](assets/core_overview_diagram.svg)
 
 ### 7.1 Telemetry Architecture Overview
 
