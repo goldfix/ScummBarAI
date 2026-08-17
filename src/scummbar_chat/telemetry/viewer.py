@@ -7,7 +7,11 @@ import html
 
 
 def render_waterfall_html(tree: dict) -> str:
-    """Generate a responsive dark-themed Gantt Waterfall timeline HTML block."""
+    """Generate a responsive dark-themed Gantt Waterfall timeline HTML block.
+
+    Zero leading whitespace per line is maintained so that markdown renderers
+    never mistake HTML lines for 4-space indented code blocks.
+    """
     spans = tree.get("spans", [])
     if not spans:
         return (
@@ -17,17 +21,19 @@ def render_waterfall_html(tree: dict) -> str:
         )
 
     total_duration_ms = tree.get("total_duration_ms", 1.0)
+    if total_duration_ms <= 0:
+        total_duration_ms = 1.0
     mid_duration_ms = total_duration_ms / 2.0
 
     # Header Axis
-    axis_html = f"""
-    <div style="display: flex; justify-content: space-between; font-size: 0.78em; color: #a6adc8;
-                padding-bottom: 6px; border-bottom: 1px solid #313244; margin-bottom: 10px; font-family: monospace;">
-        <span>0 ms</span>
-        <span>⏱️ {mid_duration_ms:.1f} ms</span>
-        <span>🏁 {total_duration_ms:.1f} ms</span>
-    </div>
-    """
+    axis_html = (
+        '<div style="display: flex; justify-content: space-between; font-size: 0.78em; color: #a6adc8; '
+        'padding-bottom: 6px; border-bottom: 1px solid #313244; margin-bottom: 10px; font-family: monospace;">'
+        '<span>0 ms</span>'
+        f'<span>⏱️ {mid_duration_ms:.1f} ms</span>'
+        f'<span>🏁 {total_duration_ms:.1f} ms</span>'
+        '</div>'
+    )
 
     rows_html = []
     for span in spans:
@@ -47,35 +53,35 @@ def render_waterfall_html(tree: dict) -> str:
             else ""
         )
 
-        row = f"""
-        <div style="margin-bottom: 8px; padding: 4px 6px; border-radius: 6px; background-color: rgba(255,255,255,0.02);">
-            <!-- Label Row -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-family: monospace; font-size: 0.82em;">
-                <div style="padding-left: {indent_px}px; color: #cdd6f4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%;">
-                    <span style="color: #6c7086;">{tree_prefix}</span>
-                    <span>{icon} </span>
-                    <strong style="color: {color};">{name}</strong>
-                    {status_badge}
-                </div>
-                <div style="color: #bac2de; font-weight: 500; font-size: 0.9em;">
-                    {dur:.1f} ms <span style="color: #6c7086; font-size: 0.85em;">({(dur / total_duration_ms) * 100:.0f}%)</span>
-                </div>
-            </div>
-            <!-- Timeline Bar Track -->
-            <div style="background-color: #313244; border-radius: 4px; height: 14px; position: relative; width: 100%; overflow: hidden;">
-                <div style="position: absolute; left: {offset_pct}%; width: {width_pct}%; background-color: {color};
-                            height: 100%; border-radius: 3px; box-shadow: 0 0 6px {color}66;">
-                </div>
-            </div>
-        </div>
-        """
+        dur_pct = (dur / total_duration_ms) * 100 if total_duration_ms > 0 else 0
+
+        row = (
+            '<div style="margin-bottom: 8px; padding: 4px 6px; border-radius: 6px; background-color: rgba(255,255,255,0.02);">'
+            '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-family: monospace; font-size: 0.82em;">'
+            f'<div style="padding-left: {indent_px}px; color: #cdd6f4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 75%;">'
+            f'<span style="color: #6c7086;">{tree_prefix}</span>'
+            f'<span>{icon} </span>'
+            f'<strong style="color: {color};">{name}</strong>'
+            f'{status_badge}'
+            '</div>'
+            '<div style="color: #bac2de; font-weight: 500; font-size: 0.9em;">'
+            f'{dur:.1f} ms <span style="color: #6c7086; font-size: 0.85em;">({dur_pct:.0f}%)</span>'
+            '</div>'
+            '</div>'
+            '<div style="background-color: #313244; border-radius: 4px; height: 14px; position: relative; width: 100%; overflow: hidden;">'
+            f'<div style="position: absolute; left: {offset_pct}%; width: {width_pct}%; background-color: {color}; '
+            f'height: 100%; border-radius: 3px; box-shadow: 0 0 6px {color}66;">'
+            '</div>'
+            '</div>'
+            '</div>'
+        )
         rows_html.append(row)
 
-    container_html = f"""
-    <div style="background-color: #181825; border: 1px solid #313244; border-radius: 8px;
-                padding: 16px; font-family: 'JetBrains Mono', monospace; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);">
-        {axis_html}
-        {''.join(rows_html)}
-    </div>
-    """
+    container_html = (
+        '<div style="background-color: #181825; border: 1px solid #313244; border-radius: 8px; '
+        'padding: 16px; font-family: \'JetBrains Mono\', monospace; box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);">'
+        f'{axis_html}'
+        f'{"".join(rows_html)}'
+        '</div>'
+    )
     return container_html

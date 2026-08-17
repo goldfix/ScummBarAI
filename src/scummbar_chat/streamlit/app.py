@@ -710,20 +710,26 @@ def main() -> None:
                 spans = tree.get("spans", [])
 
                 # Header Overview Card
-                st.markdown(
-                    f'<div style="background-color: #1e1e2e; border: 1px solid #313244; border-radius: 8px; '
-                    f'padding: 12px 18px; margin-bottom: 14px; font-family: monospace; font-size: 0.88em; color: #cdd6f4;">'
+                overview_card = (
+                    '<div style="background-color: #1e1e2e; border: 1px solid #313244; border-radius: 8px; '
+                    'padding: 12px 18px; margin-bottom: 14px; font-family: monospace; font-size: 0.88em; color: #cdd6f4;">'
                     f'🆔 <strong>Trace ID:</strong> <code style="color: #fab387;">{tree.get("trace_id") or "N/D"}</code> | '
                     f'⏱️ <strong>Durata Totale:</strong> <strong style="color: #a6e3a1;">{tree.get("total_duration_ms"):.1f} ms</strong> | '
                     f'🌲 <strong>Spans:</strong> <strong style="color: #89b4fa;">{tree.get("span_count")}</strong>'
-                    f'</div>',
-                    unsafe_allow_html=True,
+                    '</div>'
                 )
+                if hasattr(st, "html"):
+                    st.html(overview_card)
+                else:
+                    st.markdown(overview_card, unsafe_allow_html=True)
 
                 # Waterfall Timeline Gantt Chart
                 st.markdown("##### 📊 Timeline a Cascata (Waterfall Gantt)")
                 waterfall_html = render_waterfall_html(tree)
-                st.markdown(waterfall_html, unsafe_allow_html=True)
+                if hasattr(st, "html"):
+                    st.html(waterfall_html)
+                else:
+                    st.markdown(waterfall_html, unsafe_allow_html=True)
 
                 st.markdown("---")
 
