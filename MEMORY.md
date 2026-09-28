@@ -6,7 +6,7 @@
 
 ---
 
-## 🍺 STATO DEL PROGETTO (aggiornato: 2026-08-13)
+## 🍺 STATO DEL PROGETTO (aggiornato: 2026-08-17)
 
 ### Cos'è Scummbar
 Chat interattiva multi-bot ambientata in una taverna piratesca caraibica.
@@ -1083,7 +1083,7 @@ LLM_MODEL=deepseek/deepseek-v4-pro  # DeepSeek Pro
 
 ---
 
-### 2026-07-26 — Progettazione Sistema di Osservabilità (Logging, Metrics, Tracing) & Standard Diagrammi
+### 2026-08-17 — Progettazione Sistema di Osservabilità (Logging, Metrics, Tracing) & Standard Diagrammi
 
 **Obiettivo**: Definire il pattern standard visivo dei diagrammi di architettura e pianificare la progettazione modulare a 5 step per l'infrastruttura di Osservabilità (Logging, Metrics, Tracing).
 
