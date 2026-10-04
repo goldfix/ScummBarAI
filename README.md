@@ -1,8 +1,15 @@
-# 🍺 ScummBar AI — A Collaborative Multi-Agent Study Project
+# 🍺 ScummBar AI — Multi-Agent Study Project
 
 ![scummbar](assets/scummbar_6.jpg)
 
 > *"Where sabers rest, stories float, and agents run the bar."*
+
+---
+
+Support me – buy me a coffee! :)
+[PayPal](https://www.paypal.com/donate/?hosted_button_id=F34KU49T4UQGL)
+
+---
 
 **Scummbar AI** is an open-source, hands-on **study repository** that teaches how to design, orchestrate, and operate a complex **multi-agent conversational application** using **Google Agent Development Kit (ADK)**, **Gemini** and **DeepSeek**, delivered through **Telegram** (multi-player group chat) and a **Streamlit web RPG** (single-player adventure).
 
