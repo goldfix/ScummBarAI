@@ -4,13 +4,6 @@
 
 > *"Where sabers rest, stories float, and agents run the bar."*
 
----
-
-Support me – buy me a coffee! :)
-[PayPal](https://www.paypal.com/donate/?hosted_button_id=F34KU49T4UQGL)
-
----
-
 **Scummbar AI** is an open-source, hands-on **study repository** that teaches how to design, orchestrate, and operate a complex **multi-agent conversational application** using **Google Agent Development Kit (ADK)**, **Gemini** and **DeepSeek**, delivered through **Telegram** (multi-player group chat) and a **Streamlit web RPG** (single-player adventure).
 
 The repository is intentionally structured **didactically**: every architectural choice, every file, and every integration is documented so you can understand *why* the system is built this way — not just *what* it does.
@@ -684,6 +677,11 @@ TELEGRAM_BOT_TOKEN=your-telegram-bot-token
 TELEGRAM_BOT_USERNAME=your_bot_username
 TELEGRAM_GROUP_LINK=https://t.me/your-group-link
 ```
+
+---
+
+Support me – buy me a coffee! :)
+[PayPal](https://www.paypal.com/donate/?hosted_button_id=F34KU49T4UQGL)
 
 ---
 
